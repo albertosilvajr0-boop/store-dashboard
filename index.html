@@ -1,0 +1,283 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Store Dashboard — Leaderboards & 1on1s</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root { color-scheme: light; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; color: #111; background: #fafafa; }
+      header { background:#111; color:#fff; padding:14px 18px; }
+      .wrap { max-width: 1100px; margin: 0 auto; padding: 18px; }
+      h1 { margin: 0 0 6px; font-size: 20px; }
+      h2 { margin: 18px 0 8px; font-size: 18px; }
+      table { width: 100%; border-collapse: collapse; background:#fff; border:1px solid #e8e8e8; }
+      th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+      th { background:#fcfcfc; font-weight: 600; }
+      a { color: #0a66c2; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+      .card { background:#fff; border:1px solid #e8e8e8; border-radius: 10px; padding: 14px; }
+      .muted { color:#666; font-size: 12px; }
+      .pill { display:inline-block; background:#eef6ff; color:#145aa6; padding:3px 8px; border-radius:999px; font-size:12px; }
+      .kvs { display:grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap:10px; margin:10px 0 0; }
+      .kv { background:#f9fafb; border:1px solid #eee; border-radius:8px; padding:10px; text-align:center; }
+      .kv .n { font-weight:700; font-size:18px; }
+      .kv .bar { height:4px; border-radius:9999px; background:#eee; margin-top:6px; overflow:hidden; }
+      .kv .bar > span { display:block; height:100%; border-radius:9999px; }
+      .topline { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+      .linkish { font-size:12px; color:#0a66c2; cursor:pointer; }
+      .back { display:inline-block; margin-bottom:12px; }
+      @media (max-width: 900px) { .two { grid-template-columns: 1fr; } .kvs { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    </style>
+  </head>
+  <body>
+    <header><div class="wrap">
+      <h1>Store Dashboard</h1>
+      <div class="muted">Leaderboards & 1on1s</div>
+    </div></header>
+    <div class="wrap">
+      <div id="app">
+        <div class="two">
+          <div class="card">
+            <h2>Sales Leaderboard <span class="pill">Sales (MTD)</span></h2>
+            <table>
+              <thead><tr><th>#</th><th>Rep</th><th>Sales</th></tr></thead>
+              <tbody id="salesBody"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h2>BDC Leaderboard <span class="pill">Shows (MTD)</span></h2>
+            <table>
+              <thead><tr><th>#</th><th>Agent</th><th>Shows</th></tr></thead>
+              <tbody id="bdcBody"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      var GAS_URL = 'https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec';
+      function ts(){ return '&t=' + Date.now(); }
+      function qs(id){ return document.getElementById(id); }
+
+      var DEFAULT_TARGETS = {
+        Sales: {
+          perDay: { sales: 0.5, shown: 0.5, created: 1.0, calls: 40, texts: 20, talkSec: 80 },
+          mtd:    { due: 10 }
+        },
+        BDC: {
+          perDay: { sales: 0, shown: 2.5, created: 4, calls: 100, texts: 40, talkSec: 60 },
+          mtd:    { due: 0 }
+        }
+      };
+      function loadTargets(){ try { return JSON.parse(localStorage.getItem('targets_v2')||'null') || DEFAULT_TARGETS; } catch(e){ return DEFAULT_TARGETS; } }
+      function saveTargets(t){ localStorage.setItem('targets_v2', JSON.stringify(t)); }
+
+      function secsFromAny(x){
+        if (x==null) return 0;
+        if (typeof x === 'number') return x;
+        var s = String(x).trim();
+        if (/^\d+:\d{1,2}$/.test(s)){ var parts=s.split(':'); return (+parts[0])*60 + (+parts[1]); }
+        var n = parseFloat(s); return isNaN(n) ? 0 : n;
+      }
+      function mssFromSecs(sec){
+        sec = Math.max(0, Math.round(sec));
+        var m = Math.floor(sec/60), s=sec%60;
+        return m + ':' + String(s).padStart(2,'0');
+      }
+
+      function editTargets(role){
+        var t = loadTargets();
+        var group = (role && t[role]) ? role : (confirm('Edit Sales targets? Click Cancel for BDC') ? 'Sales' : 'BDC');
+        var g = t[group];
+        function askNum(label, cur){ var x = prompt(label + ' (blank = keep ' + cur + ')', cur); return (x===''||x==null) ? cur : (+x||0); }
+        function askTime(label, cur){ var x = prompt(label + ' mm:ss or seconds (blank = keep ' + mssFromSecs(cur) + ')', mssFromSecs(cur)); return (x===''||x==null) ? cur : secsFromAny(x); }
+        g.perDay.sales   = askNum(group+' per-day: Sales', g.perDay.sales);
+        g.perDay.shown   = askNum(group+' per-day: Appts Shown', g.perDay.shown);
+        g.perDay.created = askNum(group+' per-day: Appts Created', g.perDay.created);
+        g.perDay.calls   = askNum(group+' per-day: Calls', g.perDay.calls);
+        g.perDay.texts   = askNum(group+' per-day: Texts', g.perDay.texts);
+        g.perDay.talkSec = askTime(group+' per-day: Avg Talk (target)', g.perDay.talkSec);
+        g.mtd.due        = askNum(group+' MTD: Appts Due (fallback)', g.mtd.due || 0);
+        saveTargets(t);
+        alert('Saved targets for '+group+'. Reloading…'); 
+        if (location.hash.startsWith('#/person/')) location.reload();
+      }
+
+      function apiLeaderboards(){ return fetch(GAS_URL+'?route=leaderboards'+ts(), {cache:'no-store'}).then(r=>r.json()); }
+      function apiPerson(name, type){
+        var p = new URLSearchParams({route:'person', name:name, type:type});
+        return fetch(GAS_URL+'?'+p.toString()+ts(), {cache:'no-store'}).then(r=>r.json());
+      }
+
+      function navToPerson(name, type){
+        location.hash = '#/person/' + encodeURIComponent(String(name||'')) + '/' + encodeURIComponent(String(type||''));
+        location.reload();
+      }
+      function fillHome(){
+        apiLeaderboards().then(function(data){
+          if(!data || !data.ok) throw new Error((data && data.error) || 'API error');
+          var sBody = qs('salesBody'); sBody.innerHTML='';
+          var sales = Array.isArray(data.sales)?data.sales:[];
+          if(!sales.length){ var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=3; td.className='muted'; td.textContent='No data'; tr.appendChild(td); sBody.appendChild(tr); }
+          else sales.forEach(function(r,i){
+            var tr=document.createElement('tr');
+            var tdRank=document.createElement('td'); tdRank.textContent=i+1;
+            var tdName=document.createElement('td'); var a=document.createElement('a'); a.href='javascript:void(0)'; a.textContent=r.name||''; a.onclick=function(){navToPerson(r.name,'Sales');}; tdName.appendChild(a);
+            var tdSales=document.createElement('td'); tdSales.textContent=(r.sales!=null?r.sales:0);
+            tr.appendChild(tdRank); tr.appendChild(tdName); tr.appendChild(tdSales); sBody.appendChild(tr);
+          });
+          var bBody = qs('bdcBody'); bBody.innerHTML='';
+          var bdc = Array.isArray(data.bdc)?data.bdc:[];
+          if(!bdc.length){ var tr2=document.createElement('tr'); var td2=document.createElement('td'); td2.colSpan=3; td2.className='muted'; td2.textContent='No data'; tr2.appendChild(td2); bBody.appendChild(tr2); }
+          else bdc.forEach(function(r,i){
+            var tr=document.createElement('tr');
+            var tdRank=document.createElement('td'); tdRank.textContent=i+1;
+            var tdName=document.createElement('td'); var a=document.createElement('a'); a.href='javascript:void(0)'; a.textContent=r.name||''; a.onclick=function(){navToPerson(r.name,'BDC');}; tdName.appendChild(a);
+            var tdShows=document.createElement('td'); tdShows.textContent=(r.shows!=null?r.shows:0);
+            tr.appendChild(tdRank); tr.appendChild(tdName); tr.appendChild(tdShows); bBody.appendChild(tr);
+          });
+        }).catch(function(e){
+          ['salesBody','bdcBody'].forEach(function(id){ var tb=qs(id); tb.innerHTML=''; var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=3; td.className='muted'; td.textContent='Error'; tr.appendChild(td); tb.appendChild(tr); });
+          console.error(e);
+        });
+      }
+
+      function pctColor(p){ return p>=100 ? '#16a34a' : (p>=60 ? '#f59e0b' : '#ef4444'); }
+      function addBar(el, value, target, isTime){
+        if (!target || target<=0) return;
+        var wrap=document.createElement('div'); wrap.className='bar';
+        var fill=document.createElement('span');
+        var pct = Math.min(100, (value/target)*100);
+        fill.style.width=pct.toFixed(1)+'%';
+        fill.style.background=pctColor(pct);
+        wrap.title='Target: '+ (isTime? mssFromSecs(target) : target) +' | '+pct.toFixed(0)+'%';
+        wrap.appendChild(fill);
+        el.appendChild(wrap);
+      }
+      function kvTile(num,label, target, isTime){
+        var d=document.createElement('div'); d.className='kv';
+        var n=document.createElement('div'); n.className='n'; n.textContent=num; d.appendChild(n);
+        var t=document.createElement('div'); t.className='t'; t.textContent=label; d.appendChild(t);
+        addBar(d, isTime? secsFromAny(num): parseFloat(num)||0, target, isTime);
+        return d;
+      }
+      function fmt(n, decimals){ if (n==null||isNaN(n)) return '0'; var f=+n; return (decimals!=null)?f.toFixed(decimals):String(f); }
+      function safeDiv(n,d){ n=+n||0; d=+d||0; return d>0 ? (n/d) : 0; }
+
+      function deriveTargetMTD(key, roleTargets, workingDays){
+        var map = { sales:'sales', shown:'shown', created:'created', calls:'calls', texts:'texts' };
+        if (roleTargets.perDay && roleTargets.perDay[map[key]]!=null){
+          var per = +roleTargets.perDay[map[key]] || 0;
+          var wd  = +workingDays || 0;
+          return per * wd;
+        }
+        if (roleTargets.mtd && roleTargets.mtd[key]!=null) return +roleTargets.mtd[key] || 0;
+        return 0;
+      }
+
+      function fillPerson(name, type){
+        var app = document.getElementById('app');
+        app.innerHTML = '<a class="back" href="#/">&larr; Back</a><div class="card"><div class="muted">Loading 1on1…</div></div>';
+        apiPerson(name, type).then(function(data){
+          if(!data || !data.ok) throw new Error((data && data.error) || 'API error');
+          var b = data.block || {};
+          var picks = data.picks || {};
+          var over = picks.over || null;
+          var under = picks.under || null;
+          var role = (b.type || type || 'Sales').toString();
+          var targetsAll = loadTargets();
+          var tgt = targetsAll[role] || targetsAll['Sales'];
+          var wd = b.workingDays || 0;
+          var talkTarget = secsFromAny((tgt.perDay && tgt.perDay.talkSec) ? tgt.perDay.talkSec : 0);
+
+          var container = document.createElement('div');
+          var cardHead = document.createElement('div'); cardHead.className='card';
+          var top = document.createElement('div'); top.className='topline';
+          var h2 = document.createElement('h2'); h2.textContent = (b.name || name) + ' '; var pill=document.createElement('span'); pill.className='pill'; pill.textContent=role; h2.appendChild(pill);
+          var edit = document.createElement('span'); edit.className='linkish'; edit.textContent='Edit targets'; edit.onclick=function(){ editTargets(role); };
+          top.appendChild(h2); top.appendChild(edit);
+          var sub = document.createElement('div'); sub.className='muted'; sub.textContent='Last work day: ' + (data.lastWorkDay || '—');
+          cardHead.appendChild(top); cardHead.appendChild(sub);
+          container.appendChild(cardHead);
+
+          var cardMTD = document.createElement('div'); cardMTD.className='card';
+          var hMTD = document.createElement('h2'); hMTD.textContent = 'MTD KPIs'; cardMTD.appendChild(hMTD);
+          var mtd = document.createElement('div'); mtd.className='kvs';
+
+          var tSales   = deriveTargetMTD('sales',  tgt, wd);
+          var tShown   = deriveTargetMTD('shown',  tgt, wd);
+          var tCreated = deriveTargetMTD('created',tgt, wd);
+          var tCalls   = deriveTargetMTD('calls',  tgt, wd);
+          var tTexts   = deriveTargetMTD('texts',  tgt, wd);
+          var tDue     = deriveTargetMTD('due',    tgt, wd);
+          
+          mtd.appendChild(kvTile(fmt(b.salesMTD,1), 'Sales', tSales, false));
+          mtd.appendChild(kvTile(fmt(b.shownMTD,0), 'Appts Shown', tShown, false));
+          mtd.appendChild(kvTile(fmt(b.createdMTD,0),'Appts Created', tCreated, false));
+          mtd.appendChild(kvTile(fmt(b.callsMTD,0),  'Calls (MTD)', tCalls, false));
+          mtd.appendChild(kvTile(fmt(b.textsMTD,0),  'Texts', tTexts, false));
+          mtd.appendChild(kvTile(fmt(b.dueMTD,0),    'Appts Due', tDue, false));
+          mtd.appendChild(kvTile(b.avgTalk||'0:00',  'Avg Talk', talkTarget, true));
+          var kvWD = document.createElement('div'); kvWD.className='kv';
+          var nWD = document.createElement('div'); nWD.className='n'; nWD.textContent = wd; kvWD.appendChild(nWD);
+          var tWD = document.createElement('div'); tWD.className='t'; tWD.textContent = 'Working Days'; kvWD.appendChild(tWD);
+          mtd.appendChild(kvWD);
+          cardMTD.appendChild(mtd);
+          container.appendChild(cardMTD);
+
+          var cardPD = document.createElement('div'); cardPD.className='card';
+          var hPD = document.createElement('h2'); hPD.textContent = 'Per-Day KPIs'; cardPD.appendChild(hPD);
+          var per = document.createElement('div'); per.className='kvs';
+          function perTarget(key){ return (tgt.perDay && tgt.perDay[key]!=null) ? (+tgt.perDay[key]||0) : 0; }
+
+          per.appendChild(kvTile(fmt(safeDiv(+b.salesMTD,wd),2),'Sales/Day', perTarget('sales'), false));
+          per.appendChild(kvTile(fmt(safeDiv(+b.shownMTD,wd),2),'Shown/Day', perTarget('shown'), false));
+          per.appendChild(kvTile(fmt(safeDiv(+b.createdMTD,wd),2),'Created/Day', perTarget('created'), false));
+          per.appendChild(kvTile(fmt(safeDiv(+b.callsMTD,wd),1),'Calls/Day', perTarget('calls'), false));
+          per.appendChild(kvTile(fmt(safeDiv(+b.textsMTD,wd),1),'Texts/Day', perTarget('texts'), false));
+          per.appendChild(kvTile(b.avgTalk||'0:00','Avg Talk', talkTarget, true));
+
+          cardPD.appendChild(per);
+          container.appendChild(cardPD);
+
+          var callsCard = document.createElement('div'); callsCard.className='card';
+          var h2b = document.createElement('h2'); h2b.textContent='Call Coaching Picks'; callsCard.appendChild(h2b);
+          var meta = document.createElement('div'); meta.className='muted'; meta.textContent='1 over a minute, 1 under 30 seconds (longest as fallback if none ≥ 60s)'; callsCard.appendChild(meta);
+
+          function callBlock(label, pick){
+            var wrap=document.createElement('div'); wrap.className='call';
+            var strong=document.createElement('strong'); strong.textContent=label; wrap.appendChild(strong); wrap.appendChild(document.createElement('br'));
+            if (pick){
+              var span=document.createElement('span'); span.textContent=(pick.dateKey||'')+' — '+(pick.talkMSS||''); wrap.appendChild(span);
+              if (pick.url){ wrap.appendChild(document.createElement('br')); var link=document.createElement('a'); link.href=pick.url; link.target='_blank'; link.rel='noopener'; link.textContent='Play recording'; wrap.appendChild(link); }
+            } else {
+              var none=document.createElement('span'); none.className='muted'; none.textContent='None'; wrap.appendChild(none);
+            }
+            return wrap;
+          }
+          callsCard.appendChild(callBlock('Over 1:00', over));
+          callsCard.appendChild(callBlock('Under 0:30', under));
+
+          app.innerHTML = '<a class="back" href="#/">&larr; Back</a>';
+          app.appendChild(container);
+          app.appendChild(callsCard);
+        }).catch(function(e){
+          app.innerHTML = '<a class="back" href="#/">&larr; Back</a><div class="card">Error: '+(e&&e.message?e.message:String(e))+'</div>';
+        });
+      }
+
+      function route(){
+        var hash = location.hash || '#/';
+        var parts = hash.slice(2).split('/');
+        if (parts[0] === '' || parts[0] === 'home') fillHome();
+        else if (parts[0] === 'person') fillPerson(decodeURIComponent(parts[1]||''), parts[2]||'');
+        else fillHome();
+      }
+      window.addEventListener('hashchange', route);
+      route();
+    </script>
+  </body>
+</html>
