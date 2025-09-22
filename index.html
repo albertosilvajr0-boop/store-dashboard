@@ -4,6 +4,14 @@
     <meta charset="utf-8" />
     <title>Store Dashboard — Leaderboards & 1on1s</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Speed: preconnect to Apps Script early -->
+    <link rel="preconnect" href="https://script.google.com">
+    <link rel="dns-prefetch" href="https://script.google.com">
+    <!-- Optional: some deployments redirect to *.googleusercontent.com -->
+    <link rel="preconnect" href="https://script.googleusercontent.com">
+    <link rel="dns-prefetch" href="https://script.googleusercontent.com">
+
     <style>
       :root { color-scheme: light; }
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; color: #111; background: #fafafa; }
@@ -58,17 +66,20 @@
     </div>
 
     <script>
+      /* ====== CONFIG ====== */
       var GAS_URL = 'https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec';
       function ts(){ return '&t=' + Date.now(); }
       function qs(id){ return document.getElementById(id); }
 
+      /* ====== Benchmarks (editable; persisted in localStorage) ====== */
+      // MTD bars derive from per-day targets × WorkingDays (when available)
       var DEFAULT_TARGETS = {
         Sales: {
-          perDay: { sales: 0.5, shown: 0.5, created: 1.0, calls: 40, texts: 20, talkSec: 80 },
+          perDay: { sales: 0.5, shown: 0.5, created: 1.0, calls: 40, texts: 20, talkSec: 80 }, // 1:20
           mtd:    { due: 10 }
         },
         BDC: {
-          perDay: { sales: 0, shown: 2.5, created: 4, calls: 100, texts: 40, talkSec: 60 },
+          perDay: { sales: 0, shown: 2.5, created: 4, calls: 100, texts: 40, talkSec: 60 },   // 1:00
           mtd:    { due: 0 }
         }
       };
@@ -106,12 +117,14 @@
         if (location.hash.startsWith('#/person/')) location.reload();
       }
 
+      /* ====== API ====== */
       function apiLeaderboards(){ return fetch(GAS_URL+'?route=leaderboards'+ts(), {cache:'no-store'}).then(r=>r.json()); }
       function apiPerson(name, type){
         var p = new URLSearchParams({route:'person', name:name, type:type});
         return fetch(GAS_URL+'?'+p.toString()+ts(), {cache:'no-store'}).then(r=>r.json());
       }
 
+      /* ====== HOME VIEW ====== */
       function navToPerson(name, type){
         location.hash = '#/person/' + encodeURIComponent(String(name||'')) + '/' + encodeURIComponent(String(type||''));
         location.reload();
@@ -119,6 +132,7 @@
       function fillHome(){
         apiLeaderboards().then(function(data){
           if(!data || !data.ok) throw new Error((data && data.error) || 'API error');
+          // Sales table
           var sBody = qs('salesBody'); sBody.innerHTML='';
           var sales = Array.isArray(data.sales)?data.sales:[];
           if(!sales.length){ var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=3; td.className='muted'; td.textContent='No data'; tr.appendChild(td); sBody.appendChild(tr); }
@@ -129,6 +143,7 @@
             var tdSales=document.createElement('td'); tdSales.textContent=(r.sales!=null?r.sales:0);
             tr.appendChild(tdRank); tr.appendChild(tdName); tr.appendChild(tdSales); sBody.appendChild(tr);
           });
+          // BDC table
           var bBody = qs('bdcBody'); bBody.innerHTML='';
           var bdc = Array.isArray(data.bdc)?data.bdc:[];
           if(!bdc.length){ var tr2=document.createElement('tr'); var td2=document.createElement('td'); td2.colSpan=3; td2.className='muted'; td2.textContent='No data'; tr2.appendChild(td2); bBody.appendChild(tr2); }
@@ -145,6 +160,7 @@
         });
       }
 
+      /* ====== PERSON VIEW ====== */
       function pctColor(p){ return p>=100 ? '#16a34a' : (p>=60 ? '#f59e0b' : '#ef4444'); }
       function addBar(el, value, target, isTime){
         if (!target || target<=0) return;
@@ -196,6 +212,7 @@
 
           var container = document.createElement('div');
 
+          /* Header */
           var cardHead = document.createElement('div'); cardHead.className='card';
           var top = document.createElement('div'); top.className='topline';
           var h2 = document.createElement('h2'); h2.textContent = (b.name || name) + ' '; var pill=document.createElement('span'); pill.className='pill'; pill.textContent=role; h2.appendChild(pill);
@@ -205,6 +222,7 @@
           cardHead.appendChild(top); cardHead.appendChild(sub);
           container.appendChild(cardHead);
 
+          /* MTD */
           var cardMTD = document.createElement('div'); cardMTD.className='card';
           var hMTD = document.createElement('h2'); hMTD.textContent = 'MTD KPIs'; cardMTD.appendChild(hMTD);
           var mtd = document.createElement('div'); mtd.className='kvs';
@@ -230,6 +248,7 @@
           cardMTD.appendChild(mtd);
           container.appendChild(cardMTD);
 
+          /* Per-Day */
           var cardPD = document.createElement('div'); cardPD.className='card';
           var hPD = document.createElement('h2'); hPD.textContent = 'Per-Day KPIs'; cardPD.appendChild(hPD);
           var per = document.createElement('div'); per.className='kvs';
@@ -258,14 +277,15 @@
           cardLW.appendChild(lw);
           container.appendChild(cardLW);
 
+          /* Coaching picks */
           var callsCard = document.createElement('div'); callsCard.className='card';
           var h2b = document.createElement('h2'); h2b.textContent='Call Coaching Picks'; callsCard.appendChild(h2b);
           var lastDayKey = data.lastWorkDay || '';
-          var usedDay = picksUsedDate || '';
+          var usedDay = (picks && picks.usedDate) ? picks.usedDate : ((over && over.dateKey) || (under && under.dateKey) || '');
           var meta = document.createElement('div'); meta.className='muted';
           meta.textContent = (usedDay && lastDayKey && usedDay !== lastDayKey)
             ? ('Using calls from ' + usedDay + ' (no recordings on last work day).')
-            : '1 over a minute, 1 under 30 seconds (longest as fallback if none ≥ 60s)';
+            : '1 over a minute, 1 under 30 seconds (longest/shortest as fallback)';
           callsCard.appendChild(meta);
 
           function callBlock(label, pick){
@@ -290,6 +310,7 @@
         });
       }
 
+      /* ====== Router ====== */
       function route(){
         var hash = location.hash || '#/';
         var parts = hash.slice(2).split('/');
