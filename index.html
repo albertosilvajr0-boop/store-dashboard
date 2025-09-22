@@ -58,17 +58,20 @@
     </div>
 
     <script>
+      /* ====== CONFIG ====== */
       var GAS_URL = 'https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec';
       function ts(){ return '&t=' + Date.now(); }
       function qs(id){ return document.getElementById(id); }
 
+      /* ====== Benchmarks (editable; persisted in localStorage) ====== */
+      // MTD bars derive from per-day targets × WorkingDays (when available)
       var DEFAULT_TARGETS = {
         Sales: {
-          perDay: { sales: 0.5, shown: 0.5, created: 1.0, calls: 40, texts: 20, talkSec: 80 },
+          perDay: { sales: 0.5, shown: 0.5, created: 1.0, calls: 40, texts: 20, talkSec: 80 }, // 1:20
           mtd:    { due: 10 }
         },
         BDC: {
-          perDay: { sales: 0, shown: 2.5, created: 4, calls: 100, texts: 40, talkSec: 60 },
+          perDay: { sales: 0, shown: 2.5, created: 4, calls: 100, texts: 40, talkSec: 60 },   // 1:00
           mtd:    { due: 0 }
         }
       };
@@ -106,12 +109,14 @@
         if (location.hash.startsWith('#/person/')) location.reload();
       }
 
+      /* ====== API ====== */
       function apiLeaderboards(){ return fetch(GAS_URL+'?route=leaderboards'+ts(), {cache:'no-store'}).then(r=>r.json()); }
       function apiPerson(name, type){
         var p = new URLSearchParams({route:'person', name:name, type:type});
         return fetch(GAS_URL+'?'+p.toString()+ts(), {cache:'no-store'}).then(r=>r.json());
       }
 
+      /* ====== HOME VIEW ====== */
       function navToPerson(name, type){
         location.hash = '#/person/' + encodeURIComponent(String(name||'')) + '/' + encodeURIComponent(String(type||''));
         location.reload();
@@ -119,6 +124,7 @@
       function fillHome(){
         apiLeaderboards().then(function(data){
           if(!data || !data.ok) throw new Error((data && data.error) || 'API error');
+          // Sales table
           var sBody = qs('salesBody'); sBody.innerHTML='';
           var sales = Array.isArray(data.sales)?data.sales:[];
           if(!sales.length){ var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=3; td.className='muted'; td.textContent='No data'; tr.appendChild(td); sBody.appendChild(tr); }
@@ -129,6 +135,7 @@
             var tdSales=document.createElement('td'); tdSales.textContent=(r.sales!=null?r.sales:0);
             tr.appendChild(tdRank); tr.appendChild(tdName); tr.appendChild(tdSales); sBody.appendChild(tr);
           });
+          // BDC table
           var bBody = qs('bdcBody'); bBody.innerHTML='';
           var bdc = Array.isArray(data.bdc)?data.bdc:[];
           if(!bdc.length){ var tr2=document.createElement('tr'); var td2=document.createElement('td'); td2.colSpan=3; td2.className='muted'; td2.textContent='No data'; tr2.appendChild(td2); bBody.appendChild(tr2); }
@@ -145,6 +152,7 @@
         });
       }
 
+      /* ====== PERSON VIEW ====== */
       function pctColor(p){ return p>=100 ? '#16a34a' : (p>=60 ? '#f59e0b' : '#ef4444'); }
       function addBar(el, value, target, isTime){
         if (!target || target<=0) return;
@@ -194,6 +202,8 @@
           var talkTarget = secsFromAny((tgt.perDay && tgt.perDay.talkSec) ? tgt.perDay.talkSec : 0);
 
           var container = document.createElement('div');
+
+          /* Header */
           var cardHead = document.createElement('div'); cardHead.className='card';
           var top = document.createElement('div'); top.className='topline';
           var h2 = document.createElement('h2'); h2.textContent = (b.name || name) + ' '; var pill=document.createElement('span'); pill.className='pill'; pill.textContent=role; h2.appendChild(pill);
@@ -203,6 +213,7 @@
           cardHead.appendChild(top); cardHead.appendChild(sub);
           container.appendChild(cardHead);
 
+          /* MTD */
           var cardMTD = document.createElement('div'); cardMTD.className='card';
           var hMTD = document.createElement('h2'); hMTD.textContent = 'MTD KPIs'; cardMTD.appendChild(hMTD);
           var mtd = document.createElement('div'); mtd.className='kvs';
@@ -213,39 +224,58 @@
           var tCalls   = deriveTargetMTD('calls',  tgt, wd);
           var tTexts   = deriveTargetMTD('texts',  tgt, wd);
           var tDue     = deriveTargetMTD('due',    tgt, wd);
-          
+
+          /* First row (5): Sales, Shown, Created, Calls, Texts */
           mtd.appendChild(kvTile(fmt(b.salesMTD,1), 'Sales', tSales, false));
           mtd.appendChild(kvTile(fmt(b.shownMTD,0), 'Appts Shown', tShown, false));
           mtd.appendChild(kvTile(fmt(b.createdMTD,0),'Appts Created', tCreated, false));
           mtd.appendChild(kvTile(fmt(b.callsMTD,0),  'Calls (MTD)', tCalls, false));
           mtd.appendChild(kvTile(fmt(b.textsMTD,0),  'Texts', tTexts, false));
+          /* Second row (3 here): Due, Avg Talk, Working Days (no target) */
           mtd.appendChild(kvTile(fmt(b.dueMTD,0),    'Appts Due', tDue, false));
           mtd.appendChild(kvTile(b.avgTalk||'0:00',  'Avg Talk', talkTarget, true));
           var kvWD = document.createElement('div'); kvWD.className='kv';
           var nWD = document.createElement('div'); nWD.className='n'; nWD.textContent = wd; kvWD.appendChild(nWD);
           var tWD = document.createElement('div'); tWD.className='t'; tWD.textContent = 'Working Days'; kvWD.appendChild(tWD);
           mtd.appendChild(kvWD);
+
           cardMTD.appendChild(mtd);
           container.appendChild(cardMTD);
 
+          /* Per-Day */
           var cardPD = document.createElement('div'); cardPD.className='card';
           var hPD = document.createElement('h2'); hPD.textContent = 'Per-Day KPIs'; cardPD.appendChild(hPD);
           var per = document.createElement('div'); per.className='kvs';
           function perTarget(key){ return (tgt.perDay && tgt.perDay[key]!=null) ? (+tgt.perDay[key]||0) : 0; }
 
+          /* First row to align with MTD first row */
           per.appendChild(kvTile(fmt(safeDiv(+b.salesMTD,wd),2),'Sales/Day', perTarget('sales'), false));
           per.appendChild(kvTile(fmt(safeDiv(+b.shownMTD,wd),2),'Shown/Day', perTarget('shown'), false));
           per.appendChild(kvTile(fmt(safeDiv(+b.createdMTD,wd),2),'Created/Day', perTarget('created'), false));
           per.appendChild(kvTile(fmt(safeDiv(+b.callsMTD,wd),1),'Calls/Day', perTarget('calls'), false));
           per.appendChild(kvTile(fmt(safeDiv(+b.textsMTD,wd),1),'Texts/Day', perTarget('texts'), false));
+          /* Second row (Avg Talk target is the same) */
           per.appendChild(kvTile(b.avgTalk||'0:00','Avg Talk', talkTarget, true));
 
           cardPD.appendChild(per);
           container.appendChild(cardPD);
 
+          /* Coaching picks */
           var callsCard = document.createElement('div'); callsCard.className='card';
           var h2b = document.createElement('h2'); h2b.textContent='Call Coaching Picks'; callsCard.appendChild(h2b);
-          var meta = document.createElement('div'); meta.className='muted'; meta.textContent='1 over a minute, 1 under 30 seconds (longest as fallback if none ≥ 60s)'; callsCard.appendChild(meta);
+
+          // indicate fallback if dateKey differs from lastWorkDay
+          var fallbackInfo = null;
+          var lastDay = data.lastWorkDay || '';
+          var overDay  = (over && over.dateKey) ? over.dateKey : null;
+          var underDay = (under && under.dateKey) ? under.dateKey : null;
+          var usedDay  = overDay || underDay;
+          if (usedDay && lastDay && usedDay !== lastDay) {
+            fallbackInfo = 'Using calls from ' + usedDay + ' (no recordings on last work day).';
+          }
+          var meta = document.createElement('div'); meta.className='muted';
+          meta.textContent = (fallbackInfo || '1 over a minute, 1 under 30 seconds (longest as fallback if none ≥ 60s)');
+          callsCard.appendChild(meta);
 
           function callBlock(label, pick){
             var wrap=document.createElement('div'); wrap.className='call';
@@ -269,6 +299,7 @@
         });
       }
 
+      /* ====== Router ====== */
       function route(){
         var hash = location.hash || '#/';
         var parts = hash.slice(2).split('/');
