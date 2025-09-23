@@ -71,21 +71,52 @@
       function ts(){ return '&t=' + Date.now(); }
       function qs(id){ return document.getElementById(id); }
 
+      /* ====== Person cache (sessionStorage) ====== */
+      var PERSON_CACHE_TTL_MS = 9 * 60 * 1000; // 9 minutes
+      function personKey(name, type){
+        return 'person:' + String(name || '').toUpperCase() + ':' + String(type || '');
+      }
+      function readPersonCache(name, type){
+        try {
+          var raw = sessionStorage.getItem(personKey(name, type));
+          if (!raw) return null;
+          var obj = JSON.parse(raw);
+          if (!obj || !obj.t || (Date.now() - obj.t) > PERSON_CACHE_TTL_MS) {
+            sessionStorage.removeItem(personKey(name, type));
+            return null;
+          }
+          return obj.data;
+        } catch(e){ return null; }
+      }
+      function writePersonCache(name, type, data){
+        try { sessionStorage.setItem(personKey(name, type), JSON.stringify({ t: Date.now(), data: data })); } catch(e){}
+      }
+      async function fetchPerson(name, type, opts){
+        var useCache = !opts || opts.useCache !== false;
+        if (useCache) {
+          var cached = readPersonCache(name, type);
+          if (cached) return { data: cached, fromCache: true };
+        }
+        var params = new URLSearchParams({ route: 'person', name: name, type: type });
+        var res = await fetch(GAS_URL + '?' + params.toString() + ts(), { cache: 'no-store' });
+        var json = await res.json();
+        if (json && json.ok) writePersonCache(name, type, json);
+        return { data: json, fromCache: false };
+      }
+
       /* ====== Benchmarks (editable; persisted in localStorage) ====== */
-      // MTD bars derive from per-day targets × WorkingDays (when available)
       var DEFAULT_TARGETS = {
         Sales: {
-          perDay: { sales: 0.5, shown: 0.5, created: 1.0, calls: 40, texts: 20, talkSec: 80 }, // 1:20
+          perDay: { sales: 0.5, shown: 0.5, created: 1.0, calls: 40, texts: 20, talkSec: 80 },
           mtd:    { due: 10 }
         },
         BDC: {
-          perDay: { sales: 0, shown: 2.5, created: 4, calls: 100, texts: 40, talkSec: 60 },   // 1:00
+          perDay: { sales: 0, shown: 2.5, created: 4, calls: 100, texts: 40, talkSec: 60 },
           mtd:    { due: 0 }
         }
       };
       function loadTargets(){ try { return JSON.parse(localStorage.getItem('targets_v3')||'null') || DEFAULT_TARGETS; } catch(e){ return DEFAULT_TARGETS; } }
       function saveTargets(t){ localStorage.setItem('targets_v3', JSON.stringify(t)); }
-
       function secsFromAny(x){
         if (x==null) return 0;
         if (typeof x === 'number') return x;
@@ -98,7 +129,6 @@
         var m = Math.floor(sec/60), s=sec%60;
         return m + ':' + String(s).padStart(2,'0');
       }
-
       function editTargets(role){
         var t = loadTargets();
         var group = (role && t[role]) ? role : (confirm('Edit Sales targets? Click Cancel for BDC') ? 'Sales' : 'BDC');
@@ -117,49 +147,72 @@
         if (location.hash.startsWith('#/person/')) location.reload();
       }
 
-      /* ====== API ====== */
-      function apiLeaderboards(){ return fetch(GAS_URL+'?route=leaderboards'+ts(), {cache:'no-store'}).then(r=>r.json()); }
-      function apiPerson(name, type){
-        var p = new URLSearchParams({route:'person', name:name, type:type});
-        return fetch(GAS_URL+'?'+p.toString()+ts(), {cache:'no-store'}).then(r=>r.json());
-      }
+      /* ====== API (leaderboards only; person uses fetchPerson) ====== */
+      async function apiLeaderboards(){ var r=await fetch(GAS_URL+'?route=leaderboards'+ts(), {cache:'no-store'}); return r.json(); }
 
       /* ====== HOME VIEW ====== */
-function navToPerson(name, type){
-  location.hash = '#/person/' + encodeURIComponent(String(name||'')) + '/' + encodeURIComponent(String(type||''));
-}
+      function navToPerson(name, type){
+        // Faster nav — no full page reload
+        location.hash = '#/person/' + encodeURIComponent(String(name||'')) + '/' + encodeURIComponent(String(type||''));
+      }
       function fillHome(){
         apiLeaderboards().then(function(data){
-          if(!data || !data.ok) throw new Error((data && data.error) || 'API error');
-          // Sales table
+          if(!data || !data.ok) throw new Error(data && data.error || 'API error');
+
           var sBody = qs('salesBody'); sBody.innerHTML='';
           var sales = Array.isArray(data.sales)?data.sales:[];
           if(!sales.length){ var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=3; td.className='muted'; td.textContent='No data'; tr.appendChild(td); sBody.appendChild(tr); }
           else sales.forEach(function(r,i){
             var tr=document.createElement('tr');
             var tdRank=document.createElement('td'); tdRank.textContent=i+1;
-            var tdName=document.createElement('td'); var a=document.createElement('a'); a.href='javascript:void(0)'; a.textContent=r.name||''; a.onclick=function(){navToPerson(r.name,'Sales');}; tdName.appendChild(a);
+            var tdName=document.createElement('td'); var a=document.createElement('a');
+            a.href = '#/person/' + encodeURIComponent(r.name) + '/Sales';
+            a.textContent=r.name||'';
+            a.onclick=function(e){ e.preventDefault(); navToPerson(r.name,'Sales'); };
+            tdName.appendChild(a);
             var tdSales=document.createElement('td'); tdSales.textContent=(r.sales!=null?r.sales:0);
             tr.appendChild(tdRank); tr.appendChild(tdName); tr.appendChild(tdSales); sBody.appendChild(tr);
           });
-          // BDC table
+
           var bBody = qs('bdcBody'); bBody.innerHTML='';
           var bdc = Array.isArray(data.bdc)?data.bdc:[];
           if(!bdc.length){ var tr2=document.createElement('tr'); var td2=document.createElement('td'); td2.colSpan=3; td2.className='muted'; td2.textContent='No data'; tr2.appendChild(td2); bBody.appendChild(tr2); }
           else bdc.forEach(function(r,i){
             var tr=document.createElement('tr');
             var tdRank=document.createElement('td'); tdRank.textContent=i+1;
-            var tdName=document.createElement('td'); var a=document.createElement('a'); a.href='javascript:void(0)'; a.textContent=r.name||''; a.onclick=function(){navToPerson(r.name,'BDC');}; tdName.appendChild(a);
+            var tdName=document.createElement('td'); var a=document.createElement('a');
+            a.href = '#/person/' + encodeURIComponent(r.name) + '/BDC';
+            a.textContent=r.name||'';
+            a.onclick=function(e){ e.preventDefault(); navToPerson(r.name,'BDC'); };
+            tdName.appendChild(a);
             var tdShows=document.createElement('td'); tdShows.textContent=(r.shows!=null?r.shows:0);
             tr.appendChild(tdRank); tr.appendChild(tdName); tr.appendChild(tdShows); bBody.appendChild(tr);
           });
+
+          /* Prefetch top rows + hover (for instant first clicks) */
+          try {
+            var prefetchList = [];
+            (data.sales || []).slice(0, 8).forEach(function(r){ prefetchList.push({name:r.name, type:'Sales'}); });
+            (data.bdc   || []).slice(0, 8).forEach(function(r){ prefetchList.push({name:r.name, type:'BDC'}); });
+            prefetchList.forEach(function(p, i){
+              setTimeout(function(){ fetchPerson(p.name, p.type).catch(function(){}); }, i * 120);
+            });
+            document.querySelectorAll('a[href^="#/person/"]').forEach(function(a){
+              try {
+                var parts = decodeURIComponent(a.getAttribute('href').slice(2)).split('/');
+                var nm = parts[1] || '', tp = parts[2] || '';
+                a.addEventListener('mouseenter', function(){ fetchPerson(nm, tp).catch(function(){}); });
+              } catch(e){}
+            });
+          } catch(e){}
+
         }).catch(function(e){
           ['salesBody','bdcBody'].forEach(function(id){ var tb=qs(id); tb.innerHTML=''; var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=3; td.className='muted'; td.textContent='Error'; tr.appendChild(td); tb.appendChild(tr); });
           console.error(e);
         });
       }
 
-      /* ====== PERSON VIEW ====== */
+      /* ====== PERSON VIEW (cache-then-network) ====== */
       function pctColor(p){ return p>=100 ? '#16a34a' : (p>=60 ? '#f59e0b' : '#ef4444'); }
       function addBar(el, value, target, isTime){
         if (!target || target<=0) return;
@@ -169,8 +222,7 @@ function navToPerson(name, type){
         fill.style.width=pct.toFixed(1)+'%';
         fill.style.background=pctColor(pct);
         wrap.title='Target: '+ (isTime? mssFromSecs(target) : target) +' | '+pct.toFixed(0)+'%';
-        wrap.appendChild(fill);
-        el.appendChild(wrap);
+        wrap.appendChild(fill); el.appendChild(wrap);
       }
       function kvTile(num,label, target, isTime){
         var d=document.createElement('div'); d.className='kv';
@@ -181,7 +233,6 @@ function navToPerson(name, type){
       }
       function fmt(n, decimals){ if (n==null||isNaN(n)) return '0'; var f=+n; return (decimals!=null)?f.toFixed(decimals):String(f); }
       function safeDiv(n,d){ n=+n||0; d=+d||0; return d>0 ? (n/d) : 0; }
-
       function deriveTargetMTD(key, roleTargets, workingDays){
         var map = { sales:'sales', shown:'shown', created:'created', calls:'calls', texts:'texts' };
         if (roleTargets.perDay && roleTargets.perDay[map[key]]!=null){
@@ -193,144 +244,156 @@ function navToPerson(name, type){
         return 0;
       }
 
-      function fillPerson(name, type){
+      async function renderPerson(name, type) {
+        var root = document.getElementById('app');
+        root.innerHTML = '<a class="back" href="#/">&larr; Back</a><div class="card"><div class="muted">Loading 1on1…</div></div>';
+        try {
+          // 1) Instant render from cache if available
+          var cached = readPersonCache(name, type);
+          if (cached && cached.ok) {
+            renderPersonBody_(cached);
+            // 2) Revalidate in background
+            fetchPerson(name, type, { useCache:false })
+              .then(function(res){ if (res && res.data && res.data.ok) { writePersonCache(name, type, res.data); renderPersonBody_(res.data); } })
+              .catch(function(){});
+            return;
+          }
+          // No cache → fetch
+          var res = await fetchPerson(name, type, { useCache:false });
+          if (!res || !res.data || !res.data.ok) throw new Error(res && res.data && res.data.error || 'API error');
+          renderPersonBody_(res.data);
+        } catch (e) {
+          root.innerHTML = '<a class="back" href="#/">&larr; Back</a><div class="card">Error: '+(e && e.message ? e.message : String(e))+'</div>';
+        }
+      }
+
+      function renderPersonBody_(data){
+        var b = data.block || {};
+        var picks = data.picks || {};
+        var over = picks.over || null;
+        var under = picks.under || null;
+        var role = (b.type || '').toString();
+        var targetsAll = loadTargets();
+        var tgt = targetsAll[role] || targetsAll['Sales'];
+        var wd = b.workingDays || 0;
+        var talkTarget = secsFromAny((tgt.perDay && tgt.perDay.talkSec) ? tgt.perDay.talkSec : 0);
+
         var app = document.getElementById('app');
-        app.innerHTML = '<a class="back" href="#/">&larr; Back</a><div class="card"><div class="muted">Loading 1on1…</div></div>';
-        apiPerson(name, type).then(function(data){
-          if(!data || !data.ok) throw new Error((data && data.error) || 'API error');
-          var b = data.block || {};
-          var picks = data.picks || {};
-          var over = picks.over || null;
-          var under = picks.under || null;
-          var picksUsedDate = (picks && picks.usedDate) ? picks.usedDate : ((over && over.dateKey) || (under && under.dateKey) || null);
-          var role = (b.type || type || 'Sales').toString();
-          var targetsAll = loadTargets();
-          var tgt = targetsAll[role] || targetsAll['Sales'];
-          var wd = b.workingDays || 0;
-          var talkTarget = secsFromAny((tgt.perDay && tgt.perDay.talkSec) ? tgt.perDay.talkSec : 0);
+        var container = document.createElement('div');
 
-          var container = document.createElement('div');
+        /* Header */
+        var cardHead = document.createElement('div'); cardHead.className='card';
+        var top = document.createElement('div'); top.className='topline';
+        var h2 = document.createElement('h2'); h2.textContent = (b.name || '') + ' '; var pill=document.createElement('span'); pill.className='pill'; pill.textContent=role; h2.appendChild(pill);
+        var edit = document.createElement('span'); edit.className='linkish'; edit.textContent='Edit targets'; edit.onclick=function(){ editTargets(role); };
+        top.appendChild(h2); top.appendChild(edit);
+        var sub = document.createElement('div'); sub.className='muted'; sub.textContent='Last work day: ' + (data.lastWorkDay || '—');
+        cardHead.appendChild(top); cardHead.appendChild(sub);
+        container.appendChild(cardHead);
 
-          /* Header */
-          var cardHead = document.createElement('div'); cardHead.className='card';
-          var top = document.createElement('div'); top.className='topline';
-          var h2 = document.createElement('h2'); h2.textContent = (b.name || name) + ' '; var pill=document.createElement('span'); pill.className='pill'; pill.textContent=role; h2.appendChild(pill);
-          var edit = document.createElement('span'); edit.className='linkish'; edit.textContent='Edit targets'; edit.onclick=function(){ editTargets(role); };
-          top.appendChild(h2); top.appendChild(edit);
-          var sub = document.createElement('div'); sub.className='muted'; sub.textContent='Last work day: ' + (data.lastWorkDay || '—');
-          cardHead.appendChild(top); cardHead.appendChild(sub);
-          container.appendChild(cardHead);
+        /* MTD KPIs */
+        var cardMTD = document.createElement('div'); cardMTD.className='card';
+        var hMTD = document.createElement('h2'); hMTD.textContent = 'MTD KPIs'; cardMTD.appendChild(hMTD);
+        var mtd = document.createElement('div'); mtd.className='kvs';
 
-          /* MTD */
-          var cardMTD = document.createElement('div'); cardMTD.className='card';
-          var hMTD = document.createElement('h2'); hMTD.textContent = 'MTD KPIs'; cardMTD.appendChild(hMTD);
-          var mtd = document.createElement('div'); mtd.className='kvs';
+        var tSales   = deriveTargetMTD('sales',  tgt, wd);
+        var tShown   = deriveTargetMTD('shown',  tgt, wd);
+        var tCreated = deriveTargetMTD('created',tgt, wd);
+        var tCalls   = deriveTargetMTD('calls',  tgt, wd);
+        var tTexts   = deriveTargetMTD('texts',  tgt, wd);
+        var tDue     = deriveTargetMTD('due',    tgt, wd);
 
-          var tSales   = deriveTargetMTD('sales',  tgt, wd);
-          var tShown   = deriveTargetMTD('shown',  tgt, wd);
-          var tCreated = deriveTargetMTD('created',tgt, wd);
-          var tCalls   = deriveTargetMTD('calls',  tgt, wd);
-          var tTexts   = deriveTargetMTD('texts',  tgt, wd);
-          var tDue     = deriveTargetMTD('due',    tgt, wd);
+        mtd.appendChild(kvTile(fmt(b.salesMTD,1), 'Sales', tSales, false));
+        mtd.appendChild(kvTile(fmt(b.shownMTD,0), 'Appts Shown', tShown, false));
+        mtd.appendChild(kvTile(fmt(b.createdMTD,0),'Appts Created', tCreated, false));
+        mtd.appendChild(kvTile(fmt(b.callsMTD,0),  'Calls (MTD)', tCalls, false));
+        mtd.appendChild(kvTile(fmt(b.textsMTD,0),  'Texts', tTexts, false));
+        mtd.appendChild(kvTile(fmt(b.dueMTD,0),    'Appts Due', tDue, false));
+        mtd.appendChild(kvTile(b.avgTalk||'0:00',  'Avg Talk', talkTarget, true));
+        var kvWD = document.createElement('div'); kvWD.className='kv';
+        var nWD = document.createElement('div'); nWD.className='n'; nWD.textContent = wd; kvWD.appendChild(nWD);
+        var tWD = document.createElement('div'); tWD.className='t'; tWD.textContent = 'Working Days'; kvWD.appendChild(tWD);
+        mtd.appendChild(kvWD);
+        cardMTD.appendChild(mtd);
+        container.appendChild(cardMTD);
 
-          mtd.appendChild(kvTile(fmt(b.salesMTD,1), 'Sales', tSales, false));
-          mtd.appendChild(kvTile(fmt(b.shownMTD,0), 'Appts Shown', tShown, false));
-          mtd.appendChild(kvTile(fmt(b.createdMTD,0),'Appts Created', tCreated, false));
-          mtd.appendChild(kvTile(fmt(b.callsMTD,0),  'Calls (MTD)', tCalls, false));
-          mtd.appendChild(kvTile(fmt(b.textsMTD,0),  'Texts', tTexts, false));
-          mtd.appendChild(kvTile(fmt(b.dueMTD,0),    'Appts Due', tDue, false));
-          mtd.appendChild(kvTile(b.avgTalk||'0:00',  'Avg Talk', talkTarget, true));
-          var kvWD = document.createElement('div'); kvWD.className='kv';
-          var nWD = document.createElement('div'); nWD.className='n'; nWD.textContent = wd; kvWD.appendChild(nWD);
-          var tWD = document.createElement('div'); tWD.className='t'; tWD.textContent = 'Working Days'; kvWD.appendChild(tWD);
-          mtd.appendChild(kvWD);
-          cardMTD.appendChild(mtd);
-          container.appendChild(cardMTD);
+        /* Per-Day KPIs */
+        var cardPD = document.createElement('div'); cardPD.className='card';
+        var hPD = document.createElement('h2'); hPD.textContent = 'Per-Day KPIs'; cardPD.appendChild(hPD);
+        var per = document.createElement('div'); per.className='kvs';
+        function perTarget(key){ return (tgt.perDay && tgt.perDay[key]!=null) ? (+tgt.perDay[key]||0) : 0; }
 
-          /* Per-Day */
-          var cardPD = document.createElement('div'); cardPD.className='card';
-          var hPD = document.createElement('h2'); hPD.textContent = 'Per-Day KPIs'; cardPD.appendChild(hPD);
-          var per = document.createElement('div'); per.className='kvs';
-          function perTarget(key){ return (tgt.perDay && tgt.perDay[key]!=null) ? (+tgt.perDay[key]||0) : 0; }
+        per.appendChild(kvTile(fmt(safeDiv(+b.salesMTD,wd),2),'Sales/Day', perTarget('sales'), false));
+        per.appendChild(kvTile(fmt(safeDiv(+b.shownMTD,wd),2),'Shown/Day', perTarget('shown'), false));
+        per.appendChild(kvTile(fmt(safeDiv(+b.createdMTD,wd),2),'Created/Day', perTarget('created'), false));
+        per.appendChild(kvTile(fmt(safeDiv(+b.callsMTD,wd),1),'Calls/Day', perTarget('calls'), false));
+        per.appendChild(kvTile(fmt(safeDiv(+b.textsMTD,wd),1),'Texts/Day', perTarget('texts'), false));
+        per.appendChild(kvTile(b.avgTalk||'0:00','Avg Talk', talkTarget, true));
+        cardPD.appendChild(per);
+        container.appendChild(cardPD);
 
-          per.appendChild(kvTile(fmt(safeDiv(+b.salesMTD,wd),2),'Sales/Day', perTarget('sales'), false));
-          per.appendChild(kvTile(fmt(safeDiv(+b.shownMTD,wd),2),'Shown/Day', perTarget('shown'), false));
-          per.appendChild(kvTile(fmt(safeDiv(+b.createdMTD,wd),2),'Created/Day', perTarget('created'), false));
-          per.appendChild(kvTile(fmt(safeDiv(+b.callsMTD,wd),1),'Calls/Day', perTarget('calls'), false));
-          per.appendChild(kvTile(fmt(safeDiv(+b.textsMTD,wd),1),'Texts/Day', perTarget('texts'), false));
-          per.appendChild(kvTile(b.avgTalk||'0:00','Avg Talk', talkTarget, true));
-          cardPD.appendChild(per);
-          container.appendChild(cardPD);
+        /* Last Work Day KPIs */
+        var lastDay = data.lastDay || null;
+        var cardLW = document.createElement('div'); cardLW.className='card';
+        var hLW = document.createElement('h2'); hLW.textContent = 'Last Work Day KPIs'; cardLW.appendChild(hLW);
+        var subLW = document.createElement('div'); subLW.className='muted'; subLW.textContent = lastDay && lastDay.dateKey ? ('Date: ' + lastDay.dateKey) : 'Date: ' + (data.lastWorkDay || '—');
+        cardLW.appendChild(subLW);
+        var lw = document.createElement('div'); lw.className='kvs';
+        var tgtSales = perTarget('sales'), tgtCalls = perTarget('calls');
+        lw.appendChild(kvTile(fmt(lastDay && lastDay.sales != null ? lastDay.sales : 0 ,0), 'Sales (Day)', tgtSales, false));
+        lw.appendChild(kvTile(fmt(lastDay && lastDay.calls != null ? lastDay.calls : 0 ,0), 'Calls (Day)', tgtCalls, false));
+        lw.appendChild(kvTile((lastDay && lastDay.avgTalkMSS) ? lastDay.avgTalkMSS : '0:00', 'Avg Talk', talkTarget, true));
+        cardLW.appendChild(lw);
+        container.appendChild(cardLW);
 
-          /* Last Work Day KPIs */
-          var lastDay = data.lastDay || null;
-          var cardLW = document.createElement('div'); cardLW.className='card';
-          var hLW = document.createElement('h2'); hLW.textContent = 'Last Work Day KPIs'; cardLW.appendChild(hLW);
-          var subLW = document.createElement('div'); subLW.className='muted'; subLW.textContent = lastDay && lastDay.dateKey ? ('Date: ' + lastDay.dateKey) : 'Date: ' + (data.lastWorkDay || '—');
-          cardLW.appendChild(subLW);
-          var lw = document.createElement('div'); lw.className='kvs';
-          var tgtSales = perTarget('sales'), tgtCalls = perTarget('calls');
-          lw.appendChild(kvTile(fmt(lastDay && lastDay.sales != null ? lastDay.sales : 0 ,0), 'Sales (Day)', tgtSales, false));
-          lw.appendChild(kvTile(fmt(lastDay && lastDay.calls != null ? lastDay.calls : 0 ,0), 'Calls (Day)', tgtCalls, false));
-          lw.appendChild(kvTile((lastDay && lastDay.avgTalkMSS) ? lastDay.avgTalkMSS : '0:00', 'Avg Talk', talkTarget, true));
-          cardLW.appendChild(lw);
-          container.appendChild(cardLW);
+        /* PR Wins / Opportunities / Last Sales Day (from PerformanceReview output) */
+        var pr = data.prNotes || {};
+        if (pr.wins || pr.opportunities || (pr.lastSales && pr.lastSales.date)) {
+          var cardPR = document.createElement('div'); cardPR.className='card';
+          var hPR = document.createElement('h2'); hPR.textContent = 'Wins & Opportunities'; cardPR.appendChild(hPR);
 
-          /* PR Wins / Opportunities / Last Sales Day (from PerformanceReview output) */
-          var pr = data.prNotes || {};
-          if (pr.wins || pr.opportunities || (pr.lastSales && pr.lastSales.date)) {
-            var cardPR = document.createElement('div'); cardPR.className='card';
-            var hPR = document.createElement('h2'); hPR.textContent = 'Wins & Opportunities'; cardPR.appendChild(hPR);
-
-            if (pr.lastSales && pr.lastSales.date) {
-              var info = document.createElement('div'); info.className='muted';
-              info.textContent = 'Last Sales Day: ' + pr.lastSales.date + ' — Sales ' + (pr.lastSales.sales != null ? pr.lastSales.sales : '0');
-              cardPR.appendChild(info);
-            }
-            if (pr.wins) {
-              var w = document.createElement('div'); w.style.marginTop = '8px';
-              w.textContent = pr.wins;
-              cardPR.appendChild(w);
-            }
-            if (pr.opportunities) {
-              var o = document.createElement('div'); o.style.marginTop = '6px';
-              o.textContent = pr.opportunities;
-              cardPR.appendChild(o);
-            }
-            container.appendChild(cardPR);
+          if (pr.lastSales && pr.lastSales.date) {
+            var info = document.createElement('div'); info.className='muted';
+            info.textContent = 'Last Sales Day: ' + pr.lastSales.date + ' — Sales ' + (pr.lastSales.sales != null ? pr.lastSales.sales : '0');
+            cardPR.appendChild(info);
           }
-
-          /* Coaching picks */
-          var callsCard = document.createElement('div'); callsCard.className='card';
-          var h2b = document.createElement('h2'); h2b.textContent='Call Coaching Picks'; callsCard.appendChild(h2b);
-          var lastDayKey = data.lastWorkDay || '';
-          var usedDay = (picks && picks.usedDate) ? picks.usedDate : ((over && over.dateKey) || (under && under.dateKey) || '');
-          var meta = document.createElement('div'); meta.className='muted';
-          meta.textContent = (usedDay && lastDayKey && usedDay !== lastDayKey)
-            ? ('Using calls from ' + usedDay + ' (no recordings on last work day).')
-            : '1 over a minute, 1 under 30 seconds (longest/shortest as fallback)';
-          callsCard.appendChild(meta);
-
-          function callBlock(label, pick){
-            var wrap=document.createElement('div'); wrap.className='call';
-            var strong=document.createElement('strong'); strong.textContent=label; wrap.appendChild(strong); wrap.appendChild(document.createElement('br'));
-            if (pick){
-              var span=document.createElement('span'); span.textContent=(pick.dateKey||'')+' — '+(pick.talkMSS||''); wrap.appendChild(span);
-              if (pick.url){ wrap.appendChild(document.createElement('br')); var link=document.createElement('a'); link.href=pick.url; link.target='_blank'; link.rel='noopener'; link.textContent='Play recording'; wrap.appendChild(link); }
-            } else {
-              var none=document.createElement('span'); none.className='muted'; none.textContent='None'; wrap.appendChild(none);
-            }
-            return wrap;
+          if (pr.wins) {
+            var w = document.createElement('div'); w.style.marginTop = '8px'; w.textContent = pr.wins; cardPR.appendChild(w);
           }
-          callsCard.appendChild(callBlock('Over 1:00', over));
-          callsCard.appendChild(callBlock('Under 0:30', under));
+          if (pr.opportunities) {
+            var o = document.createElement('div'); o.style.marginTop = '6px'; o.textContent = pr.opportunities; cardPR.appendChild(o);
+          }
+          container.appendChild(cardPR);
+        }
 
-          app.innerHTML = '<a class="back" href="#/">&larr; Back</a>';
-          app.appendChild(container);
-          app.appendChild(callsCard);
-        }).catch(function(e){
-          app.innerHTML = '<a class="back" href="#/">&larr; Back</a><div class="card">Error: '+(e&&e.message?e.message:String(e))+'</div>';
-        });
+        /* Coaching picks */
+        var callsCard = document.createElement('div'); callsCard.className='card';
+        var h2b = document.createElement('h2'); h2b.textContent='Call Coaching Picks'; callsCard.appendChild(h2b);
+        var lastDayKey = data.lastWorkDay || '';
+        var usedDay = (picks && picks.usedDate) ? picks.usedDate : ((over && over.dateKey) || (under && under.dateKey) || '');
+        var meta = document.createElement('div'); meta.className='muted';
+        meta.textContent = (usedDay && lastDayKey && usedDay !== lastDayKey)
+          ? ('Using calls from ' + usedDay + ' (no recordings on last work day).')
+          : '1 over a minute, 1 under 30 seconds (longest/shortest as fallback)';
+        callsCard.appendChild(meta);
+
+        function callBlock(label, pick){
+          var wrap=document.createElement('div'); wrap.className='call';
+          var strong=document.createElement('strong'); strong.textContent=label; wrap.appendChild(strong); wrap.appendChild(document.createElement('br'));
+          if (pick){
+            var span=document.createElement('span'); span.textContent=(pick.dateKey||'')+' — '+(pick.talkMSS||''); wrap.appendChild(span);
+            if (pick.url){ wrap.appendChild(document.createElement('br')); var link=document.createElement('a'); link.href=pick.url; link.target='_blank'; link.rel='noopener'; link.textContent='Play recording'; wrap.appendChild(link); }
+          } else {
+            var none=document.createElement('span'); none.className='muted'; none.textContent='None'; wrap.appendChild(none);
+          }
+          return wrap;
+        }
+        callsCard.appendChild(callBlock('Over 1:00', over));
+        callsCard.appendChild(callBlock('Under 0:30', under));
+
+        app.innerHTML = '<a class="back" href="#/">&larr; Back</a>';
+        app.appendChild(container);
+        app.appendChild(callsCard);
       }
 
       /* ====== Router ====== */
@@ -338,7 +401,7 @@ function navToPerson(name, type){
         var hash = location.hash || '#/';
         var parts = hash.slice(2).split('/');
         if (parts[0] === '' || parts[0] === 'home') fillHome();
-        else if (parts[0] === 'person') fillPerson(decodeURIComponent(parts[1]||''), parts[2]||'');
+        else if (parts[0] === 'person') renderPerson(decodeURIComponent(parts[1]||''), parts[2]||'');
         else fillHome();
       }
       window.addEventListener('hashchange', route);
