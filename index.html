@@ -39,10 +39,16 @@
     </style>
   </head>
   <body>
-    <header><div class="wrap">
-      <h1>Store Dashboard</h1>
-      <div class="muted">Leaderboards & 1on1s</div>
-    </div></header>
+    <header>
+      <div class="wrap">
+        <h1>Store Dashboard</h1>
+        <div class="muted">Leaderboards & 1on1s</div>
+      </div>
+    </header>
+
+    <!-- Top nav (Login / My Calls / Logout) -->
+    <div class="wrap"><div id="nav"></div></div>
+
     <div class="wrap">
       <div id="app"><!-- populated by JS --></div>
     </div>
@@ -52,6 +58,24 @@
       const GAS_URL = 'https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec';
       function ts(){ return '&t=' + Date.now(); }
       function qs(id){ return document.getElementById(id); }
+
+      /* ====== Simple client session (auth) ====== */
+      function setSession(tok, prof){ try { localStorage.setItem('session', tok); localStorage.setItem('profile', JSON.stringify(prof||{})); } catch(e){} }
+      function getSession(){ try { return localStorage.getItem('session')||''; } catch(e){ return ''; } }
+      function getProfile(){ try { return JSON.parse(localStorage.getItem('profile')||'{}'); } catch(e){ return {}; } }
+      function clearSession(){ try { localStorage.removeItem('session'); localStorage.removeItem('profile'); } catch(e){} }
+
+      function renderNav(){
+        const nav = qs('nav'); if (!nav) return;
+        const prof = getProfile(); const tok = getSession();
+        if (tok) {
+          nav.innerHTML = `<div class="muted">Logged in as <strong>${prof.name||''}</strong> — <a href="#/me">My Calls</a> · <a href="#/" id="logoutLink">Logout</a></div>`;
+          const a = document.getElementById('logoutLink');
+          if (a) a.onclick = function(e){ e.preventDefault(); clearSession(); location.hash = '#/'; };
+        } else {
+          nav.innerHTML = `<div class="muted"><a href="#/login">Login</a></div>`;
+        }
+      }
 
       /* ====== Person cache (sessionStorage) ====== */
       const PERSON_CACHE_TTL_MS = 9 * 60 * 1000; // 9 minutes
@@ -86,7 +110,7 @@
         return { data: json, fromCache: false };
       }
 
-      /* ====== Benchmarks (editable; persisted in localStorage) ====== */
+      /* ====== Benchmarks (editable; persisted) ====== */
       const DEFAULT_TARGETS = {
         Sales: {
           perDay: { sales: 0.5, shown: 0.5, created: 1.0, calls: 40, texts: 20, talkSec: 80 },
@@ -129,8 +153,11 @@
         if (location.hash.startsWith('#/person/')) location.reload();
       }
 
-      /* ====== API ====== */
-      async function apiLeaderboards(){ const r=await fetch(GAS_URL+'?route=leaderboards'+ts(), {cache:'no-store'}); return r.json(); }
+      /* ====== API (leaderboards) ====== */
+      async function apiLeaderboards(){
+        const r = await fetch(GAS_URL+'?route=leaderboards'+ts(), {cache:'no-store'});
+        return r.json();
+      }
 
       /* ====== HOME VIEW ====== */
       function navToPerson(name, type){
@@ -139,7 +166,7 @@
       }
 
       function fillHome(){
-        // 1) rebuild the Home skeleton so Back always works
+        // rebuild the Home skeleton so Back always works
         const root = qs('app');
         root.innerHTML = `
           <div class="two">
@@ -160,11 +187,10 @@
           </div>
         `;
 
-        // 2) fetch & populate
         apiLeaderboards().then(function(data){
           if(!data || !data.ok) throw new Error(data && data.error || 'API error');
 
-          // --- Sales ---
+          // Sales
           const sBody = qs('salesBody'); sBody.innerHTML='';
           const sales = Array.isArray(data.sales)?data.sales:[];
           if (!sales.length){
@@ -177,7 +203,7 @@
               const tdRank=document.createElement('td'); tdRank.textContent=i+1;
               const tdName=document.createElement('td'); const a=document.createElement('a');
               a.href = '#/person/' + encodeURIComponent(r.name) + '/Sales';
-              a.textContent = r.name || '';
+              a.textContent=r.name||'';
               a.onclick=function(e){ e.preventDefault(); navToPerson(r.name,'Sales'); };
               tdName.appendChild(a);
               const tdSales=document.createElement('td'); tdSales.textContent=(r.sales!=null?r.sales:0);
@@ -186,7 +212,7 @@
             });
           }
 
-          // --- BDC ---
+          // BDC
           const bBody = qs('bdcBody'); bBody.innerHTML='';
           const bdc = Array.isArray(data.bdc)?data.bdc:[];
           if (!bdc.length){
@@ -208,7 +234,7 @@
             });
           }
 
-          // 3) Prefetch top rows + hover (for instant first clicks)
+          // Prefetch top rows + hover (instant first clicks)
           try {
             const prefetchList = [];
             (data.sales || []).slice(0, 20).forEach(function(r){ prefetchList.push({name:r.name, type:'Sales'}); });
@@ -310,7 +336,7 @@
         cardHead.appendChild(top); cardHead.appendChild(sub);
         container.appendChild(cardHead);
 
-        // MTD KPIs
+        // MTD
         const cardMTD = document.createElement('div'); cardMTD.className='card';
         const hMTD = document.createElement('h2'); hMTD.textContent = 'MTD KPIs'; cardMTD.appendChild(hMTD);
         const mtd = document.createElement('div'); mtd.className='kvs';
@@ -336,7 +362,7 @@
         cardMTD.appendChild(mtd);
         container.appendChild(cardMTD);
 
-        // Per-Day KPIs
+        // Per-Day
         const cardPD = document.createElement('div'); cardPD.className='card';
         const hPD = document.createElement('h2'); hPD.textContent = 'Per-Day KPIs'; cardPD.appendChild(hPD);
         const per = document.createElement('div'); per.className='kvs';
@@ -415,17 +441,92 @@
         app.appendChild(callsCard);
       }
 
+      /* ====== LOGIN & MY CALLS ====== */
+      async function renderLogin() {
+        renderNav();
+        const app = qs('app');
+        // Auto-exchange if hash has ?token=...
+        const parts = (location.hash||'').split('?');
+        const q = parts[1] ? new URLSearchParams(parts[1]) : new URLSearchParams();
+        const token = q.get('token') || '';
+        if (token) {
+          app.innerHTML = '<div class="card">Logging you in…</div>';
+          try {
+            const url = GAS_URL + '?route=auth_exchange&token=' + encodeURIComponent(token) + ts();
+            const res = await fetch(url, {cache: 'no-store'}); const json = await res.json();
+            if (!json || !json.ok) throw new Error(json && json.error || 'Auth error');
+            setSession(json.session, json.profile);
+            renderNav();
+            location.hash = '#/me';
+            return;
+          } catch (e) {
+            app.innerHTML = '<div class="card">Login failed: '+(e.message||String(e))+'</div>';
+            return;
+          }
+        }
+        app.innerHTML = `
+          <div class="card">
+            <h2>Login</h2>
+            <div class="muted">Ask admin to email your magic login link.</div>
+          </div>`;
+      }
+
+      async function renderMyCalls() {
+        renderNav();
+        const app = qs('app');
+        const tok = getSession();
+        if (!tok) { location.hash = '#/login'; return; }
+        app.innerHTML = '<a class="back" href="#/">&larr; Back</a><div class="card">Loading your calls…</div>';
+        try {
+          const url = GAS_URL + '?route=me_calls&session=' + encodeURIComponent(tok) + ts();
+          const res = await fetch(url, {cache:'no-store'});
+          const json = await res.json();
+          if (!json || !json.ok) throw new Error(json && json.error || 'API error');
+          const rows = json.calls || [];
+          const wrap = document.createElement('div'); wrap.className='card';
+          const h = document.createElement('h2'); h.textContent = 'My Calls'; wrap.appendChild(h);
+          const tbl = document.createElement('table');
+          tbl.innerHTML = `
+            <thead><tr>
+              <th>Customer</th><th>Phone</th><th>Source</th><th>Date In</th><th>Bucket</th><th>Status</th>
+            </tr></thead>
+            <tbody id="myCallsBody"></tbody>`;
+          wrap.appendChild(tbl);
+          app.innerHTML = '<a class="back" href="#/">&larr; Back</a>';
+          app.appendChild(wrap);
+          const tb = qs('myCallsBody');
+          if (!rows.length) {
+            const tr=document.createElement('tr'); const td=document.createElement('td'); td.colSpan=6; td.className='muted'; td.textContent='No calls found.'; tr.appendChild(td); tb.appendChild(tr);
+          } else {
+            rows.forEach(function(r){
+              const tr=document.createElement('tr');
+              const td0=document.createElement('td'); td0.textContent = r.name || ''; tr.appendChild(td0);
+              const td1=document.createElement('td'); td1.textContent = r.phone || ''; tr.appendChild(td1);
+              const td2=document.createElement('td'); td2.textContent = r.source || ''; tr.appendChild(td2);
+              const td3=document.createElement('td'); td3.textContent = r.dateIn || ''; tr.appendChild(td3);
+              const td4=document.createElement('td'); td4.textContent = r.bucket || ''; tr.appendChild(td4);
+              const td5=document.createElement('td'); td5.textContent = r.status || ''; tr.appendChild(td5);
+              tb.appendChild(tr);
+            });
+          }
+        } catch (e) {
+          app.innerHTML = '<a class="back" href="#/">&larr; Back</a><div class="card">Error: '+(e.message||String(e))+'</div>';
+        }
+      }
+
       /* ====== Router ====== */
       function route(){
+        renderNav();
         const hash = location.hash || '#/';
         const parts = hash.slice(2).split('/');
         if (parts[0] === '' || parts[0] === 'home') fillHome();
         else if (parts[0] === 'person') renderPerson(decodeURIComponent(parts[1]||''), parts[2]||'');
+        else if (parts[0] === 'login')  renderLogin();
+        else if (parts[0] === 'me')     renderMyCalls();
         else fillHome();
       }
       window.addEventListener('hashchange', route);
-      // Initial render
-      route();
+      route(); // initial
     </script>
   </body>
 </html>
