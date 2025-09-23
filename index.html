@@ -272,34 +272,65 @@
       }
 
       /* ====== LOGIN ====== */
-      async function renderLogin(){
-        renderNav();
-        const app=qs('app');
-        app.innerHTML=`<div class="card"><h2>Login</h2>
-          <div>
-            <input id="em" type="email" placeholder="Email or Username (e.g. Alberto)"><br/>
-            <input id="pw" type="password" placeholder="Password"><br/>
-            <button id="loginBtn" style="margin-top:10px;">Login</button>
-          </div>
-          <div class="muted" id="loginMsg" style="margin-top:8px;"></div>
-        </div>`;
-        document.getElementById('loginBtn').onclick = async function(){
-          const em=(document.getElementById('em').value||'').trim();
-          const pw=(document.getElementById('pw').value||'');
-          const msg=document.getElementById('loginMsg');
-          if(!em||!pw){ msg.textContent='Enter email/username and password.'; return; }
-          msg.textContent='Authenticating…';
-          try{
-            const res=await fetch(GAS_URL+'?route=auth_login'+ts(),{
-              method:'POST', headers:{'Content-Type':'application/json'},
-              body: JSON.stringify({ route:'auth_login', email: em, password: pw })
-            });
-            const j=await res.json();
-            if(!j||!j.ok) throw new Error(j&&j.error||'Invalid credentials');
-            setSession(j.session, j.profile); renderNav(); location.hash = '#/';
-          }catch(e){ msg.textContent='Error: '+(e.message||String(e)); }
-        };
+      async function renderLogin() {
+  renderNav();
+  const app = qs('app');
+
+  app.innerHTML = `
+    <div class="card">
+      <h2>Login</h2>
+      <div>
+        <input id="loginUser" type="email" placeholder="Email or Username (e.g. Alberto)" />
+        <br/>
+        <input id="loginPass" type="password" placeholder="Password" />
+        <br/>
+        <button id="loginBtn" style="margin-top:10px;">Login</button>
+      </div>
+      <div class="muted" id="loginMsg" style="margin-top:8px;"></div>
+    </div>
+  `;
+
+  const $u   = document.getElementById('loginUser');
+  const $p   = document.getElementById('loginPass');
+  const $btn = document.getElementById('loginBtn');
+  const $msg = document.getElementById('loginMsg');
+
+  async function submitLogin() {
+    const user = ($u.value || '').trim();
+    const pass = ($p.value || '');
+    if (!user || !pass) { $msg.textContent = 'Enter email/username and password.'; return; }
+
+    $btn.disabled = true;
+    $msg.textContent = 'Authenticating…';
+
+    try {
+      // Use form-encoded body to avoid CORS preflight
+      const form = new URLSearchParams();
+      form.append('route', 'auth_login');
+      form.append('email', user);      // backend accepts username "Alberto" or email
+      form.append('password', pass);
+
+      const res = await fetch(GAS_URL, { method: 'POST', body: form });
+      const json = await res.json();
+
+      if (!json || !json.ok) {
+        throw new Error((json && json.error) || 'Invalid credentials');
       }
+
+      setSession(json.session, json.profile);
+      renderNav();
+      location.hash = '#/';            // go to Home
+    } catch (e) {
+      $msg.textContent = 'Error: ' + (e.message || 'Failed to login');
+      $btn.disabled = false;
+    }
+  }
+
+  $btn.onclick = submitLogin;
+  $u.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
+  $p.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
+}
+
 
       /* ====== Router ====== */
       function route(){
