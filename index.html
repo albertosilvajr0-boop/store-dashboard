@@ -125,10 +125,9 @@
       }
 
       /* ====== HOME VIEW ====== */
-      function navToPerson(name, type){
-        location.hash = '#/person/' + encodeURIComponent(String(name||'')) + '/' + encodeURIComponent(String(type||''));
-        location.reload();
-      }
+function navToPerson(name, type){
+  location.hash = '#/person/' + encodeURIComponent(String(name||'')) + '/' + encodeURIComponent(String(type||''));
+}
       function fillHome(){
         apiLeaderboards().then(function(data){
           if(!data || !data.ok) throw new Error((data && data.error) || 'API error');
