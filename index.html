@@ -277,6 +277,30 @@
           cardLW.appendChild(lw);
           container.appendChild(cardLW);
 
+          /* PR Wins / Opportunities / Last Sales Day (from PerformanceReview output) */
+          var pr = data.prNotes || {};
+          if (pr.wins || pr.opportunities || (pr.lastSales && pr.lastSales.date)) {
+            var cardPR = document.createElement('div'); cardPR.className='card';
+            var hPR = document.createElement('h2'); hPR.textContent = 'Wins & Opportunities'; cardPR.appendChild(hPR);
+
+            if (pr.lastSales && pr.lastSales.date) {
+              var info = document.createElement('div'); info.className='muted';
+              info.textContent = 'Last Sales Day: ' + pr.lastSales.date + ' — Sales ' + (pr.lastSales.sales != null ? pr.lastSales.sales : '0');
+              cardPR.appendChild(info);
+            }
+            if (pr.wins) {
+              var w = document.createElement('div'); w.style.marginTop = '8px';
+              w.textContent = pr.wins;
+              cardPR.appendChild(w);
+            }
+            if (pr.opportunities) {
+              var o = document.createElement('div'); o.style.marginTop = '6px';
+              o.textContent = pr.opportunities;
+              cardPR.appendChild(o);
+            }
+            container.appendChild(cardPR);
+          }
+
           /* Coaching picks */
           var callsCard = document.createElement('div'); callsCard.className='card';
           var h2b = document.createElement('h2'); h2b.textContent='Call Coaching Picks'; callsCard.appendChild(h2b);
