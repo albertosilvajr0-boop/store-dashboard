@@ -32,12 +32,12 @@
       .kv .n { font-weight:700; font-size:18px; }
       .kv .bar { height:4px; border-radius:9999px; background:#eee; margin-top:6px; overflow:hidden; }
       .kv .bar > span { display:block; height:100%; border-radius:9999px; }
+      .btn { display:inline-block; padding:8px 12px; border:1px solid #e0e0e0; border-radius:8px; background:#f8f8f8; text-decoration:none; }
+      .btn:hover { background:#f0f0f0; }
       .topline { display:flex; align-items:center; justify-content:space-between; gap:12px; }
       .linkish { font-size:12px; color:#0a66c2; cursor:pointer; }
       .back { display:inline-block; margin-bottom:12px; }
       @media (max-width: 900px) { .two { grid-template-columns: 1fr; } .kvs { grid-template-columns: repeat(2, minmax(0,1fr)); } }
-      input[type="email"], input[type="password"] { width:260px; padding:8px; margin-bottom:6px; }
-      button { padding:8px 12px; cursor:pointer; }
     </style>
   </head>
   <body>
@@ -48,9 +48,7 @@
       </div>
     </header>
 
-    <!-- Top nav -->
     <div class="wrap"><div id="nav"></div></div>
-
     <div class="wrap"><div id="app"></div></div>
 
     <script>
@@ -59,37 +57,22 @@
       function ts(){ return '&t=' + Date.now(); }
       function qs(id){ return document.getElementById(id); }
 
-      /* ====== Session helpers ====== */
-      function setSession(tok, prof){ try { localStorage.setItem('session', tok); localStorage.setItem('profile', JSON.stringify(prof||{})); } catch(e){} }
-      function getSession(){ try { return localStorage.getItem('session')||''; } catch(e){ return ''; } }
-      function getProfile(){ try { return JSON.parse(localStorage.getItem('profile')||'{}'); } catch(e){ return {}; } }
-      function clearSession(){ try { localStorage.removeItem('session'); localStorage.removeItem('profile'); } catch(e){} }
+      /* ====== (minimal) nav (optional) ====== */
+      function renderNav(){ qs('nav').innerHTML = '<div class="muted"><a href="#/">Home</a></div>'; }
 
-      function renderNav(){
-        const nav = qs('nav'); if (!nav) return;
-        const prof = getProfile(); const tok = getSession();
-        if (tok) {
-          nav.innerHTML = `<div class="muted">Logged in as <strong>${prof.name||''}</strong> — <a href="#/me">My Calls</a> · <a href="#/" id="logoutLink">Logout</a></div>`;
-          const a = document.getElementById('logoutLink');
-          if (a) a.onclick = function(e){ e.preventDefault(); clearSession(); location.hash = '#/'; };
-        } else {
-          nav.innerHTML = `<div class="muted"><a href="#/login">Login</a></div>`;
-        }
-      }
-
-      /* ====== Person cache (sessionStorage) ====== */
+      /* ====== person cache (sessionStorage) to keep 1on1 snappy ====== */
       const PERSON_CACHE_TTL_MS = 9 * 60 * 1000;
-      function personKey(name, type){ return 'person:' + String(name||'').toUpperCase() + ':' + String(type||''); }
+      function personKey(name, type){ return 'person:' + String(name || '').toUpperCase() + ':' + String(type || ''); }
       function readPersonCache(name, type){
         try{
           const raw = sessionStorage.getItem(personKey(name, type));
           if (!raw) return null;
           const obj = JSON.parse(raw);
-          if (!obj || !obj.t || (Date.now()-obj.t)>PERSON_CACHE_TTL_MS){ sessionStorage.removeItem(personKey(name, type)); return null; }
+          if (!obj || !obj.t || (Date.now() - obj.t) > PERSON_CACHE_TTL_MS) { sessionStorage.removeItem(personKey(name, type)); return null; }
           return obj.data;
         }catch(e){ return null; }
       }
-      function writePersonCache(name, type, data){ try{ sessionStorage.setItem(personKey(name,type), JSON.stringify({ t:Date.now(), data })); }catch(e){} }
+      function writePersonCache(name, type, data){ try{ sessionStorage.setItem(personKey(name, type), JSON.stringify({ t:Date.now(), data })); }catch(e){} }
 
       async function fetchPerson(name, type, opts){
         const useCache = !opts || opts.useCache !== false;
@@ -104,27 +87,9 @@
         return { data: json, fromCache:false };
       }
 
-      /* ====== Benchmarks ====== */
-      const DEFAULT_TARGETS = {
-        Sales: { perDay: { sales:0.5, shown:0.5, created:1.0, calls:40, texts:20, talkSec:80 }, mtd: { due:10 } },
-        BDC:   { perDay: { sales:0,   shown:2.5, created:4,   calls:100, texts:40, talkSec:60 }, mtd: { due:0 } }
-      };
-      function loadTargets(){ try{ return JSON.parse(localStorage.getItem('targets_v3')||'null') || DEFAULT_TARGETS; }catch(e){ return DEFAULT_TARGETS; } }
-      function saveTargets(t){ localStorage.setItem('targets_v3', JSON.stringify(t)); }
-      function secsFromAny(x){ if(x==null) return 0; if(typeof x==='number') return x; const s=String(x).trim(); if(/^\d+:\d{1,2}$/.test(s)){const p=s.split(':'); return (+p[0])*60+(+p[1]);} const n=parseFloat(s); return isNaN(n)?0:n; }
-      function mssFromSecs(sec){ sec=Math.max(0,Math.round(sec)); const m=Math.floor(sec/60), s=sec%60; return m+':'+String(s).padStart(2,'0'); }
-      function editTargets(role){
-        const t=loadTargets(); const group=(role&&t[role])?role:(confirm('Edit Sales targets? Click Cancel for BDC')?'Sales':'BDC'); const g=t[group];
-        function askNum(label,cur){const x=prompt(label+' (blank = keep '+cur+')',cur); return (x===''||x==null)?cur:(+x||0);}
-        function askTime(label,cur){const x=prompt(label+' mm:ss or seconds (blank = keep '+mssFromSecs(cur)+')',mssFromSecs(cur)); return (x===''||x==null)?cur:secsFromAny(x);}
-        g.perDay.sales=askNum(group+' per-day: Sales', g.perDay.sales); g.perDay.shown=askNum(group+' per-day: Appts Shown', g.perDay.shown);
-        g.perDay.created=askNum(group+' per-day: Appts Created', g.perDay.created); g.perDay.calls=askNum(group+' per-day: Calls', g.perDay.calls);
-        g.perDay.texts=askNum(group+' per-day: Texts', g.perDay.texts); g.perDay.talkSec=askTime(group+' per-day: Avg Talk (target)', g.perDay.talkSec);
-        g.mtd.due=askNum(group+' MTD: Appts Due (fallback)', g.mtd.due||0); saveTargets(t); alert('Saved '+group+' targets. Reloading…'); if(location.hash.startsWith('#/person/')) location.reload();
-      }
-
-      /* ====== API (leaderboards) ====== */
+      /* ====== API ====== */
       async function apiLeaderboards(){ const r=await fetch(GAS_URL+'?route=leaderboards'+ts(),{cache:'no-store'}); return r.json(); }
+      async function apiCallsFor(name){ const u=GAS_URL+'?route=calls_for&name='+encodeURIComponent(name)+ts(); const r=await fetch(u,{cache:'no-store'}); return r.json(); }
 
       /* ====== HOME ====== */
       function navToPerson(name, type){ location.hash = '#/person/' + encodeURIComponent(String(name||'')) + '/' + encodeURIComponent(String(type||'')); }
@@ -145,11 +110,8 @@
         apiLeaderboards().then(function(data){
           if(!data || !data.ok) throw new Error(data && data.error || 'API error');
 
-          // Sales
           const sBody=qs('salesBody'); sBody.innerHTML='';
-          const sales=Array.isArray(data.sales)?data.sales:[];
-          if(!sales.length){ const tr=document.createElement('tr'); const td=document.createElement('td'); td.colSpan=3; td.className='muted'; td.textContent='No data'; tr.appendChild(td); sBody.appendChild(tr); }
-          else sales.forEach(function(r,i){
+          (data.sales||[]).forEach(function(r,i){
             const tr=document.createElement('tr');
             const tdRank=document.createElement('td'); tdRank.textContent=i+1;
             const tdName=document.createElement('td'); const a=document.createElement('a');
@@ -160,11 +122,8 @@
             tr.appendChild(tdRank); tr.appendChild(tdName); tr.appendChild(tdSales); sBody.appendChild(tr);
           });
 
-          // BDC
           const bBody=qs('bdcBody'); bBody.innerHTML='';
-          const bdc=Array.isArray(data.bdc)?data.bdc:[];
-          if(!bdc.length){ const tr2=document.createElement('tr'); const td2=document.createElement('td'); td2.colSpan=3; td2.className='muted'; td2.textContent='No data'; tr2.appendChild(td2); bBody.appendChild(tr2); }
-          else bdc.forEach(function(r,i){
+          (data.bdc||[]).forEach(function(r,i){
             const tr=document.createElement('tr');
             const tdRank=document.createElement('td'); tdRank.textContent=i+1;
             const tdName=document.createElement('td'); const a=document.createElement('a');
@@ -175,21 +134,18 @@
             tr.appendChild(tdRank); tr.appendChild(tdName); tr.appendChild(tdShows); bBody.appendChild(tr);
           });
 
-          // Prefetch top rows + hover
+          // Prefetch a handful for instant first-clicks
           try{
-            const prefetch=[]; (data.sales||[]).slice(0,20).forEach(r=>prefetch.push({name:r.name,type:'Sales'}));
-            (data.bdc||[]).slice(0,20).forEach(r=>prefetch.push({name:r.name,type:'BDC'}));
-            prefetch.forEach((p,i)=>setTimeout(()=>fetchPerson(p.name,p.type).catch(()=>{}), i*120));
-            document.querySelectorAll('a[href^="#/person/"]').forEach(a=>{
-              try{ const parts=decodeURIComponent(a.getAttribute('href').slice(2)).split('/'); const nm=parts[1]||'', tp=parts[2]||''; a.addEventListener('mouseenter',()=>fetchPerson(nm,tp).catch(()=>{})); }catch(e){}
-            });
+            const prefetch=[]; (data.sales||[]).slice(0,12).forEach(r=>prefetch.push({name:r.name,type:'Sales'}));
+            (data.bdc||[]).slice(0,12).forEach(r=>prefetch.push({name:r.name,type:'BDC'}));
+            prefetch.forEach((p,i)=>setTimeout(()=>fetchPerson(p.name,p.type).catch(()=>{}), i*100));
           }catch(e){}
         }).catch(function(e){
           qs('app').innerHTML = '<div class="card">Error: '+(e && e.message ? e.message : String(e))+'</div>';
         });
       }
 
-      /* ====== PERSON (cache-first, revalidate) ====== */
+      /* ====== PERSON (1on1) ====== */
       function pctColor(p){ return p>=100 ? '#16a34a' : (p>=60 ? '#f59e0b' : '#ef4444'); }
       function addBar(el, value, target, isTime){
         if(!target||target<=0) return;
@@ -220,12 +176,14 @@
 
         const app=qs('app'); const container=document.createElement('div');
 
-        // Header
+        // Header + "Open Call Sheet" link
         const cardHead=document.createElement('div'); cardHead.className='card';
         const top=document.createElement('div'); top.className='topline';
         const h2=document.createElement('h2'); h2.textContent=(b.name||'')+' '; const pill=document.createElement('span'); pill.className='pill'; pill.textContent=role; h2.appendChild(pill);
-        const edit=document.createElement('span'); edit.className='linkish'; edit.textContent='Edit targets'; edit.onclick=function(){ editTargets(role); };
-        top.appendChild(h2); top.appendChild(edit);
+        const right=document.createElement('div');
+        const linkSheet=document.createElement('a'); linkSheet.className='btn'; linkSheet.href='#/sheet/'+encodeURIComponent(b.name||''); linkSheet.textContent='Open Call Sheet';
+        right.appendChild(linkSheet);
+        top.appendChild(h2); top.appendChild(right);
         const sub=document.createElement('div'); sub.className='muted'; sub.textContent='Last work day: '+(data.lastWorkDay||'—');
         cardHead.appendChild(top); cardHead.appendChild(sub); container.appendChild(cardHead);
 
@@ -271,107 +229,66 @@
         lw.appendChild(kvTile((lastDay&&lastDay.avgTalkMSS)?lastDay.avgTalkMSS:'0:00','Avg Talk',talkTarget,true));
         cardLW.appendChild(lw); container.appendChild(cardLW);
 
-        // PR notes
-        const pr=data.prNotes||{};
-        if(pr.wins||pr.opportunities||(pr.lastSales&&pr.lastSales.date)){
-          const cardPR=document.createElement('div'); cardPR.className='card';
-          const hPR=document.createElement('h2'); hPR.textContent='Wins & Opportunities'; cardPR.appendChild(hPR);
-          if(pr.lastSales&&pr.lastSales.date){ const info=document.createElement('div'); info.className='muted'; info.textContent='Last Sales Day: '+pr.lastSales.date+' — Sales '+(pr.lastSales.sales!=null?pr.lastSales.sales:'0'); cardPR.appendChild(info); }
-          if(pr.wins){ const w=document.createElement('div'); w.style.marginTop='8px'; w.textContent=pr.wins; cardPR.appendChild(w); }
-          if(pr.opportunities){ const o=document.createElement('div'); o.style.marginTop='6px'; o.textContent=pr.opportunities; cardPR.appendChild(o); }
-          container.appendChild(cardPR);
-        }
-
-        // Coaching picks
+        // Coaching picks (kept)
         const callsCard=document.createElement('div'); callsCard.className='card';
         const h2b=document.createElement('h2'); h2b.textContent='Call Coaching Picks'; callsCard.appendChild(h2b);
         const lastDayKey=data.lastWorkDay||''; const usedDay=(picks&&picks.usedDate)?picks.usedDate:((over&&over.dateKey)||(under&&under.dateKey)||'');
         const meta=document.createElement('div'); meta.className='muted';
         meta.textContent=(usedDay&&lastDayKey&&usedDay!==lastDayKey)?('Using calls from '+usedDay+' (no recordings on last work day).'):'1 over a minute, 1 under 30 seconds (longest/shortest as fallback)';
         callsCard.appendChild(meta);
+
         function callBlock(label,pick){ const wrap=document.createElement('div'); wrap.className='call'; const strong=document.createElement('strong'); strong.textContent=label; wrap.appendChild(strong); wrap.appendChild(document.createElement('br')); if(pick){ const span=document.createElement('span'); span.textContent=(pick.dateKey||'')+' — '+(pick.talkMSS||''); wrap.appendChild(span); if(pick.url){ wrap.appendChild(document.createElement('br')); const link=document.createElement('a'); link.href=pick.url; link.target='_blank'; link.rel='noopener'; link.textContent='Play recording'; wrap.appendChild(link);} } else { const none=document.createElement('span'); none.className='muted'; none.textContent='None'; wrap.appendChild(none);} return wrap; }
         callsCard.appendChild(callBlock('Over 1:00', over)); callsCard.appendChild(callBlock('Under 0:30', under));
 
         app.innerHTML='<a class="back" href="#/">&larr; Back</a>'; app.appendChild(container); app.appendChild(callsCard);
       }
 
-      /* ====== LOGIN & MY CALLS ====== */
-      async function renderSetPassword(){
-        renderNav();
+      /* ====== PERSON CALL SHEET (#/sheet/<Name>) ====== */
+      async function renderPersonSheet(name){
         const app=qs('app');
-        const parts=(location.hash||'').split('?'); const q=parts[1]?new URLSearchParams(parts[1]):new URLSearchParams(); const token=q.get('token')||'';
-        if(!token){ app.innerHTML='<div class="card">Missing token.</div>'; return; }
-        app.innerHTML='<div class="card">Preparing set-password…</div>';
+        app.innerHTML = `<a class="back" href="#/">&larr; Back</a><div class="card">Loading ${name}'s call sheet…</div>`;
         try{
-          const url=GAS_URL+'?route=auth_prepare_password&token='+encodeURIComponent(token)+ts(); const res=await fetch(url,{cache:'no-store'}); const js=await res.json();
-          if(!js||!js.ok) throw new Error(js&&js.error||'Invalid or expired link');
+          const res = await apiCallsFor(name);
+          if(!res || !res.ok) throw new Error(res && res.error || 'API error');
+          const rows = res.calls || [];
+          const wrap = document.createElement('div'); wrap.className='card';
+          const h = document.createElement('h2'); h.textContent = `${name} — Call Sheet`; wrap.appendChild(h);
 
-          app.innerHTML = `
-            <div class="card">
-              <h2>Set Password</h2>
-              <div class="muted">User: <strong>${js.name}</strong> (${js.email})</div>
-              <div style="margin-top:10px;">
-                <input id="pw1" type="password" placeholder="New password"><br/>
-                <input id="pw2" type="password" placeholder="Confirm password"><br/>
-                <button id="pwBtn" style="margin-top:10px;">Save Password</button>
-              </div>
-              <div class="muted" id="pwMsg" style="margin-top:8px;"></div>
-            </div>`;
-          document.getElementById('pwBtn').onclick = async function(){
-            const p1=document.getElementById('pw1').value||''; const p2=document.getElementById('pw2').value||''; const msg=document.getElementById('pwMsg');
-            if(p1.length<8){ msg.textContent='Password must be at least 8 characters.'; return; }
-            if(p1!==p2){ msg.textContent='Passwords do not match.'; return; }
-            msg.textContent='Saving…';
-            try{
-              const res=await fetch(GAS_URL+'?route=auth_set_password'+ts(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({route:'auth_set_password',token:token,password:p1})});
-              const j=await res.json(); if(!j||!j.ok) throw new Error(j&&j.error||'Error');
-              msg.textContent='Password set. Redirecting to login…'; setTimeout(()=>{ location.hash='#/login'; },900);
-            }catch(e){ msg.textContent='Error: '+(e.message||String(e)); }
-          };
-        }catch(e){ app.innerHTML='<div class="card">Error: '+(e.message||String(e))+'</div>'; }
-      }
+          const tbl = document.createElement('table');
+          tbl.innerHTML = `
+            <thead>
+              <tr>
+                <th>Customer</th><th>Phone</th><th>Email</th><th>Source</th><th>Date In</th>
+                <th>Lead Age</th><th>Days Since</th><th>Bucket</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="sheetBody"></tbody>`;
+          wrap.appendChild(tbl);
+          app.innerHTML = `<a class="back" href="#/">&larr; Back</a>`;
+          app.appendChild(wrap);
 
-      async function renderLoginForm(){
-        renderNav();
-        const app=qs('app');
-        app.innerHTML = `
-          <div class="card">
-            <h2>Login</h2>
-            <div><input id="em" type="email" placeholder="Email"><br/><input id="pw" type="password" placeholder="Password"><br/><button id="loginBtn" style="margin-top:10px;">Login</button></div>
-            <div class="muted" id="loginMsg" style="margin-top:8px;"></div>
-          </div>`;
-        document.getElementById('loginBtn').onclick = async function(){
-          const em=(document.getElementById('em').value||'').trim(); const pw=(document.getElementById('pw').value||''); const msg=document.getElementById('loginMsg');
-          if(!em||!pw){ msg.textContent='Enter email and password.'; return; }
-          msg.textContent='Authenticating…';
-          try{
-            const res=await fetch(GAS_URL+'?route=auth_login'+ts(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({route:'auth_login',email:em,password:pw})});
-            const j=await res.json(); if(!j||!j.ok) throw new Error(j&&j.error||'Invalid credentials');
-            setSession(j.session,j.profile); renderNav(); location.hash='#/me';
-          }catch(e){ msg.textContent='Error: '+(e.message||String(e)); }
-        };
-      }
+          const tb = qs('sheetBody');
+          if (!rows.length){
+            const tr=document.createElement('tr'); const td=document.createElement('td'); td.colSpan=9; td.className='muted'; td.textContent='No calls found.'; tr.appendChild(td); tb.appendChild(tr);
+          } else {
+            rows.forEach(function(r){
+              const tr=document.createElement('tr');
+              const tdName=document.createElement('td');
+              if (r.link) { const a=document.createElement('a'); a.href=r.link; a.target='_blank'; a.rel='noopener'; a.textContent=r.name||''; tdName.appendChild(a); }
+              else tdName.textContent = r.name || '';
+              tr.appendChild(tdName);
 
-      async function renderMyCalls(){
-        renderNav();
-        const app=qs('app'); const tok=getSession();
-        if(!tok){ location.hash='#/login'; return; }
-        app.innerHTML='<a class="back" href="#/">&larr; Back</a><div class="card">Loading your calls…</div>';
-        try{
-          const url=GAS_URL+'?route=me_calls&session='+encodeURIComponent(tok)+ts(); const res=await fetch(url,{cache:'no-store'}); const j=await res.json();
-          if(!j||!j.ok) throw new Error(j&&j.error||'API error');
-          const rows=j.calls||[];
-          const wrap=document.createElement('div'); wrap.className='card'; const h=document.createElement('h2'); h.textContent='My Calls'; wrap.appendChild(h);
-          const tbl=document.createElement('table'); tbl.innerHTML='<thead><tr><th>Customer</th><th>Phone</th><th>Source</th><th>Date In</th><th>Bucket</th><th>Status</th></tr></thead><tbody id="myCallsBody"></tbody>';
-          wrap.appendChild(tbl); app.innerHTML='<a class="back" href="#/">&larr; Back</a>'; app.appendChild(wrap);
-          const tb=qs('myCallsBody');
-          if(!rows.length){ const tr=document.createElement('tr'); const td=document.createElement('td'); td.colSpan=6; td.className='muted'; td.textContent='No calls found.'; tr.appendChild(td); tb.appendChild(tr); }
-          else rows.forEach(function(r){ const tr=document.createElement('tr');
-            function tdv(v){ const td=document.createElement('td'); td.textContent=v||''; return td; }
-            tr.appendChild(tdv(r.name)); tr.appendChild(tdv(r.phone)); tr.appendChild(tdv(r.source));
-            tr.appendChild(tdv(r.dateIn)); tr.appendChild(tdv(r.bucket)); tr.appendChild(tdv(r.status)); tb.appendChild(tr);
-          });
-        }catch(e){ app.innerHTML='<a class="back" href="#/">&larr; Back</a><div class="card">Error: '+(e.message||String(e))+'</div>'; }
+              function tdv(v){ const td=document.createElement('td'); td.textContent = v || ''; return td; }
+              tr.appendChild(tdv(r.phone)); tr.appendChild(tdv(r.email));
+              tr.appendChild(tdv(r.source)); tr.appendChild(tdv(r.dateIn));
+              tr.appendChild(tdv(r.leadAge)); tr.appendChild(tdv(r.daysSince));
+              tr.appendChild(tdv(r.bucket));  tr.appendChild(tdv(r.status));
+              tb.appendChild(tr);
+            });
+          }
+        } catch(e){
+          app.innerHTML = `<a class="back" href="#/">&larr; Back</a><div class="card">Error: ${(e.message || String(e))}</div>`;
+        }
       }
 
       /* ====== Router ====== */
@@ -379,11 +296,9 @@
         renderNav();
         const hash=location.hash||'#/';
         const parts=hash.slice(2).split('/');
-        if(parts[0]===''||parts[0]==='home') fillHome();
+        if(parts[0]==='' || parts[0]==='home') fillHome();
         else if(parts[0]==='person') renderPerson(decodeURIComponent(parts[1]||''), parts[2]||'');
-        else if(parts[0]==='set-password') renderSetPassword();
-        else if(parts[0]==='login') renderLoginForm();
-        else if(parts[0]==='me') renderMyCalls();
+        else if(parts[0]==='sheet')  renderPersonSheet(decodeURIComponent(parts[1]||''));
         else fillHome();
       }
       window.addEventListener('hashchange', route);
