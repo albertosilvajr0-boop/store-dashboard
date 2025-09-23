@@ -155,62 +155,106 @@
         // Faster nav — no full page reload
         location.hash = '#/person/' + encodeURIComponent(String(name||'')) + '/' + encodeURIComponent(String(type||''));
       }
-      function fillHome(){
-        apiLeaderboards().then(function(data){
-          if(!data || !data.ok) throw new Error(data && data.error || 'API error');
+function fillHome(){
+    // 1) Rebuild the home layout skeleton so the IDs exist again
+    var root = document.getElementById('app');
+    root.innerHTML = `
+      <div class="two">
+        <div class="card">
+          <h2>Sales Leaderboard <span class="pill">Sales (MTD)</span></h2>
+          <table>
+            <thead><tr><th>#</th><th>Rep</th><th>Sales</th></tr></thead>
+            <tbody id="salesBody"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h2>BDC Leaderboard <span class="pill">Shows (MTD)</span></h2>
+          <table>
+            <thead><tr><th>#</th><th>Agent</th><th>Shows</th></tr></thead>
+            <tbody id="bdcBody"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    `;
 
-          var sBody = qs('salesBody'); sBody.innerHTML='';
-          var sales = Array.isArray(data.sales)?data.sales:[];
-          if(!sales.length){ var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=3; td.className='muted'; td.textContent='No data'; tr.appendChild(td); sBody.appendChild(tr); }
-          else sales.forEach(function(r,i){
-            var tr=document.createElement('tr');
-            var tdRank=document.createElement('td'); tdRank.textContent=i+1;
-            var tdName=document.createElement('td'); var a=document.createElement('a');
-            a.href = '#/person/' + encodeURIComponent(r.name) + '/Sales';
-            a.textContent=r.name||'';
-            a.onclick=function(e){ e.preventDefault(); navToPerson(r.name,'Sales'); };
-            tdName.appendChild(a);
-            var tdSales=document.createElement('td'); tdSales.textContent=(r.sales!=null?r.sales:0);
-            tr.appendChild(tdRank); tr.appendChild(tdName); tr.appendChild(tdSales); sBody.appendChild(tr);
-          });
+    // 2) Fetch and populate
+    apiLeaderboards().then(function(data){
+      if(!data || !data.ok) throw new Error(data && data.error || 'API error');
 
-          var bBody = qs('bdcBody'); bBody.innerHTML='';
-          var bdc = Array.isArray(data.bdc)?data.bdc:[];
-          if(!bdc.length){ var tr2=document.createElement('tr'); var td2=document.createElement('td'); td2.colSpan=3; td2.className='muted'; td2.textContent='No data'; tr2.appendChild(td2); bBody.appendChild(tr2); }
-          else bdc.forEach(function(r,i){
-            var tr=document.createElement('tr');
-            var tdRank=document.createElement('td'); tdRank.textContent=i+1;
-            var tdName=document.createElement('td'); var a=document.createElement('a');
-            a.href = '#/person/' + encodeURIComponent(r.name) + '/BDC';
-            a.textContent=r.name||'';
-            a.onclick=function(e){ e.preventDefault(); navToPerson(r.name,'BDC'); };
-            tdName.appendChild(a);
-            var tdShows=document.createElement('td'); tdShows.textContent=(r.shows!=null?r.shows:0);
-            tr.appendChild(tdRank); tr.appendChild(tdName); tr.appendChild(tdShows); bBody.appendChild(tr);
-          });
+      // --- Sales ---
+      var sBody = document.getElementById('salesBody'); sBody.innerHTML = '';
+      var sales = Array.isArray(data.sales) ? data.sales : [];
+      if (!sales.length){
+        var tr=document.createElement('tr'), td=document.createElement('td');
+        td.colSpan = 3; td.className='muted'; td.textContent='No data';
+        tr.appendChild(td); sBody.appendChild(tr);
+      } else {
+        sales.forEach(function(r,i){
+          var tr=document.createElement('tr');
 
-          /* Prefetch top rows + hover (for instant first clicks) */
-          try {
-            var prefetchList = [];
-            (data.sales || []).slice(0, 8).forEach(function(r){ prefetchList.push({name:r.name, type:'Sales'}); });
-            (data.bdc   || []).slice(0, 8).forEach(function(r){ prefetchList.push({name:r.name, type:'BDC'}); });
-            prefetchList.forEach(function(p, i){
-              setTimeout(function(){ fetchPerson(p.name, p.type).catch(function(){}); }, i * 120);
-            });
-            document.querySelectorAll('a[href^="#/person/"]').forEach(function(a){
-              try {
-                var parts = decodeURIComponent(a.getAttribute('href').slice(2)).split('/');
-                var nm = parts[1] || '', tp = parts[2] || '';
-                a.addEventListener('mouseenter', function(){ fetchPerson(nm, tp).catch(function(){}); });
-              } catch(e){}
-            });
-          } catch(e){}
+          var tdRank=document.createElement('td'); tdRank.textContent=i+1;
 
-        }).catch(function(e){
-          ['salesBody','bdcBody'].forEach(function(id){ var tb=qs(id); tb.innerHTML=''; var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=3; td.className='muted'; td.textContent='Error'; tr.appendChild(td); tb.appendChild(tr); });
-          console.error(e);
+          var tdName=document.createElement('td'); var a=document.createElement('a');
+          a.href = '#/person/' + encodeURIComponent(r.name) + '/Sales';
+          a.textContent=r.name||'';
+          a.onclick=function(e){ e.preventDefault(); navToPerson(r.name,'Sales'); };
+          tdName.appendChild(a);
+
+          var tdSales=document.createElement('td'); tdSales.textContent=(r.sales!=null?r.sales:0);
+
+          tr.appendChild(tdRank); tr.appendChild(tdName); tr.appendChild(tdSales);
+          sBody.appendChild(tr);
         });
       }
+
+      // --- BDC ---
+      var bBody = document.getElementById('bdcBody'); bBody.innerHTML = '';
+      var bdc = Array.isArray(data.bdc) ? data.bdc : [];
+      if (!bdc.length){
+        var tr2=document.createElement('tr'), td2=document.createElement('td');
+        td2.colSpan=3; td2.className='muted'; td2.textContent='No data';
+        tr2.appendChild(td2); bBody.appendChild(tr2);
+      } else {
+        bdc.forEach(function(r,i){
+          var tr=document.createElement('tr');
+
+          var tdRank=document.createElement('td'); tdRank.textContent=i+1;
+
+          var tdName=document.createElement('td'); var a=document.createElement('a');
+          a.href = '#/person/' + encodeURIComponent(r.name) + '/BDC';
+          a.textContent=r.name||'';
+          a.onclick=function(e){ e.preventDefault(); navToPerson(r.name,'BDC'); };
+          tdName.appendChild(a);
+
+          var tdShows=document.createElement('td'); tdShows.textContent=(r.shows!=null?r.shows:0);
+
+          tr.appendChild(tdRank); tr.appendChild(tdName); tr.appendChild(tdShows);
+          bBody.appendChild(tr);
+        });
+      }
+
+      /* Optional: prefetch top rows + hover for instant first-clicks */
+      try {
+        var prefetchList = [];
+        (data.sales || []).slice(0, 20).forEach(function(r){ prefetchList.push({name:r.name, type:'Sales'}); });
+        (data.bdc   || []).slice(0, 20).forEach(function(r){ prefetchList.push({name:r.name, type:'BDC'}); });
+        prefetchList.forEach(function(p, i){
+          setTimeout(function(){ fetchPerson(p.name, p.type).catch(function(){}); }, i * 120);
+        });
+        document.querySelectorAll('a[href^="#/person/"]').forEach(function(a){
+          try {
+            var parts = decodeURIComponent(a.getAttribute('href').slice(2)).split('/');
+            var nm = parts[1] || '', tp = parts[2] || '';
+            a.addEventListener('mouseenter', function(){ fetchPerson(nm, tp).catch(function(){}); });
+          } catch(e){}
+        });
+      } catch(e){}
+    }).catch(function(e){
+      var msg = '<div class="card">Error: '+(e && e.message ? e.message : String(e))+'</div>';
+      document.getElementById('app').innerHTML = msg;
+      console.error(e);
+    });
+  }
 
       /* ====== PERSON VIEW (cache-then-network) ====== */
       function pctColor(p){ return p>=100 ? '#16a34a' : (p>=60 ? '#f59e0b' : '#ef4444'); }
