@@ -543,10 +543,36 @@
         // Load dashboard data
         async function loadDashboardData() {
             try {
+                console.log('Fetching data from Google Apps Script...');
                 const response = await fetch('https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 dashboardData = await response.json();
+                console.log('Successfully loaded data:', dashboardData);
+                
+                // Check if data has expected structure
+                if (!dashboardData || typeof dashboardData !== 'object') {
+                    console.error('Invalid data structure received');
+                    document.getElementById('mainContent').innerHTML = `
+                        <div style="background: #fee; color: #c00; padding: 20px; border-radius: 10px; text-align: center;">
+                            <h3>Data Structure Error</h3>
+                            <p>The data from Google Sheets doesn't match expected format.</p>
+                            <p>Please check the Google Apps Script URL and data structure.</p>
+                        </div>
+                    `;
+                }
             } catch (error) {
                 console.error('Error loading dashboard data:', error);
+                document.getElementById('mainContent').innerHTML = `
+                    <div style="background: #fee; color: #c00; padding: 20px; border-radius: 10px; text-align: center;">
+                        <h3>Failed to Load Data</h3>
+                        <p>Error: ${error.message}</p>
+                        <p>Please check your internet connection and try refreshing.</p>
+                    </div>
+                `;
             }
         }
 
@@ -559,31 +585,77 @@
                 return;
             }
 
+            // Debug: Log the data structure to see what we're working with
+            console.log('Dashboard Data:', dashboardData);
+
             // Extract sales and BDC data
             let salesData = [];
             let bdcData = [];
             
-            // Process sales data (from activations or sales tabs)
+            // Try multiple data locations for flexibility
+            // Check for activationsTab first (for sales)
             if (dashboardData.activationsTab && Array.isArray(dashboardData.activationsTab)) {
+                console.log('Activations Tab:', dashboardData.activationsTab);
                 for (let i = 1; i < dashboardData.activationsTab.length; i++) {
                     const row = dashboardData.activationsTab[i];
-                    if (row[0]) { // Person name
+                    if (row && row[0]) { // Person name
+                        // Find the sales value - could be in different columns
+                        let salesValue = 0;
+                        for (let j = 1; j < row.length; j++) {
+                            if (!isNaN(row[j]) && row[j] > 0) {
+                                salesValue = row[j];
+                                break;
+                            }
+                        }
                         salesData.push({
                             name: row[0],
-                            sales: row[1] || 0 // Assuming sales is in second column
+                            sales: salesValue
                         });
                     }
                 }
             }
             
-            // Process BDC data (from calls tab for shows)
+            // If no activations, check upgradesTab or grandPrizeTab
+            if (salesData.length === 0 && dashboardData.upgradesTab) {
+                console.log('Upgrades Tab:', dashboardData.upgradesTab);
+                for (let i = 1; i < dashboardData.upgradesTab.length; i++) {
+                    const row = dashboardData.upgradesTab[i];
+                    if (row && row[0]) {
+                        let salesValue = 0;
+                        for (let j = 1; j < row.length; j++) {
+                            if (!isNaN(row[j]) && row[j] > 0) {
+                                salesValue = row[j];
+                                break;
+                            }
+                        }
+                        salesData.push({
+                            name: row[0],
+                            sales: salesValue
+                        });
+                    }
+                }
+            }
+            
+            // Process BDC data from calls tab
             if (dashboardData.callsTab && Array.isArray(dashboardData.callsTab)) {
+                console.log('Calls Tab:', dashboardData.callsTab);
                 for (let i = 1; i < dashboardData.callsTab.length; i++) {
                     const row = dashboardData.callsTab[i];
-                    if (row[0]) { // Person name
+                    if (row && row[0]) { // Person name
+                        // Find shows value - check multiple columns
+                        let showsValue = 0;
+                        // Check columns 2, 3, 4 for shows data
+                        for (let j = 1; j < row.length; j++) {
+                            if (!isNaN(row[j]) && row[j] > 0) {
+                                // Assume shows is the 2nd or 3rd numeric column
+                                if (j === 2 || (j === 1 && !row[2])) {
+                                    showsValue = row[j];
+                                }
+                            }
+                        }
                         bdcData.push({
                             name: row[0],
-                            shows: row[2] || row[1] || 0 // Shows might be in 3rd column
+                            shows: showsValue || row[1] || 0
                         });
                     }
                 }
@@ -593,14 +665,42 @@
             salesData.sort((a, b) => b.sales - a.sales);
             bdcData.sort((a, b) => b.shows - a.shows);
             
+            console.log('Sales Data:', salesData);
+            console.log('BDC Data:', bdcData);
+            
             const isAdmin = currentUserData && currentUserData.role === 'admin';
             const linkedPerson = currentUserData ? currentUserData.linkedPerson : null;
+            
+            // Show message if no data
+            if (salesData.length === 0 && bdcData.length === 0) {
+                mainContent.innerHTML = `
+                    <div class="leaderboard-container">
+                        <div class="leaderboard-card">
+                            <h2>Sales Representatives</h2>
+                            <div style="padding: 20px; text-align: center; color: #6b7280;">
+                                No sales data available. Check console for data structure.
+                            </div>
+                        </div>
+                        <div class="leaderboard-card">
+                            <h2>BDC Agents</h2>
+                            <div style="padding: 20px; text-align: center; color: #6b7280;">
+                                No BDC data available. Check console for data structure.
+                            </div>
+                        </div>
+                    </div>
+                    <div style="background: #f3f4f6; padding: 20px; border-radius: 10px; margin-top: 20px;">
+                        <p><strong>Debug Info:</strong> Open browser console (F12) to see data structure.</p>
+                        <p>Data tabs found: ${Object.keys(dashboardData).join(', ')}</p>
+                    </div>
+                `;
+                return;
+            }
             
             mainContent.innerHTML = `
                 <div class="leaderboard-container">
                     <div class="leaderboard-card">
                         <h2>Sales Representatives</h2>
-                        ${salesData.map((person, index) => {
+                        ${salesData.length > 0 ? salesData.map((person, index) => {
                             const canClick = isAdmin || person.name === linkedPerson;
                             return `
                                 <div class="leaderboard-item ${canClick ? 'clickable' : ''}" 
@@ -610,12 +710,12 @@
                                     <span class="score">${person.sales} sales</span>
                                 </div>
                             `;
-                        }).join('')}
+                        }).join('') : '<div style="padding: 20px; text-align: center; color: #6b7280;">No sales data available</div>'}
                     </div>
                     
                     <div class="leaderboard-card">
                         <h2>BDC Agents</h2>
-                        ${bdcData.map((person, index) => {
+                        ${bdcData.length > 0 ? bdcData.map((person, index) => {
                             const canClick = isAdmin || person.name === linkedPerson;
                             return `
                                 <div class="leaderboard-item ${canClick ? 'clickable' : ''}" 
@@ -625,7 +725,7 @@
                                     <span class="score">${person.shows} shows</span>
                                 </div>
                             `;
-                        }).join('')}
+                        }).join('') : '<div style="padding: 20px; text-align: center; color: #6b7280;">No BDC data available</div>'}
                     </div>
                 </div>
             `;
