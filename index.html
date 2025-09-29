@@ -347,7 +347,7 @@
         const GAS_URL = 'https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec';
         
         // ============================================
-        // SESSION MANAGEMENT (uses sessionStorage)
+        // SESSION MANAGEMENT (uses localStorage for persistence)
         // ============================================
         class SessionManager {
             constructor() {
@@ -356,22 +356,23 @@
             }
 
             setSession(sessionData, userData) {
-                sessionStorage.setItem(this.SESSION_KEY, sessionData);
-                sessionStorage.setItem(this.USER_KEY, JSON.stringify(userData));
+                // Use localStorage for cross-tab persistence
+                localStorage.setItem(this.SESSION_KEY, sessionData);
+                localStorage.setItem(this.USER_KEY, JSON.stringify(userData));
             }
 
             getSession() {
-                return sessionStorage.getItem(this.SESSION_KEY);
+                return localStorage.getItem(this.SESSION_KEY);
             }
 
             getUser() {
-                const stored = sessionStorage.getItem(this.USER_KEY);
+                const stored = localStorage.getItem(this.USER_KEY);
                 return stored ? JSON.parse(stored) : null;
             }
 
             clear() {
-                sessionStorage.removeItem(this.SESSION_KEY);
-                sessionStorage.removeItem(this.USER_KEY);
+                localStorage.removeItem(this.SESSION_KEY);
+                localStorage.removeItem(this.USER_KEY);
             }
 
             isAdmin() {
@@ -497,7 +498,7 @@
                         <div style="margin-top: 1rem; text-align: center; color: var(--gray-500); font-size: 0.875rem;">
                             <div>Default admin: admin / Password1</div>
                             <div style="margin-top: 0.5rem; font-size: 0.75rem;">
-                                Users are stored on the server and work across all browsers
+                                Note: Each browser maintains its own session. You need to login separately in each browser.
                             </div>
                         </div>
                     </div>
@@ -559,6 +560,8 @@
                         <div class="leaderboard-list">
                             ${data.sales ? data.sales.map((item, index) => {
                                 const canView = session.canViewPerson(item.name);
+                                // Handle both score formats
+                                const score = item.score || item.mtdSales || item.value || '0';
                                 return `
                                     <div class="leaderboard-item ${canView ? 'clickable' : 'disabled'}"
                                          ${canView ? `onclick="navigate('#/person/${encodeURIComponent(item.name)}/Sales')"` : ''}>
@@ -566,7 +569,7 @@
                                             <span class="rank">#${index + 1}</span>
                                             <span>${item.name}</span>
                                         </div>
-                                        <strong>${item.score}</strong>
+                                        <strong>${score}</strong>
                                     </div>
                                 `;
                             }).join('') : '<p>No sales data available</p>'}
@@ -578,6 +581,8 @@
                         <div class="leaderboard-list">
                             ${data.bdc ? data.bdc.map((item, index) => {
                                 const canView = session.canViewPerson(item.name);
+                                // Handle both score formats
+                                const score = item.score || item.mtdSales || item.value || '0';
                                 return `
                                     <div class="leaderboard-item ${canView ? 'clickable' : 'disabled'}"
                                          ${canView ? `onclick="navigate('#/person/${encodeURIComponent(item.name)}/BDC')"` : ''}>
@@ -585,7 +590,7 @@
                                             <span class="rank">#${index + 1}</span>
                                             <span>${item.name}</span>
                                         </div>
-                                        <strong>${item.score}</strong>
+                                        <strong>${score}</strong>
                                     </div>
                                 `;
                             }).join('') : '<p>No BDC data available</p>'}
@@ -743,13 +748,48 @@
                 });
 
                 if (data.ok) {
+                    // Format the performance data nicely
+                    const formatSection = (title, obj) => {
+                        if (!obj || Object.keys(obj).length === 0) return '';
+                        return `
+                            <div class="card">
+                                <h3 style="margin-bottom: 1rem; color: var(--gray-700);">${title}</h3>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                                    ${Object.entries(obj).map(([key, value]) => `
+                                        <div style="background: var(--gray-50); padding: 1rem; border-radius: 0.375rem;">
+                                            <div style="font-size: 0.875rem; color: var(--gray-500); margin-bottom: 0.25rem;">
+                                                ${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                            </div>
+                                            <div style="font-size: 1.25rem; font-weight: bold; color: var(--primary);">
+                                                ${value || '0'}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    };
+
                     document.getElementById('person-content').innerHTML = `
-                        <div class="card">
-                            <h2>Performance Data</h2>
-                            <pre style="background: var(--gray-50); padding: 1rem; border-radius: 0.375rem; overflow-x: auto;">
-${JSON.stringify(data, null, 2)}
-                            </pre>
-                        </div>
+                        ${formatSection('Block Metrics', data.block)}
+                        ${formatSection('Last Work Day', data.lastWorkDay)}
+                        ${formatSection('Last Day', data.lastDay)}
+                        ${data.picks ? `
+                            <div class="card">
+                                <h3 style="margin-bottom: 1rem; color: var(--gray-700);">Coaching Picks</h3>
+                                <div style="background: var(--gray-50); padding: 1rem; border-radius: 0.375rem;">
+                                    ${data.picks}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${data.prNotes ? `
+                            <div class="card">
+                                <h3 style="margin-bottom: 1rem; color: var(--gray-700);">Notes</h3>
+                                <div style="background: var(--gray-50); padding: 1rem; border-radius: 0.375rem;">
+                                    ${data.prNotes}
+                                </div>
+                            </div>
+                        ` : ''}
                     `;
                 } else {
                     document.getElementById('person-content').innerHTML = `
@@ -837,6 +877,7 @@ ${JSON.stringify(data, null, 2)}
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             
+            console.log('Attempting login with:', username);
             document.getElementById('login-message').innerHTML = '<div class="loading">Logging in...</div>';
             
             try {
@@ -846,17 +887,22 @@ ${JSON.stringify(data, null, 2)}
                     password: password
                 });
                 
+                console.log('Login response:', result);
+                
                 if (result.ok) {
                     session.setSession(result.session, result.user);
+                    console.log('Session set, redirecting to home');
                     navigate('#/home');
                 } else {
+                    console.error('Login failed:', result.error);
                     document.getElementById('login-message').innerHTML = `
                         <div class="message error">${result.error || 'Invalid credentials'}</div>
                     `;
                 }
             } catch (error) {
+                console.error('Login error:', error);
                 document.getElementById('login-message').innerHTML = `
-                    <div class="message error">Login failed. Please try again.</div>
+                    <div class="message error">Login failed. Please check the console for details.</div>
                 `;
             }
         }
