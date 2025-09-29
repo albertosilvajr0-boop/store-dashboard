@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Store Dashboard - User Management</title>
+    <title>Store Dashboard</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -220,6 +220,7 @@
         .user-actions {
             display: flex;
             gap: 0.5rem;
+            align-items: center;
         }
 
         /* Leaderboard */
@@ -346,180 +347,47 @@
         const GAS_URL = 'https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec';
         
         // ============================================
-        // USER MANAGEMENT SYSTEM (Frontend-based)
+        // SESSION MANAGEMENT (uses sessionStorage)
         // ============================================
-        class UserSystem {
+        class SessionManager {
             constructor() {
-                this.STORAGE_KEY = 'dashboard_users';
                 this.SESSION_KEY = 'dashboard_session';
-                this.initializeDefaultAdmin();
+                this.USER_KEY = 'dashboard_user';
             }
 
-            initializeDefaultAdmin() {
-                const users = this.getUsers();
-                if (users.length === 0) {
-                    // Create default admin account
-                    this.createUser('admin', 'Alberto', 'Password1', 'admin', null);
-                    console.log('Default admin account created');
-                }
-            }
-
-            hashPassword(password) {
-                // Simple hash for demo - in production use proper encryption
-                let hash = 0;
-                for (let i = 0; i < password.length; i++) {
-                    const char = password.charCodeAt(i);
-                    hash = ((hash << 5) - hash) + char;
-                    hash = hash & hash;
-                }
-                return btoa(hash.toString(36));
-            }
-
-            getUsers() {
-                const stored = localStorage.getItem(this.STORAGE_KEY);
-                return stored ? JSON.parse(stored) : [];
-            }
-
-            saveUsers(users) {
-                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(users));
-            }
-
-            createUser(userId, username, password, role = 'user', linkedPerson = null) {
-                const users = this.getUsers();
-                
-                // Check if user already exists
-                if (users.find(u => u.userId === userId)) {
-                    return { success: false, error: 'User ID already exists' };
-                }
-
-                const newUser = {
-                    userId: userId,
-                    username: username,
-                    passwordHash: this.hashPassword(password),
-                    role: role,
-                    linkedPerson: linkedPerson,
-                    createdAt: new Date().toISOString(),
-                    lastLogin: null
-                };
-
-                users.push(newUser);
-                this.saveUsers(users);
-                
-                return { success: true, user: newUser };
-            }
-
-            updateUser(userId, updates) {
-                const users = this.getUsers();
-                const index = users.findIndex(u => u.userId === userId);
-                
-                if (index === -1) {
-                    return { success: false, error: 'User not found' };
-                }
-
-                // Update password if provided
-                if (updates.password) {
-                    updates.passwordHash = this.hashPassword(updates.password);
-                    delete updates.password;
-                }
-
-                users[index] = { ...users[index], ...updates };
-                this.saveUsers(users);
-                
-                return { success: true, user: users[index] };
-            }
-
-            deleteUser(userId) {
-                const users = this.getUsers();
-                const filtered = users.filter(u => u.userId !== userId);
-                
-                if (filtered.length === users.length) {
-                    return { success: false, error: 'User not found' };
-                }
-
-                this.saveUsers(filtered);
-                return { success: true };
-            }
-
-            login(username, password) {
-                const users = this.getUsers();
-                console.log('Login attempt for:', username);
-                console.log('Available users:', users.map(u => ({ userId: u.userId, username: u.username })));
-                
-                // Allow login with either userId OR username (display name) - case insensitive
-                const user = users.find(u => 
-                    u.username.toLowerCase() === username.toLowerCase() || 
-                    u.userId.toLowerCase() === username.toLowerCase()
-                );
-                
-                if (!user) {
-                    console.log('User not found');
-                    return { success: false, error: 'Invalid credentials' };
-                }
-
-                console.log('User found:', user.username, 'Checking password...');
-                const hashedInput = this.hashPassword(password);
-                console.log('Password hash matches:', hashedInput === user.passwordHash);
-                
-                if (user.passwordHash !== hashedInput) {
-                    return { success: false, error: 'Invalid credentials' };
-                }
-
-                // Update last login
-                user.lastLogin = new Date().toISOString();
-                this.saveUsers(users);
-
-                // Create session
-                const session = {
-                    userId: user.userId,
-                    username: user.username,
-                    role: user.role,
-                    linkedPerson: user.linkedPerson,
-                    loginTime: Date.now()
-                };
-
-                sessionStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
-                
-                return { success: true, session };
-            }
-
-            logout() {
-                sessionStorage.removeItem(this.SESSION_KEY);
+            setSession(sessionData, userData) {
+                sessionStorage.setItem(this.SESSION_KEY, sessionData);
+                sessionStorage.setItem(this.USER_KEY, JSON.stringify(userData));
             }
 
             getSession() {
-                const stored = sessionStorage.getItem(this.SESSION_KEY);
-                if (!stored) return null;
+                return sessionStorage.getItem(this.SESSION_KEY);
+            }
 
-                const session = JSON.parse(stored);
-                
-                // Check if session is still valid (24 hour timeout)
-                if (Date.now() - session.loginTime > 24 * 60 * 60 * 1000) {
-                    this.logout();
-                    return null;
-                }
+            getUser() {
+                const stored = sessionStorage.getItem(this.USER_KEY);
+                return stored ? JSON.parse(stored) : null;
+            }
 
-                return session;
+            clear() {
+                sessionStorage.removeItem(this.SESSION_KEY);
+                sessionStorage.removeItem(this.USER_KEY);
             }
 
             isAdmin() {
-                const session = this.getSession();
-                return session && session.role === 'admin';
+                const user = this.getUser();
+                return user && user.role === 'admin';
             }
 
             canViewPerson(personName) {
-                const session = this.getSession();
-                if (!session) return false;
-                
-                // Admin can view everyone
-                if (session.role === 'admin') return true;
-                
-                // Users can only view their linked person
-                return session.linkedPerson === personName;
+                const user = this.getUser();
+                if (!user) return false;
+                if (user.role === 'admin') return true;
+                return user.linkedTo === personName;
             }
         }
 
-        // Initialize user system
-        const userSystem = new UserSystem();
+        const session = new SessionManager();
 
         // ============================================
         // API HELPERS
@@ -530,9 +398,27 @@
             
             try {
                 const response = await fetch(url);
-                return await response.json();
+                const data = await response.json();
+                return data;
             } catch (error) {
                 console.error('API call failed:', error);
+                throw error;
+            }
+        }
+
+        async function apiPost(params = {}) {
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams(params)
+                });
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('API POST failed:', error);
                 throw error;
             }
         }
@@ -544,14 +430,14 @@
             location.hash = route;
         }
 
-        function router() {
+        async function router() {
             const hash = location.hash.slice(1) || '/';
             const parts = hash.split('/').filter(Boolean);
             
-            const session = userSystem.getSession();
+            const userSession = session.getSession();
             
             // Public routes
-            if (!session && parts[0] !== 'login') {
+            if (!userSession && parts[0] !== 'login') {
                 renderLogin();
                 return;
             }
@@ -563,27 +449,27 @@
                     break;
                 case 'home':
                 case '':
-                    renderHome();
+                    await renderHome();
                     break;
                 case 'users':
-                    if (userSystem.isAdmin()) {
-                        renderUserManagement();
+                    if (session.isAdmin()) {
+                        await renderUserManagement();
                     } else {
                         navigate('#/home');
                     }
                     break;
                 case 'person':
                     if (parts[1] && parts[2]) {
-                        renderPerson(decodeURIComponent(parts[1]), parts[2]);
+                        await renderPerson(decodeURIComponent(parts[1]), parts[2]);
                     }
                     break;
                 case 'sheet':
                     if (parts[1]) {
-                        renderCallSheet(decodeURIComponent(parts[1]));
+                        await renderCallSheet(decodeURIComponent(parts[1]));
                     }
                     break;
                 default:
-                    renderHome();
+                    await renderHome();
             }
         }
 
@@ -598,9 +484,9 @@
                         <div id="login-message"></div>
                         <form onsubmit="handleLogin(event)">
                             <div class="form-group">
-                                <label>Username or User ID</label>
+                                <label>Login ID or Display Name</label>
                                 <input type="text" id="username" required autofocus 
-                                       placeholder="Enter display name or user ID">
+                                       placeholder="Enter your login ID or name">
                             </div>
                             <div class="form-group">
                                 <label>Password</label>
@@ -609,7 +495,10 @@
                             <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
                         </form>
                         <div style="margin-top: 1rem; text-align: center; color: var(--gray-500); font-size: 0.875rem;">
-                            <div>You can login with either your Display Name or Login ID</div>
+                            <div>Default admin: admin / Password1</div>
+                            <div style="margin-top: 0.5rem; font-size: 0.75rem;">
+                                Users are stored on the server and work across all browsers
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -617,7 +506,7 @@
         }
 
         async function renderHome() {
-            const session = userSystem.getSession();
+            const user = session.getUser();
             
             document.getElementById('app').innerHTML = `
                 <div class="header">
@@ -625,9 +514,9 @@
                         <h1>Store Dashboard</h1>
                         <div class="header-actions">
                             <div class="user-badge">
-                                👤 ${session.username} ${session.role === 'admin' ? '(Admin)' : ''}
+                                👤 ${user ? user.name : 'Loading...'} ${user && user.role === 'admin' ? '(Admin)' : ''}
                             </div>
-                            ${userSystem.isAdmin() ? `
+                            ${session.isAdmin() ? `
                                 <button class="btn btn-secondary" onclick="navigate('#/users')">
                                     Manage Users
                                 </button>
@@ -661,43 +550,15 @@
         }
 
         function renderLeaderboards(data) {
-            const session = userSystem.getSession();
+            const user = session.getUser();
             
-            // Calculate stats
-            const totalSales = data.sales ? data.sales.length : 0;
-            const totalBDC = data.bdc ? data.bdc.length : 0;
-            
-            let viewableCount = 0;
-            if (userSystem.isAdmin()) {
-                viewableCount = totalSales + totalBDC;
-            } else if (session.linkedPerson) {
-                // Count how many times their linked person appears
-                if (data.sales) viewableCount += data.sales.filter(p => p.name === session.linkedPerson).length;
-                if (data.bdc) viewableCount += data.bdc.filter(p => p.name === session.linkedPerson).length;
-            }
-
             document.getElementById('content').innerHTML = `
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-value">${totalSales}</div>
-                        <div class="stat-label">Sales Reps</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${totalBDC}</div>
-                        <div class="stat-label">BDC Agents</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${viewableCount}</div>
-                        <div class="stat-label">Accessible to You</div>
-                    </div>
-                </div>
-
                 <div class="leaderboard-grid">
                     <div class="card">
                         <h2>Sales Leaderboard</h2>
                         <div class="leaderboard-list">
                             ${data.sales ? data.sales.map((item, index) => {
-                                const canView = userSystem.canViewPerson(item.name);
+                                const canView = session.canViewPerson(item.name);
                                 return `
                                     <div class="leaderboard-item ${canView ? 'clickable' : 'disabled'}"
                                          ${canView ? `onclick="navigate('#/person/${encodeURIComponent(item.name)}/Sales')"` : ''}>
@@ -716,7 +577,7 @@
                         <h2>BDC Leaderboard</h2>
                         <div class="leaderboard-list">
                             ${data.bdc ? data.bdc.map((item, index) => {
-                                const canView = userSystem.canViewPerson(item.name);
+                                const canView = session.canViewPerson(item.name);
                                 return `
                                     <div class="leaderboard-item ${canView ? 'clickable' : 'disabled'}"
                                          ${canView ? `onclick="navigate('#/person/${encodeURIComponent(item.name)}/BDC')"` : ''}>
@@ -735,24 +596,10 @@
         }
 
         async function renderUserManagement() {
-            if (!userSystem.isAdmin()) {
+            if (!session.isAdmin()) {
                 navigate('#/home');
                 return;
             }
-
-            // Get leaderboard data for linking options
-            const leaderData = await apiCall('', { route: 'leaderboards' });
-            const allPeople = [];
-            
-            if (leaderData.ok) {
-                if (leaderData.sales) allPeople.push(...leaderData.sales.map(p => p.name));
-                if (leaderData.bdc) allPeople.push(...leaderData.bdc.map(p => p.name));
-            }
-            
-            // Remove duplicates and sort
-            const uniquePeople = [...new Set(allPeople)].sort();
-            
-            const users = userSystem.getUsers();
 
             document.getElementById('app').innerHTML = `
                 <div class="header">
@@ -764,6 +611,24 @@
                     </div>
                 </div>
                 <div class="container">
+                    <div id="user-management" class="loading">
+                        <div class="spinner"></div>
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            `;
+
+            try {
+                // Get users and leaderboard people in parallel
+                const [usersData, peopleData] = await Promise.all([
+                    apiCall('', { route: 'users_list' }),
+                    apiCall('', { route: 'leaderboard_people' })
+                ]);
+
+                const users = usersData.ok ? usersData.users : [];
+                const people = peopleData.ok ? peopleData.people : [];
+
+                document.getElementById('user-management').innerHTML = `
                     <div class="card">
                         <h2>Create New User</h2>
                         <div id="create-message"></div>
@@ -771,14 +636,14 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Login ID (for authentication)</label>
-                                    <input type="text" id="new-userid" required 
+                                    <input type="text" id="new-loginid" required 
                                            pattern="[a-z0-9_]+" 
                                            placeholder="e.g., jsmith"
                                            title="Lowercase letters, numbers, and underscores only">
                                 </div>
                                 <div class="form-group">
                                     <label>Display Name (shown in UI)</label>
-                                    <input type="text" id="new-username" required
+                                    <input type="text" id="new-name" required
                                            placeholder="e.g., John Smith">
                                 </div>
                             </div>
@@ -791,7 +656,7 @@
                                     <label>Link to Person</label>
                                     <select id="new-linked">
                                         <option value="">-- No Linking (Admin Only) --</option>
-                                        ${uniquePeople.map(name => 
+                                        ${people.map(name => 
                                             `<option value="${name}">${name}</option>`
                                         ).join('')}
                                     </select>
@@ -807,40 +672,44 @@
                             ${users.map(user => `
                                 <div class="user-item">
                                     <div class="user-info">
-                                        <div class="user-name">${user.username}</div>
+                                        <div class="user-name">${user.name}</div>
                                         <div class="user-details">
-                                            <strong>Login ID:</strong> ${user.userId} | 
+                                            <strong>Login ID:</strong> ${user.loginId} | 
                                             Role: ${user.role} | 
-                                            ${user.linkedPerson ? `Linked to: ${user.linkedPerson}` : 'No linking'} |
+                                            ${user.linkedTo ? `Linked to: ${user.linkedTo}` : 'No linking'} |
                                             Last login: ${user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
                                         </div>
                                     </div>
                                     <div class="user-actions">
-                                        ${user.role !== 'admin' ? `
-                                            <select onchange="handleUpdateLink('${user.userId}', this.value)" 
+                                        ${user.loginId !== 'admin' ? `
+                                            <select onchange="handleUpdateLink('${user.loginId}', this.value)" 
                                                     style="padding: 0.25rem; border: 1px solid var(--gray-300); border-radius: 0.25rem;">
                                                 <option value="">-- Change Link --</option>
                                                 <option value="">No Linking</option>
-                                                ${uniquePeople.map(name => 
-                                                    `<option value="${name}" ${user.linkedPerson === name ? 'selected' : ''}>${name}</option>`
+                                                ${people.map(name => 
+                                                    `<option value="${name}" ${user.linkedTo === name ? 'selected' : ''}>${name}</option>`
                                                 ).join('')}
                                             </select>
-                                            <button class="btn btn-danger" onclick="handleDeleteUser('${user.userId}')">Delete</button>
+                                            <button class="btn btn-danger" onclick="handleDeleteUser('${user.loginId}')">Delete</button>
                                         ` : '<span style="color: var(--gray-500);">Protected</span>'}
                                     </div>
                                 </div>
                             `).join('')}
                         </div>
                     </div>
-                </div>
-            `;
+                `;
+            } catch (error) {
+                document.getElementById('user-management').innerHTML = `
+                    <div class="message error">Failed to load user management. Please refresh.</div>
+                `;
+            }
         }
 
         async function renderPerson(name, type) {
-            const session = userSystem.getSession();
+            const user = session.getUser();
             
             // Check access
-            if (!userSystem.canViewPerson(name)) {
+            if (!session.canViewPerson(name)) {
                 navigate('#/home');
                 return;
             }
@@ -866,17 +735,11 @@
             `;
 
             try {
-                // Create a simple token for the backend
-                const token = btoa(JSON.stringify({
-                    name: session.linkedPerson || 'ALBERTO',
-                    role: session.role
-                }));
-
                 const data = await apiCall('', {
                     route: 'person',
                     name: name,
                     type: type,
-                    session: token
+                    session: session.getSession()
                 });
 
                 if (data.ok) {
@@ -890,7 +753,7 @@ ${JSON.stringify(data, null, 2)}
                     `;
                 } else {
                     document.getElementById('person-content').innerHTML = `
-                        <div class="message error">Failed to load data: ${data.error || 'Unknown error'}</div>
+                        <div class="message error">Access denied or data not found</div>
                     `;
                 }
             } catch (error) {
@@ -901,10 +764,10 @@ ${JSON.stringify(data, null, 2)}
         }
 
         async function renderCallSheet(name) {
-            const session = userSystem.getSession();
+            // Similar to renderPerson but for call sheet
+            const user = session.getUser();
             
-            // Check access
-            if (!userSystem.canViewPerson(name)) {
+            if (!session.canViewPerson(name)) {
                 navigate('#/home');
                 return;
             }
@@ -927,15 +790,10 @@ ${JSON.stringify(data, null, 2)}
             `;
 
             try {
-                const token = btoa(JSON.stringify({
-                    name: session.linkedPerson || 'ALBERTO',
-                    role: session.role
-                }));
-
                 const data = await apiCall('', {
                     route: 'calls_for',
                     name: name,
-                    session: token
+                    session: session.getSession()
                 });
 
                 if (data.ok && data.calls) {
@@ -952,9 +810,6 @@ ${JSON.stringify(data, null, 2)}
                                                     (call.name || 'Unknown')
                                                 }
                                             </div>
-                                            <div class="user-details">
-                                                ${call.phone || 'No phone'} | ${call.status || 'No status'}
-                                            </div>
                                         </div>
                                     </div>
                                 `).join('')}
@@ -963,7 +818,7 @@ ${JSON.stringify(data, null, 2)}
                     `;
                 } else {
                     document.getElementById('calls-content').innerHTML = `
-                        <div class="message error">Failed to load calls: ${data.error || 'Unknown error'}</div>
+                        <div class="message error">Failed to load calls or access denied</div>
                     `;
                 }
             } catch (error) {
@@ -976,77 +831,114 @@ ${JSON.stringify(data, null, 2)}
         // ============================================
         // EVENT HANDLERS
         // ============================================
-        function handleLogin(event) {
+        async function handleLogin(event) {
             event.preventDefault();
             
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             
-            const result = userSystem.login(username, password);
+            document.getElementById('login-message').innerHTML = '<div class="loading">Logging in...</div>';
             
-            if (result.success) {
-                navigate('#/home');
-            } else {
+            try {
+                const result = await apiCall('', {
+                    route: 'user_login',
+                    username: username,
+                    password: password
+                });
+                
+                if (result.ok) {
+                    session.setSession(result.session, result.user);
+                    navigate('#/home');
+                } else {
+                    document.getElementById('login-message').innerHTML = `
+                        <div class="message error">${result.error || 'Invalid credentials'}</div>
+                    `;
+                }
+            } catch (error) {
                 document.getElementById('login-message').innerHTML = `
-                    <div class="message error">${result.error}</div>
+                    <div class="message error">Login failed. Please try again.</div>
                 `;
             }
         }
 
         function handleLogout() {
-            userSystem.logout();
+            session.clear();
             navigate('#/login');
         }
 
-        function handleCreateUser(event) {
+        async function handleCreateUser(event) {
             event.preventDefault();
             
-            const userId = document.getElementById('new-userid').value;
-            const username = document.getElementById('new-username').value;
+            const loginId = document.getElementById('new-loginid').value.trim();
+            const name = document.getElementById('new-name').value.trim();
             const password = document.getElementById('new-password').value;
-            const linkedPerson = document.getElementById('new-linked').value;
+            const linkedTo = document.getElementById('new-linked').value;
             
-            const result = userSystem.createUser(
-                userId,
-                username,
-                password,
-                linkedPerson ? 'user' : 'admin',
-                linkedPerson || null
-            );
+            document.getElementById('create-message').innerHTML = '<div class="loading">Creating user...</div>';
             
-            if (result.success) {
+            try {
+                const result = await apiPost({
+                    route: 'user_create',
+                    loginId: loginId,
+                    name: name,
+                    password: password,
+                    linkedTo: linkedTo
+                });
+                
+                if (result.ok) {
+                    document.getElementById('create-message').innerHTML = `
+                        <div class="message success">User created successfully!</div>
+                    `;
+                    // Reload the page to show new user
+                    setTimeout(() => renderUserManagement(), 1500);
+                } else {
+                    document.getElementById('create-message').innerHTML = `
+                        <div class="message error">${result.error || 'Failed to create user'}</div>
+                    `;
+                }
+            } catch (error) {
                 document.getElementById('create-message').innerHTML = `
-                    <div class="message success">User created successfully!</div>
-                `;
-                // Reload the page to show new user
-                setTimeout(() => renderUserManagement(), 1500);
-            } else {
-                document.getElementById('create-message').innerHTML = `
-                    <div class="message error">${result.error}</div>
+                    <div class="message error">Failed to create user. Please try again.</div>
                 `;
             }
         }
 
-        function handleUpdateLink(userId, newLink) {
-            const result = userSystem.updateUser(userId, {
-                linkedPerson: newLink || null,
-                role: newLink ? 'user' : 'admin'
-            });
-            
-            if (result.success) {
-                renderUserManagement();
+        async function handleUpdateLink(loginId, newLink) {
+            try {
+                const result = await apiPost({
+                    route: 'user_update',
+                    loginId: loginId,
+                    linkedTo: newLink
+                });
+                
+                if (result.ok) {
+                    await renderUserManagement();
+                } else {
+                    alert('Failed to update user: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Failed to update user. Please try again.');
             }
         }
 
-        function handleDeleteUser(userId) {
+        async function handleDeleteUser(loginId) {
             if (!confirm('Are you sure you want to delete this user?')) {
                 return;
             }
             
-            const result = userSystem.deleteUser(userId);
-            
-            if (result.success) {
-                renderUserManagement();
+            try {
+                const result = await apiPost({
+                    route: 'user_delete',
+                    loginId: loginId
+                });
+                
+                if (result.ok) {
+                    await renderUserManagement();
+                } else {
+                    alert('Failed to delete user: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Failed to delete user. Please try again.');
             }
         }
 
