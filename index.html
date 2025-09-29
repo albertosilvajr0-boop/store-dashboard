@@ -442,13 +442,25 @@
 
             login(username, password) {
                 const users = this.getUsers();
-                const user = users.find(u => u.username === username);
+                console.log('Login attempt for:', username);
+                console.log('Available users:', users.map(u => ({ userId: u.userId, username: u.username })));
+                
+                // Allow login with either userId OR username (display name) - case insensitive
+                const user = users.find(u => 
+                    u.username.toLowerCase() === username.toLowerCase() || 
+                    u.userId.toLowerCase() === username.toLowerCase()
+                );
                 
                 if (!user) {
+                    console.log('User not found');
                     return { success: false, error: 'Invalid credentials' };
                 }
 
-                if (user.passwordHash !== this.hashPassword(password)) {
+                console.log('User found:', user.username, 'Checking password...');
+                const hashedInput = this.hashPassword(password);
+                console.log('Password hash matches:', hashedInput === user.passwordHash);
+                
+                if (user.passwordHash !== hashedInput) {
                     return { success: false, error: 'Invalid credentials' };
                 }
 
@@ -586,8 +598,9 @@
                         <div id="login-message"></div>
                         <form onsubmit="handleLogin(event)">
                             <div class="form-group">
-                                <label>Username</label>
-                                <input type="text" id="username" required autofocus>
+                                <label>Username or User ID</label>
+                                <input type="text" id="username" required autofocus 
+                                       placeholder="Enter display name or user ID">
                             </div>
                             <div class="form-group">
                                 <label>Password</label>
@@ -596,7 +609,7 @@
                             <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
                         </form>
                         <div style="margin-top: 1rem; text-align: center; color: var(--gray-500); font-size: 0.875rem;">
-                            Default admin: Alberto / Password1
+                            <div>You can login with either your Display Name or Login ID</div>
                         </div>
                     </div>
                 </div>
@@ -757,14 +770,16 @@
                         <form onsubmit="handleCreateUser(event)">
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label>User ID</label>
+                                    <label>Login ID (for authentication)</label>
                                     <input type="text" id="new-userid" required 
                                            pattern="[a-z0-9_]+" 
+                                           placeholder="e.g., jsmith"
                                            title="Lowercase letters, numbers, and underscores only">
                                 </div>
                                 <div class="form-group">
-                                    <label>Display Name</label>
-                                    <input type="text" id="new-username" required>
+                                    <label>Display Name (shown in UI)</label>
+                                    <input type="text" id="new-username" required
+                                           placeholder="e.g., John Smith">
                                 </div>
                             </div>
                             <div class="form-row">
@@ -794,7 +809,7 @@
                                     <div class="user-info">
                                         <div class="user-name">${user.username}</div>
                                         <div class="user-details">
-                                            ID: ${user.userId} | 
+                                            <strong>Login ID:</strong> ${user.userId} | 
                                             Role: ${user.role} | 
                                             ${user.linkedPerson ? `Linked to: ${user.linkedPerson}` : 'No linking'} |
                                             Last login: ${user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
@@ -964,7 +979,7 @@ ${JSON.stringify(data, null, 2)}
         function handleLogin(event) {
             event.preventDefault();
             
-            const username = document.getElementById('username').value;
+            const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             
             const result = userSystem.login(username, password);
