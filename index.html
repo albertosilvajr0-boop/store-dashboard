@@ -160,6 +160,7 @@
         .user-actions {
             display: flex;
             gap: 10px;
+            align-items: center;
         }
 
         .delete-btn {
@@ -175,6 +176,13 @@
 
         .delete-btn:hover {
             background: #da190b;
+        }
+
+        .edit-link-select {
+            padding: 6px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 13px;
         }
 
         .protected-badge {
@@ -286,10 +294,31 @@
             cursor: pointer;
             font-weight: 600;
             transition: all 0.3s;
+            z-index: 1000;
         }
 
         .logout-btn:hover {
             background: #667eea;
+            color: white;
+        }
+
+        .admin-btn {
+            position: fixed;
+            top: 20px;
+            right: 120px;
+            padding: 10px 20px;
+            background: white;
+            color: #4CAF50;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .admin-btn:hover {
+            background: #4CAF50;
             color: white;
         }
 
@@ -308,6 +337,15 @@
             border-left: 4px solid #c62828;
         }
 
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4CAF50;
+        }
+
         #userGreeting {
             background: white;
             padding: 15px 25px;
@@ -320,6 +358,22 @@
         #userGreeting h3 {
             color: #333;
             margin: 0;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .status-online {
+            background: #4CAF50;
+        }
+
+        .status-offline {
+            background: #f44336;
         }
 
         @media (max-width: 768px) {
@@ -346,6 +400,18 @@
             th, td {
                 padding: 8px;
             }
+
+            .logout-btn {
+                position: static;
+                margin: 10px auto;
+                display: block;
+            }
+
+            .admin-btn {
+                position: static;
+                margin: 10px auto;
+                display: block;
+            }
         }
     </style>
 </head>
@@ -365,21 +431,29 @@
         <!-- Dashboard Section -->
         <div id="dashboardSection" style="display: none;">
             <button class="logout-btn" onclick="logout()">Logout</button>
+            <button id="adminButton" class="admin-btn" style="display: none;" onclick="toggleAdminPanel()">Admin Panel</button>
             
             <h1>Store Performance Dashboard</h1>
             
             <div id="userGreeting" style="display: none;">
-                <h3>Welcome, <span id="userDisplayName"></span></h3>
+                <h3>Welcome, <span id="userDisplayName"></span>
+                    <span id="adminBadge" style="color: #4CAF50; display: none;"> (Admin)</span>
+                    <span id="linkedPersonBadge" style="color: #667eea; display: none;"> - Viewing: <span id="linkedPersonName"></span></span>
+                </h3>
             </div>
 
-            <!-- Admin Panel -->
+            <!-- Admin Panel (Initially Hidden) -->
             <div id="adminPanel" class="admin-panel" style="display: none;">
-                <h3>User Management</h3>
+                <h3>User Management 
+                    <button onclick="hideAdminPanel()" style="float: right; background: #f44336; color: white; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer;">Close</button>
+                </h3>
+                
+                <div id="adminMessages"></div>
                 
                 <div class="user-form">
                     <input type="email" id="newEmail" placeholder="Email" required>
                     <input type="text" id="newDisplayName" placeholder="Display Name" required>
-                    <input type="password" id="newPassword" placeholder="Password" required>
+                    <input type="password" id="newPassword" placeholder="Password (min 6 chars)" required>
                     <select id="newLinkedPerson">
                         <option value="">-- No Linking (Admin Only) --</option>
                     </select>
@@ -453,9 +527,11 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
+        // Global variables
         let currentUser = null;
         let currentUserData = null;
         let allData = null;
+        let allPersonNames = [];
 
         // Authentication functions
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -468,8 +544,27 @@
                 await auth.signInWithEmailAndPassword(email, password);
                 errorDiv.style.display = 'none';
             } catch (error) {
-                errorDiv.textContent = error.message;
-                errorDiv.style.display = 'block';
+                // If user doesn't exist and it's the admin email, create it
+                if (error.code === 'auth/user-not-found' && email === 'admin@dashboard.com') {
+                    try {
+                        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                        // Create admin user in Firestore
+                        await db.collection('users').doc(userCredential.user.uid).set({
+                            email: email,
+                            displayName: 'Administrator',
+                            role: 'admin',
+                            linkedPerson: null,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        errorDiv.style.display = 'none';
+                    } catch (createError) {
+                        errorDiv.textContent = 'Error creating admin account: ' + createError.message;
+                        errorDiv.style.display = 'block';
+                    }
+                } else {
+                    errorDiv.textContent = error.message;
+                    errorDiv.style.display = 'block';
+                }
             }
         });
 
@@ -479,6 +574,26 @@
             } catch (error) {
                 console.error('Error signing out:', error);
             }
+        }
+
+        // Admin panel functions
+        function toggleAdminPanel() {
+            const panel = document.getElementById('adminPanel');
+            if (panel.style.display === 'none') {
+                showAdminPanel();
+            } else {
+                hideAdminPanel();
+            }
+        }
+
+        function showAdminPanel() {
+            document.getElementById('adminPanel').style.display = 'block';
+            loadUsers();
+            populatePersonDropdown();
+        }
+
+        function hideAdminPanel() {
+            document.getElementById('adminPanel').style.display = 'none';
         }
 
         // Listen for auth state changes
@@ -491,76 +606,79 @@
                 const userDoc = await db.collection('users').doc(user.uid).get();
                 
                 if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    currentUserData = userData;
-                    
-                    document.getElementById('authSection').style.display = 'none';
-                    document.getElementById('dashboardSection').style.display = 'block';
-                    
-                    // Show user greeting
-                    document.getElementById('userGreeting').style.display = 'block';
-                    document.getElementById('userDisplayName').textContent = userData.displayName || user.email;
-                    
-                    // Show admin panel if user is admin
-                    if (userData.role === 'admin') {
-                        showAdminPanel();
-                    }
-                    
-                    // Load dashboard data
-                    loadDashboardData();
+                    currentUserData = userDoc.data();
                 } else {
-                    // First time login - create user document
-                    const newUserData = {
+                    // Create user document if it doesn't exist
+                    currentUserData = {
                         email: user.email,
                         displayName: user.email.split('@')[0],
-                        role: 'user',
+                        role: user.email === 'admin@dashboard.com' ? 'admin' : 'user',
                         linkedPerson: null,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     };
                     
-                    await db.collection('users').doc(user.uid).set(newUserData);
-                    currentUserData = newUserData;
-                    
-                    document.getElementById('authSection').style.display = 'none';
-                    document.getElementById('dashboardSection').style.display = 'block';
-                    
-                    document.getElementById('userGreeting').style.display = 'block';
-                    document.getElementById('userDisplayName').textContent = newUserData.displayName;
-                    
-                    loadDashboardData();
+                    await db.collection('users').doc(user.uid).set(currentUserData);
                 }
+                
+                // Show dashboard
+                document.getElementById('authSection').style.display = 'none';
+                document.getElementById('dashboardSection').style.display = 'block';
+                
+                // Show user greeting
+                document.getElementById('userGreeting').style.display = 'block';
+                document.getElementById('userDisplayName').textContent = currentUserData.displayName || user.email;
+                
+                // Show admin badge and button if admin
+                if (currentUserData.role === 'admin') {
+                    document.getElementById('adminBadge').style.display = 'inline';
+                    document.getElementById('adminButton').style.display = 'block';
+                }
+                
+                // Show linked person badge if user is linked
+                if (currentUserData.linkedPerson) {
+                    document.getElementById('linkedPersonBadge').style.display = 'inline';
+                    document.getElementById('linkedPersonName').textContent = currentUserData.linkedPerson;
+                }
+                
+                // Load dashboard data
+                loadDashboardData();
+                
             } else {
                 console.log('User signed out');
                 currentUser = null;
                 currentUserData = null;
                 document.getElementById('authSection').style.display = 'block';
                 document.getElementById('dashboardSection').style.display = 'none';
+                document.getElementById('adminPanel').style.display = 'none';
             }
         });
 
-        // Admin functions
-        function showAdminPanel() {
-            document.getElementById('adminPanel').style.display = 'block';
-            loadUsers();
-            populatePersonDropdown();  // Populate the dropdown when showing admin panel
-        }
-
+        // User management functions
         async function createUser() {
             const email = document.getElementById('newEmail').value;
             const displayName = document.getElementById('newDisplayName').value;
             const password = document.getElementById('newPassword').value;
             const linkedPerson = document.getElementById('newLinkedPerson').value;
+            const messageDiv = document.getElementById('adminMessages');
 
             if (!email || !displayName || !password) {
-                alert('Please fill in all required fields');
+                messageDiv.innerHTML = '<div class="error">Please fill in all required fields</div>';
+                return;
+            }
+
+            if (password.length < 6) {
+                messageDiv.innerHTML = '<div class="error">Password must be at least 6 characters</div>';
                 return;
             }
 
             try {
-                // Create auth user
+                // Store current user credentials
+                const adminEmail = currentUser.email;
+                
+                // Create new user
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 
-                // Create Firestore document
+                // Create Firestore document for new user
                 await db.collection('users').doc(userCredential.user.uid).set({
                     email: email,
                     displayName: displayName,
@@ -576,13 +694,17 @@
                 document.getElementById('newPassword').value = '';
                 document.getElementById('newLinkedPerson').value = '';
 
-                alert('User created successfully!');
-                loadUsers();
-
-                // Sign back in as the admin
-                await auth.signInWithEmailAndPassword(currentUser.email, 'admin_password');
+                messageDiv.innerHTML = '<div class="success">User created successfully! Re-authenticating admin...</div>';
+                
+                // Sign back in as admin (you'll need to store admin password or use a different method)
+                // For now, we'll just reload the users
+                setTimeout(() => {
+                    loadUsers();
+                    messageDiv.innerHTML = '';
+                }, 2000);
+                
             } catch (error) {
-                alert('Error creating user: ' + error.message);
+                messageDiv.innerHTML = `<div class="error">Error creating user: ${error.message}</div>`;
             }
         }
 
@@ -593,10 +715,29 @@
 
             try {
                 await db.collection('users').doc(userId).delete();
-                alert('User deleted successfully!');
                 loadUsers();
+                document.getElementById('adminMessages').innerHTML = '<div class="success">User deleted successfully!</div>';
+                setTimeout(() => {
+                    document.getElementById('adminMessages').innerHTML = '';
+                }, 3000);
             } catch (error) {
-                alert('Error deleting user: ' + error.message);
+                document.getElementById('adminMessages').innerHTML = `<div class="error">Error deleting user: ${error.message}</div>`;
+            }
+        }
+
+        async function updateUserLink(userId, newLink) {
+            try {
+                await db.collection('users').doc(userId).update({
+                    linkedPerson: newLink || null,
+                    role: newLink ? 'user' : 'admin'
+                });
+                loadUsers();
+                document.getElementById('adminMessages').innerHTML = '<div class="success">User updated successfully!</div>';
+                setTimeout(() => {
+                    document.getElementById('adminMessages').innerHTML = '';
+                }, 3000);
+            } catch (error) {
+                document.getElementById('adminMessages').innerHTML = `<div class="error">Error updating user: ${error.message}</div>`;
             }
         }
 
@@ -612,106 +753,118 @@
                     users.push({ id: doc.id, ...doc.data() });
                 });
 
+                // Sort users by creation date or name
+                users.sort((a, b) => {
+                    if (a.email === 'admin@dashboard.com') return -1;
+                    if (b.email === 'admin@dashboard.com') return 1;
+                    return (a.displayName || '').localeCompare(b.displayName || '');
+                });
+
                 usersDiv.innerHTML = '';
                 users.forEach(user => {
                     const userDiv = document.createElement('div');
                     userDiv.className = 'user-item';
                     
-                    const isProtected = user.id === currentUser.uid;
+                    const isProtected = user.id === currentUser.uid || user.email === 'admin@dashboard.com';
                     
                     userDiv.innerHTML = `
                         <div class="user-info">
                             <strong>${user.displayName}</strong>
                             <div class="user-details">
-                                Email: ${user.email} | 
+                                <span class="status-indicator ${user.id === currentUser.uid ? 'status-online' : 'status-offline'}"></span>
+                                ${user.email} | 
                                 Role: ${user.role} | 
                                 ${user.linkedPerson ? `Linked to: ${user.linkedPerson}` : 'No linking'}
                             </div>
                         </div>
                         <div class="user-actions">
-                            ${isProtected ? 
-                                '<span class="protected-badge">Protected</span>' : 
-                                `<button class="delete-btn" onclick="deleteUser('${user.id}')">Delete</button>`
-                            }
+                            ${!isProtected ? `
+                                <select class="edit-link-select" onchange="updateUserLink('${user.id}', this.value)">
+                                    <option value="">-- Change Link --</option>
+                                    <option value="">No Linking (Admin)</option>
+                                    ${allPersonNames.map(name => 
+                                        `<option value="${name}" ${user.linkedPerson === name ? 'selected' : ''}>${name}</option>`
+                                    ).join('')}
+                                </select>
+                                <button class="delete-btn" onclick="deleteUser('${user.id}')">Delete</button>
+                            ` : '<span class="protected-badge">Protected</span>'}
                         </div>
                     `;
                     
                     usersDiv.appendChild(userDiv);
                 });
+
+                if (users.length === 0) {
+                    usersDiv.innerHTML = '<div class="error">No users found</div>';
+                }
             } catch (error) {
                 usersDiv.innerHTML = `<div class="error">Error loading users: ${error.message}</div>`;
             }
         }
 
-        // NEW FUNCTION: Populate person dropdown with names from leaderboard
+        // Populate person dropdown with names from leaderboard
         async function populatePersonDropdown() {
             try {
-                // Fetch data from Google Apps Script
-                const response = await fetch('https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec');
-                const data = await response.json();
+                if (!allData) {
+                    // Fetch data if not already loaded
+                    const response = await fetch('https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec');
+                    allData = await response.json();
+                }
                 
-                // Get unique person names from the leaderboard data
+                // Get unique person names from all tabs
                 const personNames = new Set();
                 
                 // Extract names from each tab's data
-                if (data.callsTab && Array.isArray(data.callsTab)) {
-                    data.callsTab.forEach(row => {
-                        if (row[0] && row[0] !== 'Person') { // Skip header
-                            personNames.add(row[0]);
-                        }
-                    });
-                }
+                ['callsTab', 'activationsTab', 'upgradesTab', 'grandPrizeTab'].forEach(tabName => {
+                    if (allData[tabName] && Array.isArray(allData[tabName])) {
+                        allData[tabName].forEach((row, index) => {
+                            if (index > 0 && row[0] && row[0] !== 'Person') {
+                                personNames.add(row[0]);
+                            }
+                        });
+                    }
+                });
                 
-                if (data.activationsTab && Array.isArray(data.activationsTab)) {
-                    data.activationsTab.forEach(row => {
-                        if (row[0] && row[0] !== 'Person') { // Skip header
-                            personNames.add(row[0]);
-                        }
-                    });
-                }
-                
-                if (data.upgradesTab && Array.isArray(data.upgradesTab)) {
-                    data.upgradesTab.forEach(row => {
-                        if (row[0] && row[0] !== 'Person') { // Skip header
-                            personNames.add(row[0]);
-                        }
-                    });
-                }
-                
-                // Sort names alphabetically
-                const sortedNames = Array.from(personNames).sort();
+                // Convert to sorted array
+                allPersonNames = Array.from(personNames).sort();
                 
                 // Update the dropdown
                 const linkedPersonSelect = document.getElementById('newLinkedPerson');
                 if (linkedPersonSelect) {
-                    // Keep the first option
                     linkedPersonSelect.innerHTML = '<option value="">-- No Linking (Admin Only) --</option>';
-                    
-                    // Add person names as options
-                    sortedNames.forEach(name => {
+                    allPersonNames.forEach(name => {
                         const option = document.createElement('option');
                         option.value = name;
                         option.textContent = name;
                         linkedPersonSelect.appendChild(option);
                     });
-                    
-                    console.log(`Populated dropdown with ${sortedNames.length} names`);
+                }
+                
+                console.log(`Populated dropdown with ${allPersonNames.length} names`);
+                
+                // Also reload users to update their dropdowns
+                if (document.getElementById('existingUsers').innerHTML !== '<div class="loading">Loading users...</div>') {
+                    loadUsers();
                 }
                 
             } catch (error) {
                 console.error('Error fetching person names:', error);
-                console.log('Make sure to check the data structure from your Google Apps Script');
             }
         }
 
-        // Dashboard functions
+        // Dashboard data functions
         async function loadDashboardData() {
             try {
                 const response = await fetch('https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec');
                 const data = await response.json();
                 allData = data;
 
-                // If user is linked to a person, filter the data
+                // Populate person names for admin panel
+                if (currentUserData && currentUserData.role === 'admin') {
+                    populatePersonDropdown();
+                }
+
+                // Filter data based on user permissions
                 if (currentUserData && currentUserData.linkedPerson && currentUserData.role !== 'admin') {
                     displayFilteredData(data, currentUserData.linkedPerson);
                 } else {
@@ -728,25 +881,21 @@
 
         function displayFilteredData(data, personName) {
             // Display only data for the linked person
-            if (data.callsTab) {
-                const filteredCalls = data.callsTab.filter(row => row[0] === personName || row[0] === 'Person');
-                displayTable('callsContent', filteredCalls);
-            }
-
-            if (data.activationsTab) {
-                const filteredActivations = data.activationsTab.filter(row => row[0] === personName || row[0] === 'Person');
-                displayTable('activationsContent', filteredActivations);
-            }
-
-            if (data.upgradesTab) {
-                const filteredUpgrades = data.upgradesTab.filter(row => row[0] === personName || row[0] === 'Person');
-                displayTable('upgradesContent', filteredUpgrades);
-            }
-
-            if (data.grandPrizeTab) {
-                const filteredGrandPrize = data.grandPrizeTab.filter(row => row[0] === personName || row[0] === 'Person');
-                displayTable('grandPrizeContent', filteredGrandPrize);
-            }
+            ['callsTab', 'activationsTab', 'upgradesTab', 'grandPrizeTab'].forEach(tabName => {
+                const contentId = tabName.replace('Tab', 'Content');
+                if (data[tabName]) {
+                    const headers = data[tabName][0];
+                    const filteredData = [headers];
+                    
+                    for (let i = 1; i < data[tabName].length; i++) {
+                        if (data[tabName][i][0] === personName) {
+                            filteredData.push(data[tabName][i]);
+                        }
+                    }
+                    
+                    displayTable(contentId, filteredData);
+                }
+            });
         }
 
         function displayAllData(data) {
@@ -771,7 +920,7 @@
             const container = document.getElementById(elementId);
             
             if (!data || data.length === 0) {
-                container.innerHTML = '<p>No data available</p>';
+                container.innerHTML = '<p style="text-align: center; color: #666;">No data available</p>';
                 return;
             }
 
@@ -797,9 +946,14 @@
                     row.classList.add(`position-${i}`);
                 }
 
-                data[i].forEach(cell => {
+                data[i].forEach((cell, cellIndex) => {
                     const td = document.createElement('td');
-                    td.textContent = cell !== null && cell !== undefined ? cell : '';
+                    // Format numbers if they look like numbers
+                    if (cellIndex > 0 && !isNaN(cell) && cell !== '') {
+                        td.textContent = Number(cell).toLocaleString();
+                    } else {
+                        td.textContent = cell !== null && cell !== undefined ? cell : '';
+                    }
                     row.appendChild(td);
                 });
                 tbody.appendChild(row);
@@ -829,22 +983,10 @@
             event.target.classList.add('active');
         }
 
-        // Create initial admin user if none exists
-        async function checkAndCreateInitialAdmin() {
-            try {
-                const usersSnapshot = await db.collection('users').limit(1).get();
-                
-                if (usersSnapshot.empty) {
-                    console.log('No users found. Ready to create first admin account.');
-                    // First user to sign up will automatically be made an admin
-                }
-            } catch (error) {
-                console.error('Error checking for users:', error);
-            }
-        }
-
-        // Check for initial admin on page load
-        checkAndCreateInitialAdmin();
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            console.log('Dashboard loaded. Firebase initialized.');
+        });
     </script>
 </body>
 </html>
