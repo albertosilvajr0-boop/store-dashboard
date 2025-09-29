@@ -412,31 +412,81 @@
         }
         
         // Login function
-        async function login() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
+async function login() {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    
+    console.log('Attempting login with:', email);
+    
+    try {
+        showLoading(true);
+        
+        // Step 1: Authenticate with Firebase Auth
+        console.log('Step 1: Authenticating...');
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        console.log('✅ Authentication successful!', userCredential.user.uid);
+        
+        // Step 2: Try to get user data from Firestore
+        console.log('Step 2: Getting user role from Firestore...');
+        const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+        
+        if (!userDoc.exists()) {
+            console.error('❌ User document does not exist in Firestore!');
+            console.log('Creating missing Firestore document...');
             
-            try {
-                showLoading(true);
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-                const userData = userDoc.data();
-                
-                window.userData = {
-                    email: userCredential.user.email,
-                    uid: userCredential.user.uid,
-                    role: userData?.role || 'user',
-                    isAdmin: userData?.role === 'admin'
-                };
-                
-                showDashboard();
-            } catch (error) {
-                document.getElementById('error-message').textContent = 'Invalid email or password';
-                console.error('Login error:', error);
-            } finally {
-                showLoading(false);
-            }
+            // CREATE THE MISSING DOCUMENT
+            await setDoc(doc(db, 'users', userCredential.user.uid), {
+                email: email,
+                role: email === 'admin@dashboard.com' ? 'admin' : 'user',
+                createdAt: new Date()
+            });
+            
+            console.log('✅ Created Firestore document');
+            
+            // Now get it again
+            const newUserDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+            const userData = newUserDoc.data();
+            
+            window.userData = {
+                email: userCredential.user.email,
+                uid: userCredential.user.uid,
+                role: userData?.role || 'user',
+                isAdmin: userData?.role === 'admin'
+            };
+        } else {
+            console.log('✅ User document found in Firestore');
+            const userData = userDoc.data();
+            console.log('User data:', userData);
+            
+            window.userData = {
+                email: userCredential.user.email,
+                uid: userCredential.user.uid,
+                role: userData?.role || 'user',
+                isAdmin: userData?.role === 'admin'
+            };
         }
+        
+        console.log('✅ Login complete, showing dashboard...');
+        showDashboard();
+        
+    } catch (error) {
+        console.error('❌ Login error:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        
+        if (error.code === 'auth/wrong-password') {
+            document.getElementById('error-message').textContent = 'Wrong password';
+        } else if (error.code === 'auth/user-not-found') {
+            document.getElementById('error-message').textContent = 'User not found';
+        } else if (error.code === 'auth/invalid-email') {
+            document.getElementById('error-message').textContent = 'Invalid email format';
+        } else {
+            document.getElementById('error-message').textContent = 'Error: ' + error.message;
+        }
+    } finally {
+        showLoading(false);
+    }
+}
         
         // Logout function
         async function logout() {
