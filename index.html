@@ -386,7 +386,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <script>
-        // Firebase configuration - REPLACE WITH YOUR CONFIG
+        // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyD-GyaPXEPk4x5wIBOUqwpAWh0PU6Q3Xlk",
             authDomain: "store-dashboard-2270e.firebaseapp.com",
@@ -397,8 +397,8 @@
             measurementId: "G-0C46CN2PSQ"
         };
 
-        // Google Apps Script URL - REPLACE WITH YOUR DEPLOYMENT URL
-        const SCRIPT_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
+        // Google Apps Script URL - YOUR ACTUAL DEPLOYMENT URL
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec';
 
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
@@ -517,6 +517,11 @@
             try {
                 console.log('Fetching dashboard data...');
                 const response = await fetch(`${SCRIPT_URL}?route=dashboard`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const result = await response.json();
                 
                 if (result.ok) {
@@ -528,6 +533,21 @@
             } catch (error) {
                 console.error('Error loading dashboard data:', error);
                 dashboardData = { sales: [], bdc: [] };
+                
+                // Show error message to user
+                const mainContent = document.getElementById('mainContent');
+                if (mainContent) {
+                    mainContent.innerHTML = `
+                        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center;">
+                            <h3 style="color: #ef4444;">Connection Error</h3>
+                            <p>Unable to connect to Google Sheets data.</p>
+                            <p style="font-size: 12px; color: #666;">Error: ${error.message}</p>
+                            <button onclick="location.reload()" class="btn btn-primary" style="margin-top: 10px;">
+                                Retry
+                            </button>
+                        </div>
+                    `;
+                }
             }
         }
 
@@ -552,7 +572,6 @@
             
             if (!dashboardData) {
                 mainContent.innerHTML = '<div class="loading">Loading data...</div>';
-                loadDashboardData().then(() => renderLeaderboards());
                 return;
             }
             
