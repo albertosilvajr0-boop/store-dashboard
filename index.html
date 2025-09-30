@@ -361,8 +361,24 @@
         
         // Google Apps Script Web App URL - YOUR ACTUAL URL
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec';
+        /* ==== CRASH REPORTER (ADD ONCE) ==== */
+window.addEventListener('error', (e) => {
+  const app = document.getElementById('app');
+  if (!app) return;
+  app.innerHTML = `
+    <div class="container">
+      <div style="padding:50px;text-align:center;color:#dc2626;">
+        <h2>Frontend Error</h2>
+        <p>${e?.message || 'Unknown error'}</p>
+        <pre style="text-align:left;white-space:pre-wrap;background:#fff;border:1px solid #eee;border-radius:8px;padding:12px;">
+${(e?.error && e.error.stack) ? e.error.stack : ''}
+        </pre>
+      </div>
+    </div>
+  `;
+});
         /* === ACCESS HELPERS & SESSION (ADD THIS ONCE) === */
-const SUPERADMIN_EMAIL = 'your@email.com';   // <-- set this to YOU (the only superadmin)
+const SUPERADMIN_EMAIL = 'albertosilvajr0#gmail.com';   // <-- set this to YOU (the only superadmin)
 
 /** Build Authorization header for Apps Script (expects base64-JSON token). */
 function authHeaders() {
@@ -542,22 +558,28 @@ async function login() {
             }
         }
         
-        // Show dashboard (REPLACE ENTIRE FUNCTION)
-// Show dashboard (REPLACE ENTIRE FUNCTION)
+// Show dashboard (LOUD DIAGNOSTIC VERSION)
 async function showDashboard() {
   if (!window.userData) { showLogin(); return; }
 
   try {
     showLoading(true);
 
-    // ✅ call the correct route
-    const resp = await fetch(`${SCRIPT_URL}?route=leaderboards`);
-    const result = await resp.json();
+    const url = `${SCRIPT_URL}?route=leaderboards`;
+    const resp = await fetch(url, { headers: authHeaders() });
 
-    if (!result.ok) throw new Error(result.error || 'Failed to load leaderboards');
+    // If the response isn't JSON, dump the body so we can see what's going on
+    const raw = await resp.text();
+    let result;
+    try { result = JSON.parse(raw); } catch {
+      throw new Error(`Non-JSON response from GAS.\nHTTP ${resp.status}\n\n${raw}`);
+    }
 
-    // result already has { sales: [...], bdc: [...] }
-    window.dashboardData = result;
+    if (!result.ok) {
+      throw new Error(result.error || 'Backend returned ok:false');
+    }
+
+    window.dashboardData = result; // { sales:[...], bdc:[...] }
     renderDashboard(result);
 
   } catch (err) {
@@ -566,8 +588,8 @@ async function showDashboard() {
       <div class="container">
         <div style="padding: 50px; text-align: center; color: red;">
           <h2>Error Loading Dashboard</h2>
-          <p>${err.message}</p>
-          <button class="btn" onclick="showDashboard()" style="max-width: 200px; margin: 20px auto;">Retry</button>
+          <p style="white-space:pre-wrap;">${err.message}</p>
+          <button class="btn" onclick="showDashboard()" style="max-width:200px;margin:20px auto;">Retry</button>
         </div>
       </div>
     `;
@@ -575,6 +597,7 @@ async function showDashboard() {
     showLoading(false);
   }
 }
+
 
         
         // Render dashboard (REPLACE ENTIRE FUNCTION)
