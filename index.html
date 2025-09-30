@@ -543,17 +543,21 @@ async function login() {
         }
         
         // Show dashboard (REPLACE ENTIRE FUNCTION)
+// Show dashboard (REPLACE ENTIRE FUNCTION)
 async function showDashboard() {
   if (!window.userData) { showLogin(); return; }
 
   try {
     showLoading(true);
-    const resp = await fetch(`${SCRIPT_URL}?route=leaderboards`, { headers: authHeaders() });
+
+    // ✅ call the correct route
+    const resp = await fetch(`${SCRIPT_URL}?route=leaderboards`);
     const result = await resp.json();
 
     if (!result.ok) throw new Error(result.error || 'Failed to load leaderboards');
 
-    window.dashboardData = result; // { sales: [...], bdc: [...] }
+    // result already has { sales: [...], bdc: [...] }
+    window.dashboardData = result;
     renderDashboard(result);
 
   } catch (err) {
