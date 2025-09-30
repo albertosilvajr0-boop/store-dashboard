@@ -240,6 +240,7 @@ async function showDashboard() {
 
     window.dashboardData = result;
     renderDashboard(result);
+    prefetchForDashboard(result);
 
   } catch (err) {
     console.error('Dashboard error:', err);
@@ -324,18 +325,13 @@ async function showPersonDetails(name, type) {
   }
 
   try {
-    const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-    const resp = await fetch(url);
-    const result = await resp.json();
-    if (!result.ok) throw new Error(result.error || 'Failed to load person details');
+    const result = await fetchPerson(name);
+    if (!result?.ok) throw new Error(result?.error || 'Failed to load person details');
 
-    // Backend payload shape: { block, lastWorkDay, lastDay, picks, prNotes }
-    // block contains callsMTD, textsMTD, salesMTD, shownMTD, createdMTD, avgTalk, workingDays, type, name
     const payload = result.data || {};
     const b   = payload.block || {};
-    const day = payload.lastDay || {};         // {dateKey, calls, avgTalkMSS, sales}
-    const note = payload.prNotes || {};        // {wins, opportunities, lastSales:{date,sales}}
-
+    const day = payload.lastDay || {};
+    const note = payload.prNotes || {};
     const isSales = (b.type || type) === 'Sales';
 
     const html = `
@@ -405,14 +401,10 @@ async function viewCallSheets(name) {
   }
 
   try {
-    const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-    const resp = await fetch(url);
-    const result = await resp.json();
-    if (!result.ok) throw new Error(result.error || 'Failed to load call sheets');
+    const result = await fetchCalls(name);
+    if (!result?.ok) throw new Error(result?.error || 'Failed to load call sheets');
 
-    // Backend rows: {name, phone, email, salesPerson, bdcAgent, source, dateIn, leadAge, daysSince, bucket, status, reason, link}
     const rows = result.data?.calls || [];
-
     const trs = rows.map(r => {
       const customer = r.link
         ? `<a href="${r.link}" target="_blank" rel="noopener">${r.name || '-'}</a>`
@@ -477,6 +469,7 @@ async function viewCallSheets(name) {
     }
   }
 }
+
 
     /************ User Management ************/
     async function loadUsers() {
@@ -585,6 +578,47 @@ async function addUser() {
         </div>
       `;
     }
+// ---- Lightweight client-side cache & prefetch ----
+const personCache = new Map();        // key: name  -> payload from /person
+const callListCache = new Map();      // key: name  -> payload from /calls_for
+
+function cacheKey(name) { return (name || '').toUpperCase().trim(); }
+
+async function fetchPerson(name) {
+  const key = cacheKey(name);
+  if (personCache.has(key)) return personCache.get(key);
+  const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  if (data?.ok) personCache.set(key, data);
+  return data;
+}
+
+async function fetchCalls(name) {
+  const key = cacheKey(name);
+  if (callListCache.has(key)) return callListCache.get(key);
+  const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  if (data?.ok) callListCache.set(key, data);
+  return data;
+}
+
+function prefetchPerson(name) {
+  if (!name) return;
+  const key = cacheKey(name);
+  if (personCache.has(key)) return;
+  fetchPerson(name).catch(() => {});
+}
+
+function prefetchForDashboard(data) {
+  const topSales = (data.sales || []).slice(0, 3).map(x => x.name);
+  const topBDC   = (data.bdc   || []).slice(0, 3).map(x => x.name);
+  const mine     = window.userData?.linkedName ? [window.userData.linkedName] : [];
+  [...new Set([...topSales, ...topBDC, ...mine])].forEach(prefetchPerson);
+}
+
+    
 
     /************ Globals for inline handlers ************/
     window.login = login;
