@@ -98,6 +98,10 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db   = getFirestore(app);
+    
+// Secondary app so creating users doesn't switch the current session
+const secondaryApp  = initializeApp(firebaseConfig, 'secondary');
+const secondaryAuth = getAuth(secondaryApp);
 
     // GAS Web App URL
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwunFBZDwIOTDwplB9wvFR4wmhbG5rASIG4nj1fUbJgbzBuEZ_5-x2euwpPiDsL0i9X/exec';
@@ -308,17 +312,25 @@ async function showDashboard() {
     }
 
     // Person "1on1" page (NO custom headers; use ?session=)
+// Person "1on1" page — load inside #content (no full-page wipe)
 async function showPersonDetails(name, type) {
-  try {
-    showLoading(true);
+  // show a local loading state inside the content panel
+  const contentEl = document.getElementById('content');
+  if (contentEl) {
+    contentEl.innerHTML = `
+      <div class="leaderboard-card" style="padding:24px; text-align:center;">
+        Loading ${name}…
+      </div>`;
+  }
 
+  try {
     const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-    const resp = await fetch(url);            // <-- no headers here
+    const resp = await fetch(url);
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error || 'Failed to load person details');
 
     const d = result.data || {};
-    document.getElementById('content').innerHTML = `
+    const html = `
       <div style="max-width: 980px; margin: 0 auto;">
         <button onclick="showDashboard()" class="btn" style="background:#6B7280;margin-bottom:16px;">← Back to Leaderboard</button>
         <div class="leaderboard-card" style="padding:24px;">
@@ -345,24 +357,35 @@ async function showPersonDetails(name, type) {
         </div>
       </div>
     `;
+
+    if (contentEl) contentEl.innerHTML = html;
   } catch (e) {
-    document.getElementById('content').innerHTML = `
-      <div style="background:#fff;border-radius:16px;padding:40px;color:#dc2626; text-align:center;">
-        <h2>Error Loading Details</h2>
-        <p>${e.message}</p>
-      </div>
-    `;
-  } finally { showLoading(false); }
+    if (contentEl) {
+      contentEl.innerHTML = `
+        <div style="background:#fff;border-radius:16px;padding:40px;color:#dc2626; text-align:center;">
+          <h2>Error Loading Details</h2>
+          <p>${e.message}</p>
+        </div>
+      `;
+    }
+  }
 }
 
 
    // View Call Sheets (NO custom headers; use ?session=)
+// Call Sheets — load inside #content (no full-page wipe)
 async function viewCallSheets(name) {
-  try {
-    showLoading(true);
+  const contentEl = document.getElementById('content');
+  if (contentEl) {
+    contentEl.innerHTML = `
+      <div class="leaderboard-card" style="padding:24px; text-align:center;">
+        Loading call sheets for ${name}…
+      </div>`;
+  }
 
+  try {
     const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-    const resp = await fetch(url);            // <-- no headers here
+    const resp = await fetch(url);
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error || 'Failed to load call sheets');
 
@@ -377,7 +400,7 @@ async function viewCallSheets(name) {
       </tr>
     `).join('');
 
-    document.getElementById('content').innerHTML = `
+    const html = `
       <div class="leaderboard-card">
         <button onclick="showPersonDetails('${name.replace(/'/g, "\\'")}')" class="btn" style="background:#6B7280;margin-bottom:12px;">← Back to ${name}</button>
         <h2 style="margin-top:0;">Call Sheets - ${name}</h2>
@@ -399,9 +422,18 @@ async function viewCallSheets(name) {
         </div>
       </div>
     `;
+    if (contentEl) contentEl.innerHTML = html;
+
   } catch (e) {
-    alert('Failed to load call sheets: ' + e.message);
-  } finally { showLoading(false); }
+    if (contentEl) {
+      contentEl.innerHTML = `
+        <div style="background:#fff;border-radius:16px;padding:40px;color:#dc2626; text-align:center;">
+          <h2>Error Loading Call Sheets</h2>
+          <p>${e.message}</p>
+        </div>
+      `;
+    }
+  }
 }
 
     /************ User Management ************/
@@ -434,32 +466,48 @@ async function viewCallSheets(name) {
       }
     }
 
-    async function addUser() {
-      const email = document.getElementById('newUserEmail').value.trim();
-      const password = document.getElementById('newUserPassword').value.trim();
-      const role = document.getElementById('newUserRole').value;
-      const linkedName = document.getElementById('newUserLinked').value.trim();
+    // Add user WITHOUT switching the current (admin) session
+async function addUser() {
+  const email = document.getElementById('newUserEmail').value.trim();
+  const password = document.getElementById('newUserPassword').value.trim();
+  const role = document.getElementById('newUserRole').value;
+  const linkedName = document.getElementById('newUserLinked').value.trim();
 
-      if (!isAdmin()) { alert('Only admins can add users.'); return; }
-      if (!email || !password) { alert('Please enter email and password'); return; }
-      if (role === 'superadmin') { alert('Superadmin cannot be created here.'); return; }
+  if (!isAdmin()) { alert('Only admins can add users.'); return; }
+  if (!email || !password) { alert('Please enter email and password'); return; }
+  if (role === 'superadmin') { alert('Superadmin cannot be created here.'); return; }
 
-      try {
-        showLoading(true);
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await setDoc(doc(db, 'users', cred.user.uid), {
-          email, role, linkedName, createdAt: new Date(), createdBy: window.userData.email
-        });
-        document.getElementById('newUserEmail').value = '';
-        document.getElementById('newUserPassword').value = '';
-        document.getElementById('newUserLinked').value = '';
-        document.getElementById('newUserRole').value = 'user';
-        await loadUsers();
-        alert('User added successfully!');
-      } catch (error) {
-        alert('Error adding user: ' + error.message);
-      } finally { showLoading(false); }
-    }
+  try {
+    showLoading(true);
+
+    // Use the SECONDARY auth so we don't knock out the current session
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+
+    // Create Firestore profile (in your main DB)
+    await setDoc(doc(db, 'users', cred.user.uid), {
+      email, role, linkedName,
+      createdAt: new Date(),
+      createdBy: window.userData.email
+    });
+
+    // Clean up fields + keep admin logged in
+    document.getElementById('newUserEmail').value = '';
+    document.getElementById('newUserPassword').value = '';
+    document.getElementById('newUserLinked').value = '';
+    document.getElementById('newUserRole').value = 'user';
+
+    // Sign the secondary auth out (does NOT affect primary auth)
+    await signOut(secondaryAuth);
+
+    await loadUsers();
+    alert('User added successfully!');
+  } catch (error) {
+    console.error('Error adding user:', error);
+    alert('Error adding user: ' + error.message);
+  } finally {
+    showLoading(false);
+  }
+}
 
     async function deleteUser(uid, role, email) {
       if (!isAdmin()) { alert('Only admins can delete users.'); return; }
