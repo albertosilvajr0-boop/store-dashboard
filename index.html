@@ -377,8 +377,15 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
     </div>
   `;
 });
+        
+// Boot (ADD THESE 3 LINES AT THE END)
+if (auth.currentUser) {
+  showDashboard();
+} else {
+  showLogin();
+} 
         /* === ACCESS HELPERS & SESSION (ADD THIS ONCE) === */
-const SUPERADMIN_EMAIL = 'albertosilvajr0#gmail.com';   // <-- set this to YOU (the only superadmin)
+const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';   // <-- set this to YOU (the only superadmin)
 
 /** Build Authorization header for Apps Script (expects base64-JSON token). */
 function authHeaders() {
@@ -404,6 +411,25 @@ function makeSessionToken({ name, role }) {
   return btoa(JSON.stringify(payload));
 }
 
+// Simple login screen (ADD THIS WHOLE FUNCTION)
+function showLogin() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="login-container">
+      <h2>Store Performance Dashboard</h2>
+      <div id="error-message" style="color:#dc2626;min-height:20px;margin:10px 0 0;"></div>
+      <div class="form-group" style="margin-top:16px;">
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="you@company.com" autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input id="password" type="password" placeholder="Your password" autocomplete="current-password" />
+      </div>
+      <button class="btn" onclick="login()">Log in</button>
+    </div>
+  `;
+}
         // Global variables
         window.userData = null;
         window.dashboardData = null;
