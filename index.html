@@ -259,58 +259,61 @@ async function showDashboard() {
 }
 
 
-    function renderDashboard(data) {
-      const salesLB = (data.sales || []).slice(0, 10);
-      const bdcLB   = (data.bdc   || []).slice(0, 10);
-      const me = window.userData || {};
+function renderDashboard(data) {
+  // Show ALL sales; keep BDC top-10
+  const salesLB = (data.sales || []);            // ← no slice
+  const bdcLB   = (data.bdc   || []).slice(0, 10);
 
-      function rowHTML(person, index, type) {
-        const name = person.name || '';
-        const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
-        const allowed = canViewName(name);
-        const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', '${type}')"` : '';
-        const style = allowed ? '' : 'opacity:0.6; cursor:not-allowed;';
-        const right = type === 'Sales' ? `${person.sales || 0} Sales` : `${person.shows || 0} Shows`;
-        return `
-          <div class="leaderboard-item" ${clickAttr} style="${style}">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <div class="rank ${rankClass}">${index + 1}</div>
-              <div class="name">${name}</div>
-            </div>
-            <div class="score">${right}</div>
-          </div>
-        `;
-      }
+  const me = window.userData || {};
 
-      document.getElementById('app').innerHTML = `
-        <div class="header"><h1>Store Performance Dashboard</h1></div>
-
-        <div class="user-info">
-          <div>
-            Welcome, <strong>${me.email || ''}</strong>
-            ${isAdmin() ? '<span style="color:#a7f3d0;"> (Admin)</span>' : (isManager() ? '<span style="color:#93c5fd;"> (Manager)</span>' : '')}
-            ${me.linkedName ? ` • Linked: <strong>${me.linkedName}</strong>` : ''}
-          </div>
-          <div>
-            ${isAdmin() ? '<button class="admin-btn" onclick="showUserModal()">User Management</button>' : ''}
-            <button class="logout-btn" onclick="logout()" style="margin-left:10px;">Logout</button>
-          </div>
+  function rowHTML(person, index, type) {
+    const name = person.name || '';
+    const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
+    const allowed = canViewName(name);
+    const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', '${type}')"` : '';
+    const style = allowed ? '' : 'opacity:0.6; cursor:not-allowed;';
+    const right = type === 'Sales' ? `${person.sales || 0} Sales` : `${person.shows || 0} Shows`;
+    return `
+      <div class="leaderboard-item" ${clickAttr} style="${style}">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="rank ${rankClass}">${index + 1}</div>
+          <div class="name">${name}</div>
         </div>
+        <div class="score">${right}</div>
+      </div>
+    `;
+  }
 
-        <div class="leaderboard-section" id="content">
-          <div class="leaderboard-grid">
-            <div class="leaderboard-card">
-              <h2>🏆 Sales Leaderboard</h2>
-              ${salesLB.length ? salesLB.map((p, i) => rowHTML(p, i, 'Sales')).join('') : '<p style="text-align:center;color:#999;">No sales data</p>'}
-            </div>
-            <div class="leaderboard-card">
-              <h2>📞 BDC Leaderboard</h2>
-              ${bdcLB.length ? bdcLB.map((p, i) => rowHTML(p, i, 'BDC')).join('') : '<p style="text-align:center;color:#999;">No BDC data</p>'}
-            </div>
-          </div>
+  document.getElementById('app').innerHTML = `
+    <div class="header"><h1>Store Performance Dashboard</h1></div>
+
+    <div class="user-info">
+      <div>
+        Welcome, <strong>${me.email || ''}</strong>
+        ${isAdmin() ? '<span style="color:#a7f3d0;"> (Admin)</span>' : (isManager() ? '<span style="color:#93c5fd;"> (Manager)</span>' : '')}
+        ${me.linkedName ? ` • Linked: <strong>${me.linkedName}</strong>` : ''}
+      </div>
+      <div>
+        ${isAdmin() ? '<button class="admin-btn" onclick="showUserModal()">User Management</button>' : ''}
+        <button class="logout-btn" onclick="logout()" style="margin-left:10px;">Logout</button>
+      </div>
+    </div>
+
+    <div class="leaderboard-section" id="content">
+      <div class="leaderboard-grid">
+        <div class="leaderboard-card">
+          <h2>🏆 Sales Leaderboard</h2>
+          <div class="leaderboard-list">${salesLB.length ? salesLB.map((p, i) => rowHTML(p, i, 'Sales')).join('') : '<p style="text-align:center;color:#999;">No sales data</p>'}</div>
         </div>
-      `;
-    }
+        <div class="leaderboard-card">
+          <h2>📞 BDC Leaderboard</h2>
+          ${bdcLB.length ? bdcLB.map((p, i) => rowHTML(p, i, 'BDC')).join('') : '<p style="text-align:center;color:#999;">No BDC data</p>'}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 
     // Person "1on1" page (NO custom headers; use ?session=)
 // Person "1on1" page — load inside #content (no full-page wipe)
