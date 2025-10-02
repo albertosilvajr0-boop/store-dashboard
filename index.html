@@ -356,8 +356,9 @@ function renderDashboard(data) {
         ${me.linkedName ? ` • Linked: <strong>${me.linkedName}</strong>` : ''}
       </div>
       <div>
-        ${isAdmin() ? '<button class="admin-btn" onclick="showUserModal()">User Management</button>' : ''}
-        <button class="logout-btn" onclick="logout()" style="margin-left:10px;">Logout</button>
+        ${ (isAdmin() || isManager()) ? '<button class="admin-btn" onclick="showManagerDashboard()">Manager Dashboard</button>' : '' }
+  ${ isAdmin() ? '<button class="admin-btn" onclick="showUserModal()">User Management</button>' : '' }
+  <button class="logout-btn" onclick="logout()" style="margin-left:10px;">Logout</button>
       </div>
     </div>
 
@@ -450,9 +451,6 @@ async function showPersonDetails(name, type) {
     }
   }
 }
-
-
-
    // View Call Sheets (NO custom headers; use ?session=)
 // Call Sheets — load inside #content (no full-page wipe)
 // Call Sheets — render distribution tab fields, with hyperlink on Customer
@@ -522,6 +520,7 @@ async function viewCallSheets(name) {
       </div>
     `;
     if (contentEl) contentEl.innerHTML = html;
+    attachClickLogger();
 
   } catch (e) {
     if (contentEl) {
@@ -532,6 +531,128 @@ async function viewCallSheets(name) {
         </div>
       `;
     }
+  }
+}
+/* ========= Manager Dashboard ========= */
+function startOfToday(){ const d = new Date(); d.setHours(0,0,0,0); return Timestamp.fromDate(d); }
+function startOfMonth(){ const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return Timestamp.fromDate(d); }
+
+async function showManagerDashboard(){
+  if (!(isAdmin() || isManager())) { alert('Managers only.'); return; }
+  showLoading(true);
+  try{
+    // users collection
+    const usersSnap = await getDocs(collection(db, 'users'));
+    const users = []; usersSnap.forEach(d => users.push({ id:d.id, ...d.data() }));
+
+    const todayTs = startOfToday();
+    const monthTs = startOfMonth();
+
+    // Helpers
+    const inRange = (t, fromTs) => {
+      const d = t && t.toDate ? t.toDate() : null;
+      return d && d >= fromTs.toDate();
+    };
+    const sec = (s) => {
+      const st = s.startedAt?.toDate?.() || null;
+      const et = s.endedAt?.toDate?.() || null;
+      return (st && et) ? Math.max(0, Math.round((et - st)/1000)) : 0;
+    };
+    const fmtDur = s => { const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60; return (h? h+'h ':'')+(m? m+'m ':'')+(s? ss+'s':'0s'); };
+
+    async function getSessions(uid){
+      const q = query(collection(db,'userSessions'), where('uid','==',uid), orderBy('startedAt','desc'));
+      const snap = await getDocs(q);
+      const list = []; snap.forEach(s => list.push({ id:s.id, ...s.data() }));
+      return list;
+    }
+    async function getClicks(uid){
+      const q = query(collection(db,'callClicks'), where('uid','==',uid), orderBy('ts','desc'));
+      const snap = await getDocs(q);
+      const list = []; snap.forEach(c => list.push({ id:c.id, ...c.data() }));
+      return list;
+    }
+
+    const rows = [];
+    for (const u of users){
+      const sessions = await getSessions(u.id);
+      const clicks   = await getClicks(u.id);
+
+      const lastLogin = sessions.length ? sessions[0].startedAt : null;
+
+      // Today & MTD
+      const todaySessions = sessions.filter(s => inRange(s.startedAt, todayTs));
+      const todayDuration = todaySessions.reduce((sum, s)=> sum + sec(s), 0);
+      const mtdSessions   = sessions.filter(s => inRange(s.startedAt, monthTs));
+      const mtdCount      = mtdSessions.length;
+      const mtdDuration   = mtdSessions.reduce((sum, s)=> sum + sec(s), 0);
+      const avgSec        = mtdCount ? Math.round(mtdDuration / mtdCount) : 0;
+
+      const clicksToday = clicks.filter(c => inRange(c.ts, todayTs)).length;
+      const clicksMTD   = clicks.filter(c => inRange(c.ts, monthTs)).length;
+
+      rows.push({
+        email: u.email || '',
+        linkedName: u.linkedName || '',
+        role: u.role || 'user',
+        lastLogin: lastLogin ? lastLogin.toDate().toLocaleString() : '—',
+        today: fmtDur(todayDuration),
+        mtdCount,
+        mtdAvg: fmtDur(avgSec),
+        clicksToday,
+        clicksMTD
+      });
+    }
+
+    const table = `
+      <div class="leaderboard-card">
+        <h2>👤 Manager Dashboard — Engagement</h2>
+        <div style="overflow:auto">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:#f3f4f6;">
+              <th style="text-align:left;padding:10px;">Email</th>
+              <th style="text-align:left;padding:10px;">Linked Name</th>
+              <th style="text-align:left;padding:10px;">Role</th>
+              <th style="text-align:left;padding:10px;">Last Login</th>
+              <th style="text-align:left;padding:10px;">Time Today</th>
+              <th style="text-align:left;padding:10px;">Sessions MTD</th>
+              <th style="text-align:left;padding:10px;">Avg Session MTD</th>
+              <th style="text-align:left;padding:10px;">Call-Link Clicks Today</th>
+              <th style="text-align:left;padding:10px;">Call-Link Clicks MTD</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr style="border-top:1px solid #e5e7eb;">
+                <td style="padding:10px;">${r.email}</td>
+                <td style="padding:10px;">${r.linkedName||'—'}</td>
+                <td style="padding:10px;">${r.role}</td>
+                <td style="padding:10px;">${r.lastLogin}</td>
+                <td style="padding:10px;">${r.today}</td>
+                <td style="padding:10px;">${r.mtdCount}</td>
+                <td style="padding:10px;">${r.mtdAvg}</td>
+                <td style="padding:10px;">${r.clicksToday}</td>
+                <td style="padding:10px;">${r.clicksMTD}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="btn" onclick="showDashboard()">← Back</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('content').innerHTML = table;
+  } catch (err){
+    document.getElementById('content').innerHTML = `
+      <div class="leaderboard-card" style="color:#dc2626;">
+        <h2>Manager Dashboard</h2>
+        <p>${err.message}</p>
+      </div>`;
+  } finally {
+    showLoading(false);
   }
 }
 
@@ -684,6 +805,31 @@ function prefetchForDashboard(data) {
 }
 
     
+/* ========= Call-sheet link click logging ========= */
+async function logCallClick(link, personName) {
+  if (!link || !window.userData?.uid) return;
+  try {
+    await addDoc(collection(db, 'callClicks'), {
+      uid: window.userData.uid,
+      email: window.userData.email || '',
+      linkedName: window.userData.linkedName || '',
+      clickedFor: personName || '',
+      link: link,
+      ts: serverTimestamp()
+    });
+  } catch(_) {}
+}
+function attachClickLogger() {
+  const tbl = document.querySelector('#content table');
+  if (!tbl) return;
+  tbl.addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!a) return;
+    const href = a.getAttribute('href');
+    const forName = (document.querySelector('h2')?.textContent || '').replace(/^Call Sheets - /,'');
+    logCallClick(href, forName);
+  }, { passive:true });
+}
 
     /************ Globals for inline handlers ************/
     window.login = login;
@@ -695,6 +841,7 @@ function prefetchForDashboard(data) {
     window.showPersonDetails = showPersonDetails;
     window.viewCallSheets = viewCallSheets;
     window.showDashboard = showDashboard;
+    window.showManagerDashboard = showManagerDashboard;
 
     /************ Boot ************/
     if (auth.currentUser) { showDashboard(); } else { showLogin(); }
