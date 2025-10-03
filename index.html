@@ -453,9 +453,7 @@ async function showPersonDetails(name, type) {
 
 
 
-   // View Call Sheets (NO custom headers; use ?session=)
-// Call Sheets — load inside #content (no full-page wipe)
-// Call Sheets — render distribution tab fields, with hyperlink on Customer
+ // Call Sheets — with ✓/✗ (rep called on last work day) + Date In (date only)
 async function viewCallSheets(name) {
   const contentEl = document.getElementById('content');
   if (contentEl) {
@@ -466,23 +464,51 @@ async function viewCallSheets(name) {
   }
 
   try {
-    const result = await fetchCalls(name);
-    if (!result?.ok) throw new Error(result?.error || 'Failed to load call sheets');
+    showLoading?.(true);
+
+    const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
+    const resp = await fetch(url, { cache: 'no-store' });
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error || 'Failed to load call sheets');
 
     const rows = result.data?.calls || [];
+
+    // Helpers
+    const tzDateOnly = (value) => {
+      if (!value) return '-';
+      try {
+        // Handle Date objects, ISO strings, or preformatted text
+        const d = (value instanceof Date) ? value : new Date(value);
+        if (!isNaN(d.getTime())) return d.toLocaleDateString();
+        // Fallback: split ISO
+        return String(value).split('T')[0] || String(value);
+      } catch (_) {
+        return String(value);
+      }
+    };
+    const yesNoIcon = (flag, lastWorkDay) => {
+      return flag
+        ? `<span title="Sales rep called on last work day${lastWorkDay ? ' ('+lastWorkDay+')' : ''}" style="color:#16a34a;font-size:18px;">&#10003;</span>`
+        : `<span title="No sales-rep call on last work day${lastWorkDay ? ' ('+lastWorkDay+')' : ''}" style="color:#dc2626;font-size:18px;">&#10007;</span>`;
+    };
+
     const trs = rows.map(r => {
       const customer = r.link
         ? `<a href="${r.link}" target="_blank" rel="noopener">${r.name || '-'}</a>`
         : (r.name || '-');
+
       return `
         <tr style="border-top:1px solid #e5e7eb;">
+          <td style="padding:10px;width:36px;text-align:center;">
+            ${yesNoIcon(!!r.repCalledLastWorkDay, r.lastWorkDay || '')}
+          </td>
           <td style="padding:10px;">${customer}</td>
           <td style="padding:10px;">${r.phone || '-'}</td>
           <td style="padding:10px;">${r.email || '-'}</td>
           <td style="padding:10px;">${r.salesPerson || '-'}</td>
           <td style="padding:10px;">${r.bdcAgent || '-'}</td>
           <td style="padding:10px;">${r.source || '-'}</td>
-          <td style="padding:10px;">${r.dateIn || '-'}</td>
+          <td style="padding:10px;">${tzDateOnly(r.dateIn || r.date)}</td>
           <td style="padding:10px;">${r.leadAge ?? '-'}</td>
           <td style="padding:10px;">${r.daysSince ?? '-'}</td>
           <td style="padding:10px;">${r.bucket || '-'}</td>
@@ -500,6 +526,7 @@ async function viewCallSheets(name) {
           <table style="width:100%; border-collapse:collapse;">
             <thead>
               <tr style="background:#f3f4f6;">
+                <th style="text-align:center; padding:10px; width:36px;" title="Sales rep called on last work day?">✓/✗</th>
                 <th style="text-align:left; padding:10px;">Customer</th>
                 <th style="text-align:left; padding:10px;">Phone</th>
                 <th style="text-align:left; padding:10px;">Email</th>
@@ -515,13 +542,17 @@ async function viewCallSheets(name) {
               </tr>
             </thead>
             <tbody>
-              ${rows.length ? trs : `<tr><td colspan="12" style="padding:20px;text-align:center;color:#6b7280;">No call data</td></tr>`}
+              ${rows.length ? trs : `<tr><td colspan="13" style="padding:20px;text-align:center;color:#6b7280;">No call data</td></tr>`}
             </tbody>
           </table>
         </div>
       </div>
     `;
+
     if (contentEl) contentEl.innerHTML = html;
+
+    // Keep your link-click logger so the Manager Dashboard has data
+    if (typeof attachClickLogger === 'function') attachClickLogger();
 
   } catch (e) {
     if (contentEl) {
@@ -532,8 +563,11 @@ async function viewCallSheets(name) {
         </div>
       `;
     }
+  } finally {
+    showLoading?.(false);
   }
 }
+
 
 
     /************ User Management ************/
