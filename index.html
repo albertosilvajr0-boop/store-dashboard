@@ -15,21 +15,18 @@ html, body {
 body { position: relative; }
 
 /* START:WATERMARK_CSS */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0; /* sit above body background but below everything else */
+html {
+  /* white page + faint tiled image with a soft white veil */
   background:
-    linear-gradient(#ffffffcc,#ffffffcc),
+    linear-gradient(#ffffffcc, #ffffffcc),
     url("https://firebasestorage.googleapis.com/v0/b/store-dashboard-2025.firebasestorage.app/o/main-21230-4c67111c81ce.jpg?alt=media&token=fe0ae9ad-26ae-4c11-8517-e28b04a8a42d");
   background-repeat: repeat;
-  background-size: 280px auto;   /* increase for fewer tiles (e.g., 360px) */
+  background-size: 280px auto;     /* 360px for fewer tiles */
   background-position: top left;
-  opacity: 0.06;                 /* .04–.10 for desired subtlety */
-  pointer-events: none;
 }
+body { background: transparent; }   /* let the html background show through */
 /* END:WATERMARK_CSS */
+
 
 /* ===== ORIGINAL DASHBOARD STYLES ===== */
 :root { 
