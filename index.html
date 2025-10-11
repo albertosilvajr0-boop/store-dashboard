@@ -5,88 +5,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Store Performance Dashboard</title>
 <style>
-/* ===== Base variables ===== */
 :root { --bg1:#6a11cb; --bg2:#2575fc; --card:#ffffff; --text:#1f2937; --muted:#6b7280; }
 
-/* ===== Page canvas + watermark (ONLY change needed) ===== */
 html,body{
   height:100%;
   margin:0;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  background:#fff; /* remove old purple/blue gradient */
+  background:#fff;
 }
-/* Watermark pattern painted on <html>; body is transparent so it shows through */
+
+/* Working watermark */
 html{
   background:
     linear-gradient(#ffffffcc,#ffffffcc),
-    url("https://firebasestorage.googleapis.com/v0/b/store-dashboard-2025.firebasestorage.app/o/main-21230-4c67111c81ce.jpg?alt=media&token=fe0ae9ad-26ae-4c11-8517-e28b04a8a42d");
+    url("https://firebasestorage.googleapis.com/v0/b/store-dashboard-2025.appspot.com/o/main-21230-4c67111c81ce.jpg?alt=media&token=fe0ae9ad-26ae-4c11-8517-e28b04a8a42d");
   background-repeat:repeat;
-  background-size:280px auto;      /* 360px for fewer, larger tiles */
+  background-size:280px auto;
   background-position:top left;
 }
 body{ background:transparent; }
 
-/* ===== Layout & components (unchanged) ===== */
+/* Everything else (unchanged) */
 .container { max-width:1100px; margin:40px auto; padding:0 20px; }
-
 .header { color:#fff; text-align:center; margin-bottom:24px; }
 .header h1 { margin:0 0 6px; font-size:32px; }
-
-.user-info { 
-  display:flex; align-items:center; justify-content:space-between;
-  background:rgba(255,255,255,.15); border-radius:12px; padding:12px 16px;
-  color:#fff; backdrop-filter: blur(6px);
-}
-
+.user-info { display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,.15); border-radius:12px; padding:12px 16px; color:#fff; backdrop-filter:blur(6px); }
 .leaderboard-section { margin-top:20px; }
-
 .leaderboard-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px; }
-
 .leaderboard-card { background:var(--card); border-radius:16px; box-shadow:0 12px 24px rgba(0,0,0,.12); padding:16px; }
 .leaderboard-card h2 { margin:4px 0 10px; color:var(--text); }
-
 .leaderboard-item { display:flex; align-items:center; justify-content:space-between; padding:12px 10px; border-radius:10px; cursor:pointer; transition: transform .05s ease, background .2s; }
 .leaderboard-item:hover { background:#f3f4f6; transform: translateY(-1px); }
-
 .rank { width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-weight:700; color:#fff; background:#9ca3af; margin-right:10px; }
-.gold { background:linear-gradient(135deg,#f59e0b,#fbbf24); }
-.silver { background:linear-gradient(135deg,#9ca3af,#e5e7eb); color:#111827; }
-.bronze { background:linear-gradient(135deg,#b45309,#f59e0b); }
-
+.gold { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+.silver { background: linear-gradient(135deg, #9ca3af, #e5e7eb); color:#111827; }
+.bronze { background: linear-gradient(135deg, #b45309, #f59e0b); }
 .name { flex:1; margin-left:6px; color:#111827; font-weight:600; }
 .score { color:#6b7280; font-weight:600; }
-
-.btn { background:linear-gradient(135deg,#2563eb,#7c3aed); color:#fff; border:none; padding:12px 16px; border-radius:10px; cursor:pointer; font-weight:600; }
+.btn { background: linear-gradient(135deg, #2563eb, #7c3aed); color:#fff; border:none; padding:12px 16px; border-radius:10px; cursor:pointer; font-weight:600; }
 .btn:disabled { opacity:.5; cursor:not-allowed; }
-
 .admin-btn { background:#10b981; color:#fff; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
 .logout-btn { background:#ef4444; color:#fff; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
-
 .login-container { max-width:420px; margin:12vh auto; background:#ffffff; border-radius:16px; padding:24px; box-shadow:0 12px 24px rgba(0,0,0,.18); }
 .login-container h2 { margin:0 0 10px; color:#111827; text-align:center; }
-
 .form-group { margin-top:12px; display:flex; flex-direction:column; gap:6px; }
 .form-group input, .form-group select { padding:12px; border:1px solid #e5e7eb; border-radius:10px; font-size:15px; }
-
 .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); place-items:center; z-index:50; }
 .modal-content { width:min(720px, 92vw); background:#fff; border-radius:16px; padding:18px; box-shadow:0 12px 28px rgba(0,0,0,.25); }
 .modal-header { display:flex; align-items:center; justify-content:space-between; }
 .modal-close { background:transparent; border:none; font-size:24px; cursor:pointer; line-height:1; }
-
 .user-list .user-item { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee; }
 .delete-btn { background:#ef4444; color:#fff; border:none; padding:8px 10px; border-radius:8px; cursor:pointer; }
-
 #content { min-height:280px; }
-
-/* ===== Optional: keep the solid black user bar (matches your live look) ===== */
-.user-info{
-  color:#ffffff !important;
-  background:#000000 !important;
-  backdrop-filter:none !important;
-  border-radius:12px;
-}
+.user-info{ color:#ffffff !important; background:#000000 !important; backdrop-filter:none !important; border-radius:12px; }
 .user-info strong{ color:#ffffff !important; }
 </style>
+
 
   <!-- Firebase + App -->
   <script type="module">
