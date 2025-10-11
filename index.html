@@ -785,7 +785,33 @@ function prefetchForDashboard(data) {
   [...new Set([...topSales, ...topBDC, ...mine])].forEach(prefetchPerson);
 }
 
-    
+    <script>
+(function () {
+  // Your working Storage URL
+  const IMG = "https://firebasestorage.googleapis.com/v0/b/store-dashboard-2025.firebasestorage.app/o/main-21230-4c67111c81ce.jpg?alt=media&token=fe0ae9ad-26ae-4c11-8517-e28b04a8a42d";
+
+  const html = document.documentElement;
+  const body = document.body;
+
+  // Kill any existing gradients/images first
+  html.style.setProperty('background', '#fff', 'important');
+  html.style.setProperty('background-image', 'none', 'important');
+  body.style.setProperty('background', 'transparent', 'important');
+
+  // Apply ONLY the watermark + soft white veil (all with !important)
+  const bg = `linear-gradient(#ffffffcc,#ffffffcc), url("${IMG}")`;
+  html.style.setProperty('background', bg, 'important');
+  html.style.setProperty('background-repeat', 'repeat', 'important');
+  html.style.setProperty('background-size', '280px auto', 'important');   // change to 360px auto for fewer tiles
+  html.style.setProperty('background-position', 'top left', 'important');
+  html.style.setProperty('background-color', '#fff', 'important');
+
+  // (Optional) make it obvious for a second, then dial back—uncomment to test
+  // html.style.setProperty('background-size', '120px auto', 'important');
+  // setTimeout(() => html.style.setProperty('background-size','280px auto','important'), 1500);
+})();
+</script>
+
 
     /************ Globals for inline handlers ************/
     window.login = login;
