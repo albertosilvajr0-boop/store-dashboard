@@ -59,6 +59,21 @@ body{ background:transparent; }
 #content { min-height:280px; }
 .user-info{ color:#ffffff !important; background:#000000 !important; backdrop-filter:none !important; border-radius:12px; }
 .user-info strong{ color:#ffffff !important; }
+<style id="watermark-final">
+  /* Force page canvas + watermark */
+  html, body { height:100%; margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+  html{
+    background:
+      linear-gradient(#ffffffcc,#ffffffcc),
+      url("https://firebasestorage.googleapis.com/v0/b/store-dashboard-2025.firebasestorage.app/o/main-21230-4c67111c81ce.jpg?alt=media&token=fe0ae9ad-26ae-4c11-8517-e28b04a8a42d") !important;
+    background-repeat: repeat !important;
+    background-size: 280px auto !important;   /* try 360px auto for fewer tiles */
+    background-position: top left !important;
+    background-color: #fff !important;
+  }
+  body { background: transparent !important; }
+</style>
+  
 </style>
 
 
