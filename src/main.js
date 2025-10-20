@@ -214,6 +214,11 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function showDashboard() {
+  if (window.uploadInProgress) {
+    console.log('Upload in progress, skipping dashboard redirect');
+    return;
+  }
+
   if (!window.userData) {
     showLogin();
     return;
@@ -634,6 +639,9 @@ async function handleExcelUpload() {
 
   const file = fileInput.files[0];
 
+  // Prevent auto-redirects during upload
+  window.uploadInProgress = true;
+
   try {
     statusEl.style.display = 'block';
     messageEl.innerHTML = '<div style="color:#2563eb;">📤 Reading file...</div>';
@@ -694,16 +702,16 @@ async function handleExcelUpload() {
     await updateFileStatus(fileId, 'completed');
     console.log('Upload complete!');
 
+    window.uploadInProgress = false;
+
     messageEl.innerHTML = `
       <div style="color:#16a34a;font-weight:600;">✅ Upload Complete!</div>
       <div style="margin-top:8px;color:#6b7280;">Processed ${sales.length} sales records, ${bdc.length} BDC records, and ${allPeople.length} people.</div>
+      <button class="btn" onclick="window.showDashboard()" style="margin-top:16px;">View Dashboard</button>
     `;
 
-    setTimeout(() => {
-      showDashboard();
-    }, 2000);
-
   } catch (error) {
+    window.uploadInProgress = false;
     console.error('Upload error:', error);
     console.error('Error stack:', error.stack);
     messageEl.innerHTML = `
