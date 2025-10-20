@@ -767,10 +767,41 @@ function showColumnMapping(sheets) {
     }
   }
 
+  console.log('Sheet details:');
+  sheetNames.forEach(name => {
+    console.log(`  ${name}: ${sheets[name].length} rows`);
+    if (sheets[name].length > 0) {
+      console.log(`    Columns:`, Object.keys(sheets[name][0]));
+      console.log(`    Sample row:`, sheets[name][0]);
+    }
+  });
+
+  // Build detailed sheet info with columns
+  let sheetDetailsHTML = '';
+  sheetNames.forEach(name => {
+    const rowCount = sheets[name].length;
+    if (rowCount > 0) {
+      const cols = Object.keys(sheets[name][0]).join(', ');
+      sheetDetailsHTML += `<div style="margin-bottom:12px;padding:8px;background:white;border-radius:4px;">
+        <strong style="color:#374151;">${name}</strong> (${rowCount} rows)<br>
+        <span style="font-size:12px;color:#6b7280;">Columns: ${cols}</span>
+      </div>`;
+    } else {
+      sheetDetailsHTML += `<div style="margin-bottom:12px;padding:8px;background:white;border-radius:4px;">
+        <strong style="color:#374151;">${name}</strong> (${rowCount} rows) - No data
+      </div>`;
+    }
+  });
+
   contentEl.innerHTML = `
     <div class="leaderboard-card" style="padding:24px;max-width:1000px;margin:0 auto;">
       <h2 style="margin-top:0;">Map Excel Columns</h2>
-      <p style="color:#6b7280;margin-bottom:24px;">Found ${sheetNames.length} sheets. Please map each sheet to the correct data type:</p>
+      <p style="color:#6b7280;margin-bottom:16px;">Found ${sheetNames.length} sheets. Please map each sheet to the correct data type:</p>
+
+      <details style="margin-bottom:24px;padding:16px;background:#f8fafc;border-radius:8px;">
+        <summary style="cursor:pointer;font-weight:600;color:#374151;padding:4px;">📊 View All Sheets and Columns</summary>
+        <div style="margin-top:12px;">${sheetDetailsHTML}</div>
+      </details>
 
       <div style="background:#f8fafc;padding:20px;border-radius:10px;margin-bottom:24px;">
         <h3 style="margin-top:0;font-size:16px;">Sheet Mapping</h3>
