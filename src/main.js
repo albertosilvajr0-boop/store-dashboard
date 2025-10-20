@@ -939,21 +939,25 @@ window.showColumnMapping = showColumnMapping;
 window.confirmMapping = confirmMapping;
 window.processUploadWithMapping = processUploadWithMapping;
 
-// Only auto-show dashboard/login if not in the middle of an upload
-function startApp() {
-  console.log('startApp called, uploadInProgress:', window.uploadInProgress);
-  if (!window.uploadInProgress) {
-    if (auth.currentUser) {
-      console.log('Auto-showing dashboard');
+// Initialize upload flag
+window.uploadInProgress = false;
+window.hasInitialized = false;
+
+// Only auto-show dashboard/login on initial auth state, not during uploads
+onAuthStateChanged(auth, (user) => {
+  console.log('Auth state changed, user:', user?.email, 'uploadInProgress:', window.uploadInProgress, 'hasInitialized:', window.hasInitialized);
+
+  // Only auto-navigate once on initial load, and not during uploads
+  if (!window.uploadInProgress && !window.hasInitialized) {
+    window.hasInitialized = true;
+    if (user) {
+      console.log('Auto-showing dashboard for authenticated user');
       showDashboard();
     } else {
-      console.log('Auto-showing login');
+      console.log('Auto-showing login for unauthenticated user');
       showLogin();
     }
   } else {
-    console.log('Upload in progress, skipping auto-navigation');
+    console.log('Skipping auto-navigation - upload in progress or already initialized');
   }
-}
-
-// Small delay to ensure window.uploadInProgress is set if needed
-setTimeout(startApp, 50);
+});
