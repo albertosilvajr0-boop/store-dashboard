@@ -628,35 +628,42 @@ function showUploadDialog() {
 }
 
 async function handleExcelUpload() {
+  console.log('===== UPLOAD STARTED =====');
+
+  // Prevent auto-redirects during upload - SET THIS FIRST!
+  window.uploadInProgress = true;
+  console.log('uploadInProgress set to:', window.uploadInProgress);
+
   const fileInput = document.getElementById('excelFile');
   const statusEl = document.getElementById('upload-status');
   const messageEl = document.getElementById('upload-message');
 
   if (!fileInput.files || fileInput.files.length === 0) {
     alert('Please select a file first');
+    window.uploadInProgress = false;
     return;
   }
 
   const file = fileInput.files[0];
-
-  // Prevent auto-redirects during upload
-  window.uploadInProgress = true;
+  console.log('File selected:', file.name, 'Size:', file.size);
 
   try {
     statusEl.style.display = 'block';
     messageEl.innerHTML = '<div style="color:#2563eb;">📤 Reading file...</div>';
 
-    console.log('Starting file upload:', file.name);
+    console.log('Calling parseExcelFile...');
     const { sheets } = await parseExcelFile(file);
-    console.log('File parsed, sheets:', Object.keys(sheets));
+    console.log('File parsed successfully! Sheets:', Object.keys(sheets));
 
     // Store for column mapping
     window.uploadedSheets = sheets;
     window.uploadedFileName = file.name;
     window.uploadedFileSize = file.size;
 
+    console.log('About to call showColumnMapping...');
     // Show column mapping interface (keep uploadInProgress = true)
     showColumnMapping(sheets);
+    console.log('showColumnMapping called, uploadInProgress is:', window.uploadInProgress);
 
   } catch (error) {
     window.uploadInProgress = false;
@@ -933,10 +940,20 @@ window.confirmMapping = confirmMapping;
 window.processUploadWithMapping = processUploadWithMapping;
 
 // Only auto-show dashboard/login if not in the middle of an upload
-if (!window.uploadInProgress) {
-  if (auth.currentUser) {
-    showDashboard();
+function startApp() {
+  console.log('startApp called, uploadInProgress:', window.uploadInProgress);
+  if (!window.uploadInProgress) {
+    if (auth.currentUser) {
+      console.log('Auto-showing dashboard');
+      showDashboard();
+    } else {
+      console.log('Auto-showing login');
+      showLogin();
+    }
   } else {
-    showLogin();
+    console.log('Upload in progress, skipping auto-navigation');
   }
 }
+
+// Small delay to ensure window.uploadInProgress is set if needed
+setTimeout(startApp, 50);
