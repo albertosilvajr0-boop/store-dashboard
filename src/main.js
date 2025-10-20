@@ -797,6 +797,10 @@ async function processUploadWithMapping() {
 
 function showColumnMapping(sheets) {
   console.log('showColumnMapping called with', Object.keys(sheets).length, 'sheets');
+
+  // Mark that we're showing the mapping UI - prevent auto-navigation
+  window.showingMappingUI = true;
+
   const contentEl = document.getElementById('content');
   if (!contentEl) {
     console.error('Content element not found!');
@@ -916,6 +920,9 @@ function confirmMapping() {
     return;
   }
 
+  // Clear the mapping UI flag before processing
+  window.showingMappingUI = false;
+
   // Store mapping
   window.sheetMapping = mapping;
   console.log('Sheet mapping confirmed:', mapping);
@@ -945,10 +952,10 @@ window.hasInitialized = false;
 
 // Only auto-show dashboard/login on initial auth state, not during uploads
 onAuthStateChanged(auth, (user) => {
-  console.log('Auth state changed, user:', user?.email, 'uploadInProgress:', window.uploadInProgress, 'hasInitialized:', window.hasInitialized);
+  console.log('Auth state changed, user:', user?.email, 'uploadInProgress:', window.uploadInProgress, 'hasInitialized:', window.hasInitialized, 'showingMappingUI:', window.showingMappingUI);
 
-  // Only auto-navigate once on initial load, and not during uploads
-  if (!window.uploadInProgress && !window.hasInitialized) {
+  // Only auto-navigate once on initial load, and not during uploads or when showing mapping UI
+  if (!window.uploadInProgress && !window.hasInitialized && !window.showingMappingUI) {
     window.hasInitialized = true;
     if (user) {
       console.log('Auto-showing dashboard for authenticated user');
@@ -958,6 +965,6 @@ onAuthStateChanged(auth, (user) => {
       showLogin();
     }
   } else {
-    console.log('Skipping auto-navigation - upload in progress or already initialized');
+    console.log('Skipping auto-navigation - upload in progress, already initialized, or showing mapping UI');
   }
 });
