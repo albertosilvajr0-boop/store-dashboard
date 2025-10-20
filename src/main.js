@@ -951,9 +951,10 @@ window.showColumnMapping = showColumnMapping;
 window.confirmMapping = confirmMapping;
 window.processUploadWithMapping = processUploadWithMapping;
 
-// Initialize upload flag
+// Initialize upload flags BEFORE auth listener
 window.uploadInProgress = false;
 window.hasInitialized = false;
+window.showingMappingUI = false;
 
 // Only auto-show dashboard/login on initial auth state, not during uploads
 onAuthStateChanged(auth, (user) => {
