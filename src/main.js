@@ -958,12 +958,17 @@ window.showingMappingUI = false;
 
 // Only auto-show dashboard/login on initial auth state, not during uploads
 onAuthStateChanged(auth, (user) => {
+  // Check and set hasInitialized IMMEDIATELY to prevent race conditions
+  if (window.hasInitialized) {
+    console.log('Auth state changed but already initialized - skipping');
+    return;
+  }
+
   // Delay to ensure all synchronous code has finished and flags are properly set
   setTimeout(() => {
     console.log('Auth state changed, user:', user?.email, 'uploadInProgress:', window.uploadInProgress, 'hasInitialized:', window.hasInitialized, 'showingMappingUI:', window.showingMappingUI);
 
-    // Only auto-navigate once on initial load
-    // Skip if: already initialized, upload in progress, OR showing mapping UI
+    // Check again after timeout
     if (window.hasInitialized) {
       console.log('Skipping auto-navigation - already initialized');
       return;
