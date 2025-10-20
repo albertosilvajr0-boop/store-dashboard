@@ -960,17 +960,25 @@ window.showingMappingUI = false;
 onAuthStateChanged(auth, (user) => {
   console.log('Auth state changed, user:', user?.email, 'uploadInProgress:', window.uploadInProgress, 'hasInitialized:', window.hasInitialized, 'showingMappingUI:', window.showingMappingUI);
 
-  // Only auto-navigate once on initial load, and not during uploads or when showing mapping UI
-  if (!window.uploadInProgress && !window.hasInitialized && !window.showingMappingUI) {
-    window.hasInitialized = true;
-    if (user) {
-      console.log('Auto-showing dashboard for authenticated user');
-      showDashboard();
-    } else {
-      console.log('Auto-showing login for unauthenticated user');
-      showLogin();
-    }
+  // Only auto-navigate once on initial load
+  // Skip if: already initialized, upload in progress, OR showing mapping UI
+  if (window.hasInitialized) {
+    console.log('Skipping auto-navigation - already initialized');
+    return;
+  }
+
+  if (window.uploadInProgress || window.showingMappingUI) {
+    console.log('Skipping auto-navigation - upload/mapping in progress');
+    return;
+  }
+
+  // First time - initialize and show appropriate screen
+  window.hasInitialized = true;
+  if (user) {
+    console.log('Auto-showing dashboard for authenticated user');
+    showDashboard();
   } else {
-    console.log('Skipping auto-navigation - upload in progress, already initialized, or showing mapping UI');
+    console.log('Auto-showing login for unauthenticated user');
+    showLogin();
   }
 });
