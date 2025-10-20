@@ -2,8 +2,8 @@ export function processLeaderboardData(sheets) {
   const salesLeaderboard = [];
   const bdcLeaderboard = [];
 
-  const salesSheet = sheets['Sales'] || sheets['sales'] || [];
-  const bdcSheet = sheets['BDC'] || sheets['bdc'] || [];
+  const salesSheet = sheets['BDC Sales'] || sheets['Sales'] || sheets['sales'] || [];
+  const bdcSheet = sheets['BDC_Agent_Tracking'] || sheets['BDC'] || sheets['bdc'] || [];
   const apptSheet = sheets['Appt Act'] || sheets['appt act'] || [];
 
   const apptMap = new Map();
@@ -75,7 +75,7 @@ export function processPersonDetails(sheets, personName) {
     lastDayAvgTalk: '0:00'
   };
 
-  const detailsSheet = sheets['Details'] || sheets['details'] || sheets['Person Details'] || [];
+  const detailsSheet = sheets['User Act'] || sheets['Details'] || sheets['details'] || sheets['Person Details'] || [];
   const personRow = detailsSheet.find(row =>
     (row['Name'] || row['name'] || '').trim().toUpperCase() === upperName
   );
