@@ -893,8 +893,11 @@ window.showColumnMapping = showColumnMapping;
 window.confirmMapping = confirmMapping;
 window.processUploadWithMapping = processUploadWithMapping;
 
-if (auth.currentUser) {
-  showDashboard();
-} else {
-  showLogin();
+// Only auto-show dashboard/login if not in the middle of an upload
+if (!window.uploadInProgress) {
+  if (auth.currentUser) {
+    showDashboard();
+  } else {
+    showLogin();
+  }
 }
