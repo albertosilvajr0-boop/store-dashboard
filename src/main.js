@@ -655,9 +655,8 @@ async function handleExcelUpload() {
     window.uploadedFileName = file.name;
     window.uploadedFileSize = file.size;
 
-    // Show column mapping interface
+    // Show column mapping interface (keep uploadInProgress = true)
     showColumnMapping(sheets);
-    window.uploadInProgress = false;
 
   } catch (error) {
     window.uploadInProgress = false;
@@ -754,8 +753,12 @@ async function processUploadWithMapping() {
 }
 
 function showColumnMapping(sheets) {
+  console.log('showColumnMapping called with', Object.keys(sheets).length, 'sheets');
   const contentEl = document.getElementById('content');
-  if (!contentEl) return;
+  if (!contentEl) {
+    console.error('Content element not found!');
+    return;
+  }
 
   const sheetNames = Object.keys(sheets);
 
@@ -846,7 +849,7 @@ function showColumnMapping(sheets) {
 
       <div style="display:flex;gap:12px;">
         <button class="btn" onclick="window.confirmMapping()" style="flex:1;">Continue with Mapping</button>
-        <button class="btn" onclick="window.showUploadDialog()" style="background:#6B7280;">Cancel</button>
+        <button class="btn" onclick="window.uploadInProgress = false; window.showUploadDialog()" style="background:#6B7280;">Cancel</button>
       </div>
 
       <div id="mapping-status" style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:10px;display:none;">
