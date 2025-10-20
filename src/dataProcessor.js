@@ -2,9 +2,10 @@ export function processLeaderboardData(sheets) {
   const salesLeaderboard = [];
   const bdcLeaderboard = [];
 
-  const salesSheet = sheets['BDC Sales'] || sheets['Sales'] || sheets['sales'] || [];
-  const bdcSheet = sheets['BDC_Agent_Tracking'] || sheets['BDC'] || sheets['bdc'] || [];
-  const apptSheet = sheets['Appt Act'] || sheets['appt act'] || [];
+  const mapping = window.sheetMapping || {};
+  const salesSheet = sheets[mapping.sales] || sheets['BDC Sales'] || sheets['Sales'] || sheets['sales'] || [];
+  const bdcSheet = sheets[mapping.bdc] || sheets['BDC_Agent_Tracking'] || sheets['BDC'] || sheets['bdc'] || [];
+  const apptSheet = sheets[mapping.appt] || sheets['Appt Act'] || sheets['appt act'] || [];
 
   const apptMap = new Map();
   apptSheet.forEach(row => {
@@ -75,7 +76,8 @@ export function processPersonDetails(sheets, personName) {
     lastDayAvgTalk: '0:00'
   };
 
-  const detailsSheet = sheets['User Act'] || sheets['Details'] || sheets['details'] || sheets['Person Details'] || [];
+  const mapping = window.sheetMapping || {};
+  const detailsSheet = sheets[mapping.details] || sheets['User Act'] || sheets['Details'] || sheets['details'] || sheets['Person Details'] || [];
   const personRow = detailsSheet.find(row =>
     (row['Name'] || row['name'] || '').trim().toUpperCase() === upperName
   );
@@ -101,7 +103,8 @@ export function processPersonDetails(sheets, personName) {
 
 export function processCallSheets(sheets, personName) {
   const upperName = personName.toUpperCase();
-  const callSheetsData = sheets['Call Sheets'] || sheets['call sheets'] || sheets['Calls'] || [];
+  const mapping = window.sheetMapping || {};
+  const callSheetsData = sheets[mapping.calls] || sheets['Call Sheets'] || sheets['call sheets'] || sheets['Calls'] || [];
 
   const personCalls = callSheetsData.filter(row => {
     const assignedTo = (row['Assigned To'] || row['assigned_to'] || row['Sales Person'] || '').trim().toUpperCase();

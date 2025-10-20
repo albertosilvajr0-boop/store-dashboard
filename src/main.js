@@ -650,10 +650,41 @@ async function handleExcelUpload() {
     const { sheets } = await parseExcelFile(file);
     console.log('File parsed, sheets:', Object.keys(sheets));
 
+    // Store for column mapping
+    window.uploadedSheets = sheets;
+    window.uploadedFileName = file.name;
+    window.uploadedFileSize = file.size;
+
+    // Show column mapping interface
+    showColumnMapping(sheets);
+    window.uploadInProgress = false;
+
+  } catch (error) {
+    window.uploadInProgress = false;
+    console.error('Upload error:', error);
+    console.error('Error stack:', error.stack);
+    messageEl.innerHTML = `
+      <div style="color:#dc2626;font-weight:600;">❌ Upload Failed</div>
+      <div style="margin-top:8px;color:#6b7280;">${error.message}</div>
+      <pre style="margin-top:8px;font-size:12px;max-height:200px;overflow:auto;background:#fff;padding:8px;border-radius:4px;">${error.stack || ''}</pre>
+    `;
+  }
+}
+
+async function processUploadWithMapping() {
+  const statusEl = document.getElementById('mapping-status');
+  const messageEl = document.getElementById('mapping-message');
+
+  window.uploadInProgress = true;
+
+  try {
+    statusEl.style.display = 'block';
+    const sheets = window.uploadedSheets;
+
     messageEl.innerHTML = '<div style="color:#2563eb;">💾 Saving to database...</div>';
 
     console.log('Saving uploaded file record...');
-    const uploadedFile = await saveUploadedFile(file.name, window.userData.email, file.size);
+    const uploadedFile = await saveUploadedFile(window.uploadedFileName, window.userData.email, window.uploadedFileSize);
     console.log('File record saved:', uploadedFile);
 
     if (!uploadedFile || !uploadedFile.id) {
@@ -722,6 +753,100 @@ async function handleExcelUpload() {
   }
 }
 
+function showColumnMapping(sheets) {
+  const contentEl = document.getElementById('content');
+  if (!contentEl) return;
+
+  const sheetNames = Object.keys(sheets);
+
+  // Get sample columns from first sheet with data
+  const sampleColumns = {};
+  for (const sheetName of sheetNames) {
+    if (sheets[sheetName].length > 0) {
+      sampleColumns[sheetName] = Object.keys(sheets[sheetName][0]);
+    }
+  }
+
+  contentEl.innerHTML = `
+    <div class="leaderboard-card" style="padding:24px;max-width:1000px;margin:0 auto;">
+      <h2 style="margin-top:0;">Map Excel Columns</h2>
+      <p style="color:#6b7280;margin-bottom:24px;">Found ${sheetNames.length} sheets. Please map each sheet to the correct data type:</p>
+
+      <div style="background:#f8fafc;padding:20px;border-radius:10px;margin-bottom:24px;">
+        <h3 style="margin-top:0;font-size:16px;">Sheet Mapping</h3>
+        <div style="display:grid;gap:16px;">
+          <div class="form-group">
+            <label>Sales Data Sheet:</label>
+            <select id="map-sales-sheet" class="form-control">
+              <option value="">-- Select Sheet --</option>
+              ${sheetNames.map(name => `<option value="${name}" ${name === 'BDC Sales' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>BDC Agent Data Sheet:</label>
+            <select id="map-bdc-sheet" class="form-control">
+              <option value="">-- Select Sheet --</option>
+              ${sheetNames.map(name => `<option value="${name}" ${name === 'BDC_Agent_Tracking' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Appointment Activity Sheet:</label>
+            <select id="map-appt-sheet" class="form-control">
+              <option value="">-- Select Sheet --</option>
+              ${sheetNames.map(name => `<option value="${name}" ${name === 'Appt Act' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>User/Person Details Sheet:</label>
+            <select id="map-details-sheet" class="form-control">
+              <option value="">-- Select Sheet --</option>
+              ${sheetNames.map(name => `<option value="${name}" ${name === 'User Act' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Call Sheets Data:</label>
+            <select id="map-calls-sheet" class="form-control">
+              <option value="">-- Select Sheet --</option>
+              ${sheetNames.map(name => `<option value="${name}" ${name === 'Calls' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;">
+        <button class="btn" onclick="window.confirmMapping()" style="flex:1;">Continue with Mapping</button>
+        <button class="btn" onclick="window.showUploadDialog()" style="background:#6B7280;">Cancel</button>
+      </div>
+
+      <div id="mapping-status" style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:10px;display:none;">
+        <div id="mapping-message"></div>
+      </div>
+    </div>
+  `;
+}
+
+function confirmMapping() {
+  const mapping = {
+    sales: document.getElementById('map-sales-sheet').value,
+    bdc: document.getElementById('map-bdc-sheet').value,
+    appt: document.getElementById('map-appt-sheet').value,
+    details: document.getElementById('map-details-sheet').value,
+    calls: document.getElementById('map-calls-sheet').value
+  };
+
+  if (!mapping.sales || !mapping.bdc || !mapping.appt) {
+    alert('Please select sheets for Sales, BDC, and Appointment data at minimum.');
+    return;
+  }
+
+  // Store mapping
+  window.sheetMapping = mapping;
+  console.log('Sheet mapping confirmed:', mapping);
+
+  // Process upload with mapping
+  processUploadWithMapping();
+}
+
 window.login = login;
 window.logout = logout;
 window.showUserModal = showUserModal;
@@ -733,6 +858,9 @@ window.viewCallSheets = viewCallSheets;
 window.showDashboard = showDashboard;
 window.showUploadDialog = showUploadDialog;
 window.handleExcelUpload = handleExcelUpload;
+window.showColumnMapping = showColumnMapping;
+window.confirmMapping = confirmMapping;
+window.processUploadWithMapping = processUploadWithMapping;
 
 if (auth.currentUser) {
   showDashboard();
