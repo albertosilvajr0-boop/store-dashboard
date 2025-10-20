@@ -958,27 +958,30 @@ window.showingMappingUI = false;
 
 // Only auto-show dashboard/login on initial auth state, not during uploads
 onAuthStateChanged(auth, (user) => {
-  console.log('Auth state changed, user:', user?.email, 'uploadInProgress:', window.uploadInProgress, 'hasInitialized:', window.hasInitialized, 'showingMappingUI:', window.showingMappingUI);
+  // Delay to ensure all synchronous code has finished and flags are properly set
+  setTimeout(() => {
+    console.log('Auth state changed, user:', user?.email, 'uploadInProgress:', window.uploadInProgress, 'hasInitialized:', window.hasInitialized, 'showingMappingUI:', window.showingMappingUI);
 
-  // Only auto-navigate once on initial load
-  // Skip if: already initialized, upload in progress, OR showing mapping UI
-  if (window.hasInitialized) {
-    console.log('Skipping auto-navigation - already initialized');
-    return;
-  }
+    // Only auto-navigate once on initial load
+    // Skip if: already initialized, upload in progress, OR showing mapping UI
+    if (window.hasInitialized) {
+      console.log('Skipping auto-navigation - already initialized');
+      return;
+    }
 
-  if (window.uploadInProgress || window.showingMappingUI) {
-    console.log('Skipping auto-navigation - upload/mapping in progress');
-    return;
-  }
+    if (window.uploadInProgress || window.showingMappingUI) {
+      console.log('Skipping auto-navigation - upload/mapping in progress');
+      return;
+    }
 
-  // First time - initialize and show appropriate screen
-  window.hasInitialized = true;
-  if (user) {
-    console.log('Auto-showing dashboard for authenticated user');
-    showDashboard();
-  } else {
-    console.log('Auto-showing login for unauthenticated user');
-    showLogin();
-  }
+    // First time - initialize and show appropriate screen
+    window.hasInitialized = true;
+    if (user) {
+      console.log('Auto-showing dashboard for authenticated user');
+      showDashboard();
+    } else {
+      console.log('Auto-showing login for unauthenticated user');
+      showLogin();
+    }
+  }, 0);
 });
