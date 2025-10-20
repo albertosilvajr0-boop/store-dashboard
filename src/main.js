@@ -214,8 +214,8 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function showDashboard() {
-  if (window.uploadInProgress) {
-    console.log('Upload in progress, skipping dashboard redirect');
+  if (window.uploadInProgress || window.showingMappingUI) {
+    console.log('Upload/mapping in progress, skipping dashboard redirect');
     return;
   }
 
