@@ -630,9 +630,11 @@ function showUploadDialog() {
 async function handleExcelUpload() {
   console.log('===== UPLOAD STARTED =====');
 
-  // Prevent auto-redirects during upload - SET THIS FIRST!
+  // Prevent auto-redirects during upload - SET BOTH FLAGS FIRST!
   window.uploadInProgress = true;
+  window.showingMappingUI = true;
   console.log('uploadInProgress set to:', window.uploadInProgress);
+  console.log('showingMappingUI set to:', window.showingMappingUI);
 
   const fileInput = document.getElementById('excelFile');
   const statusEl = document.getElementById('upload-status');
@@ -641,6 +643,7 @@ async function handleExcelUpload() {
   if (!fileInput.files || fileInput.files.length === 0) {
     alert('Please select a file first');
     window.uploadInProgress = false;
+    window.showingMappingUI = false;
     return;
   }
 
@@ -667,6 +670,7 @@ async function handleExcelUpload() {
 
   } catch (error) {
     window.uploadInProgress = false;
+    window.showingMappingUI = false;
     window.lastUploadError = error;
     console.error('PARSE ERROR:', error);
     console.error('Error stack:', error.stack);
@@ -798,8 +802,9 @@ async function processUploadWithMapping() {
 function showColumnMapping(sheets) {
   console.log('showColumnMapping called with', Object.keys(sheets).length, 'sheets');
 
-  // Mark that we're showing the mapping UI - prevent auto-navigation
+  // Already set in handleExcelUpload, but ensure it's still true
   window.showingMappingUI = true;
+  console.log('showingMappingUI confirmed:', window.showingMappingUI);
 
   const contentEl = document.getElementById('content');
   if (!contentEl) {
@@ -896,7 +901,7 @@ function showColumnMapping(sheets) {
 
       <div style="display:flex;gap:12px;">
         <button class="btn" onclick="window.confirmMapping()" style="flex:1;">Continue with Mapping</button>
-        <button class="btn" onclick="window.uploadInProgress = false; window.showUploadDialog()" style="background:#6B7280;">Cancel</button>
+        <button class="btn" onclick="window.uploadInProgress = false; window.showingMappingUI = false; window.showUploadDialog()" style="background:#6B7280;">Cancel</button>
       </div>
 
       <div id="mapping-status" style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:10px;display:none;">
