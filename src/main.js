@@ -638,32 +638,61 @@ async function handleExcelUpload() {
     statusEl.style.display = 'block';
     messageEl.innerHTML = '<div style="color:#2563eb;">📤 Reading file...</div>';
 
+    console.log('Starting file upload:', file.name);
     const { sheets } = await parseExcelFile(file);
+    console.log('File parsed, sheets:', Object.keys(sheets));
 
     messageEl.innerHTML = '<div style="color:#2563eb;">💾 Saving to database...</div>';
 
+    console.log('Saving uploaded file record...');
     const uploadedFile = await saveUploadedFile(file.name, window.userData.email, file.size);
+    console.log('File record saved:', uploadedFile);
+
+    if (!uploadedFile || !uploadedFile.id) {
+      throw new Error('Failed to save file record to database');
+    }
+
     const fileId = uploadedFile.id;
 
+    console.log('Processing leaderboard data...');
     const { sales, bdc } = processLeaderboardData(sheets);
+    console.log('Processed:', sales.length, 'sales,', bdc.length, 'bdc');
+
     const period = getPeriodFromDate();
 
+    messageEl.innerHTML = '<div style="color:#2563eb;">💾 Saving sales data...</div>';
+    console.log('Saving sales data...');
     await saveSalesData(fileId, sales, period);
+    console.log('Sales data saved');
+
+    messageEl.innerHTML = '<div style="color:#2563eb;">💾 Saving BDC data...</div>';
+    console.log('Saving BDC data...');
     await saveBDCData(fileId, bdc, period);
+    console.log('BDC data saved');
 
     const allPeople = [...new Set([...sales.map(s => s.name), ...bdc.map(b => b.name)])];
+    console.log('Processing details for', allPeople.length, 'people');
 
+    let processedPeople = 0;
     for (const personName of allPeople) {
+      messageEl.innerHTML = `<div style="color:#2563eb;">💾 Processing ${personName} (${processedPeople + 1}/${allPeople.length})...</div>`;
+
+      console.log('Processing person:', personName);
       const details = processPersonDetails(sheets, personName);
       await savePersonDetails(fileId, details, period);
 
       const calls = processCallSheets(sheets, personName);
       if (calls.length > 0) {
+        console.log('Saving', calls.length, 'calls for', personName);
         await saveCallSheets(fileId, calls, personName, period);
       }
+
+      processedPeople++;
     }
 
+    console.log('Updating file status to completed...');
     await updateFileStatus(fileId, 'completed');
+    console.log('Upload complete!');
 
     messageEl.innerHTML = `
       <div style="color:#16a34a;font-weight:600;">✅ Upload Complete!</div>
@@ -676,9 +705,11 @@ async function handleExcelUpload() {
 
   } catch (error) {
     console.error('Upload error:', error);
+    console.error('Error stack:', error.stack);
     messageEl.innerHTML = `
       <div style="color:#dc2626;font-weight:600;">❌ Upload Failed</div>
       <div style="margin-top:8px;color:#6b7280;">${error.message}</div>
+      <pre style="margin-top:8px;font-size:12px;max-height:200px;overflow:auto;background:#fff;padding:8px;border-radius:4px;">${error.stack || ''}</pre>
     `;
   }
 }

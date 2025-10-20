@@ -2,6 +2,7 @@ import { supabase } from './supabase.js';
 import { getPeriodFromDate } from './excelParser.js';
 
 export async function saveUploadedFile(filename, uploadedBy, fileSize) {
+  console.log('saveUploadedFile called with:', { filename, uploadedBy, fileSize });
   const { data, error } = await supabase
     .from('uploaded_files')
     .insert({
@@ -13,7 +14,11 @@ export async function saveUploadedFile(filename, uploadedBy, fileSize) {
     .select()
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error saving uploaded file:', error);
+    throw error;
+  }
+  console.log('saveUploadedFile result:', data);
   return data;
 }
 
@@ -38,11 +43,16 @@ export async function saveSalesData(fileId, salesData, period = getPeriodFromDat
     period
   }));
 
+  console.log('Inserting', records.length, 'sales records');
   const { error } = await supabase
     .from('sales_data')
     .insert(records);
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error saving sales data:', error);
+    throw error;
+  }
+  console.log('Sales data inserted successfully');
 }
 
 export async function saveBDCData(fileId, bdcData, period = getPeriodFromDate()) {
@@ -56,11 +66,16 @@ export async function saveBDCData(fileId, bdcData, period = getPeriodFromDate())
     period
   }));
 
+  console.log('Inserting', records.length, 'BDC records');
   const { error } = await supabase
     .from('bdc_data')
     .insert(records);
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error saving BDC data:', error);
+    throw error;
+  }
+  console.log('BDC data inserted successfully');
 }
 
 export async function savePersonDetails(fileId, details, period = getPeriodFromDate()) {
