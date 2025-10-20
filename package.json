@@ -1,0 +1,16 @@
+{
+  "name": "store-performance-dashboard",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.76.0",
+    "tslib": "^2.8.1",
+    "vite": "^7.1.11",
+    "xlsx": "^0.18.5"
+  }
+}
