@@ -660,13 +660,31 @@ async function handleExcelUpload() {
 
   } catch (error) {
     window.uploadInProgress = false;
-    console.error('Upload error:', error);
+    window.lastUploadError = error;
+    console.error('PARSE ERROR:', error);
     console.error('Error stack:', error.stack);
-    messageEl.innerHTML = `
-      <div style="color:#dc2626;font-weight:600;">❌ Upload Failed</div>
-      <div style="margin-top:8px;color:#6b7280;">${error.message}</div>
-      <pre style="margin-top:8px;font-size:12px;max-height:200px;overflow:auto;background:#fff;padding:8px;border-radius:4px;">${error.stack || ''}</pre>
-    `;
+
+    // Show persistent full-page error
+    const contentEl = document.getElementById('content');
+    if (contentEl) {
+      contentEl.innerHTML = `
+        <div class="leaderboard-card" style="padding:24px;max-width:900px;margin:20px auto;background:#fee2e2;border:3px solid #dc2626;">
+          <h2 style="color:#dc2626;margin-top:0;">❌ File Parse Failed</h2>
+          <div style="background:white;padding:16px;border-radius:8px;margin:16px 0;">
+            <strong>Error Message:</strong><br>
+            <code style="color:#dc2626;">${error.message || 'Unknown error occurred'}</code>
+          </div>
+          <details open style="background:white;padding:16px;border-radius:8px;margin:16px 0;">
+            <summary style="cursor:pointer;font-weight:600;margin-bottom:12px;color:#374151;">📋 Full Stack Trace</summary>
+            <pre style="font-size:11px;overflow:auto;max-height:500px;white-space:pre-wrap;color:#1f2937;">${error.stack || 'No stack trace available'}</pre>
+          </details>
+          <div style="margin-top:20px;">
+            <button class="btn" onclick="window.showUploadDialog()" style="background:#2563eb;">Try Again</button>
+            <button class="btn" onclick="window.uploadInProgress = false; window.showDashboard()" style="background:#6B7280;margin-left:12px;">Back to Dashboard</button>
+          </div>
+        </div>
+      `;
+    }
   }
 }
 
@@ -742,13 +760,31 @@ async function processUploadWithMapping() {
 
   } catch (error) {
     window.uploadInProgress = false;
-    console.error('Upload error:', error);
+    window.lastUploadError = error;
+    console.error('PROCESSING ERROR:', error);
     console.error('Error stack:', error.stack);
-    messageEl.innerHTML = `
-      <div style="color:#dc2626;font-weight:600;">❌ Upload Failed</div>
-      <div style="margin-top:8px;color:#6b7280;">${error.message}</div>
-      <pre style="margin-top:8px;font-size:12px;max-height:200px;overflow:auto;background:#fff;padding:8px;border-radius:4px;">${error.stack || ''}</pre>
-    `;
+
+    // Show persistent full-page error
+    const contentEl = document.getElementById('content');
+    if (contentEl) {
+      contentEl.innerHTML = `
+        <div class="leaderboard-card" style="padding:24px;max-width:900px;margin:20px auto;background:#fee2e2;border:3px solid #dc2626;">
+          <h2 style="color:#dc2626;margin-top:0;">❌ Processing Failed</h2>
+          <div style="background:white;padding:16px;border-radius:8px;margin:16px 0;">
+            <strong>Error Message:</strong><br>
+            <code style="color:#dc2626;">${error.message || 'Unknown error occurred'}</code>
+          </div>
+          <details open style="background:white;padding:16px;border-radius:8px;margin:16px 0;">
+            <summary style="cursor:pointer;font-weight:600;margin-bottom:12px;color:#374151;">📋 Full Stack Trace</summary>
+            <pre style="font-size:11px;overflow:auto;max-height:500px;white-space:pre-wrap;color:#1f2937;">${error.stack || 'No stack trace available'}</pre>
+          </details>
+          <div style="margin-top:20px;">
+            <button class="btn" onclick="window.showUploadDialog()" style="background:#2563eb;">Try Again</button>
+            <button class="btn" onclick="window.uploadInProgress = false; window.showDashboard()" style="background:#6B7280;margin-left:12px;">Back to Dashboard</button>
+          </div>
+        </div>
+      `;
+    }
   }
 }
 
