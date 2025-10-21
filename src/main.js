@@ -267,6 +267,12 @@ async function showDashboard() {
 }
 
 function renderDashboard(data) {
+  // Don't render if upload/mapping is in progress
+  if (window.uploadInProgress || window.showingMappingUI) {
+    console.log('renderDashboard: Upload/mapping in progress, skipping render');
+    return;
+  }
+
   const salesLB = (data.sales || []);
   const bdcLB = (data.bdc || []).slice(0, 10);
 
