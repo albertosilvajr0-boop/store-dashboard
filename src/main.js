@@ -825,12 +825,6 @@ function showColumnMapping(sheets) {
   window.showingMappingUI = true;
   console.log('showingMappingUI confirmed:', window.showingMappingUI);
 
-  const contentEl = document.getElementById('content');
-  if (!contentEl) {
-    console.error('Content element not found!');
-    return;
-  }
-
   const sheetNames = Object.keys(sheets);
 
   // Get sample columns from first sheet with data
@@ -867,64 +861,82 @@ function showColumnMapping(sheets) {
     }
   });
 
-  contentEl.innerHTML = `
-    <div class="leaderboard-card" style="padding:24px;max-width:1000px;margin:0 auto;">
-      <h2 style="margin-top:0;">Map Excel Columns</h2>
-      <p style="color:#6b7280;margin-bottom:16px;">Found ${sheetNames.length} sheets. Please map each sheet to the correct data type:</p>
+  const me = window.userData || {};
 
-      <details style="margin-bottom:24px;padding:16px;background:#f8fafc;border-radius:8px;">
-        <summary style="cursor:pointer;font-weight:600;color:#374151;padding:4px;">📊 View All Sheets and Columns</summary>
-        <div style="margin-top:12px;">${sheetDetailsHTML}</div>
-      </details>
+  // Replace the entire app content, just like dashboard does
+  document.getElementById('app').innerHTML = `
+    <div class="header"><h1>Store Performance Dashboard</h1></div>
 
-      <div style="background:#f8fafc;padding:20px;border-radius:10px;margin-bottom:24px;">
-        <h3 style="margin-top:0;font-size:16px;">Sheet Mapping</h3>
-        <div style="display:grid;gap:16px;">
-          <div class="form-group">
-            <label>Sales Data Sheet:</label>
-            <select id="map-sales-sheet" class="form-control">
-              <option value="">-- Select Sheet --</option>
-              ${sheetNames.map(name => `<option value="${name}" ${name === 'BDC Sales' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
-            </select>
-          </div>
-          <div class="form-group">
-            <label>BDC Agent Data Sheet:</label>
-            <select id="map-bdc-sheet" class="form-control">
-              <option value="">-- Select Sheet --</option>
-              ${sheetNames.map(name => `<option value="${name}" ${name === 'BDC_Agent_Tracking' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Appointment Activity Sheet:</label>
-            <select id="map-appt-sheet" class="form-control">
-              <option value="">-- Select Sheet --</option>
-              ${sheetNames.map(name => `<option value="${name}" ${name === 'Appt Act' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
-            </select>
-          </div>
-          <div class="form-group">
-            <label>User/Person Details Sheet:</label>
-            <select id="map-details-sheet" class="form-control">
-              <option value="">-- Select Sheet --</option>
-              ${sheetNames.map(name => `<option value="${name}" ${name === 'User Act' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Call Sheets Data:</label>
-            <select id="map-calls-sheet" class="form-control">
-              <option value="">-- Select Sheet --</option>
-              ${sheetNames.map(name => `<option value="${name}" ${name === 'Calls' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
-            </select>
+    <div class="user-info">
+      <div>
+        Welcome, <strong>${me.email || ''}</strong>
+        ${isAdmin() ? '<span style="color:#a7f3d0;"> (Admin)</span>' : (isManager() ? '<span style="color:#93c5fd;"> (Manager)</span>' : '')}
+        ${me.linkedName ? ` • Linked: <strong>${me.linkedName}</strong>` : ''}
+      </div>
+      <div>
+        <button class="logout-btn" onclick="window.logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="leaderboard-section">
+      <div class="leaderboard-card" style="padding:24px;max-width:1000px;margin:0 auto;">
+        <h2 style="margin-top:0;">Map Excel Columns</h2>
+        <p style="color:#6b7280;margin-bottom:16px;">Found ${sheetNames.length} sheets. Please map each sheet to the correct data type:</p>
+
+        <details style="margin-bottom:24px;padding:16px;background:#f8fafc;border-radius:8px;">
+          <summary style="cursor:pointer;font-weight:600;color:#374151;padding:4px;">📊 View All Sheets and Columns</summary>
+          <div style="margin-top:12px;">${sheetDetailsHTML}</div>
+        </details>
+
+        <div style="background:#f8fafc;padding:20px;border-radius:10px;margin-bottom:24px;">
+          <h3 style="margin-top:0;font-size:16px;">Sheet Mapping</h3>
+          <div style="display:grid;gap:16px;">
+            <div class="form-group">
+              <label>Sales Data Sheet:</label>
+              <select id="map-sales-sheet" class="form-control">
+                <option value="">-- Select Sheet --</option>
+                ${sheetNames.map(name => `<option value="${name}" ${name === 'BDC Sales' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>BDC Agent Data Sheet:</label>
+              <select id="map-bdc-sheet" class="form-control">
+                <option value="">-- Select Sheet --</option>
+                ${sheetNames.map(name => `<option value="${name}" ${name === 'BDC_Agent_Tracking' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Appointment Activity Sheet:</label>
+              <select id="map-appt-sheet" class="form-control">
+                <option value="">-- Select Sheet --</option>
+                ${sheetNames.map(name => `<option value="${name}" ${name === 'Appt Act' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>User/Person Details Sheet:</label>
+              <select id="map-details-sheet" class="form-control">
+                <option value="">-- Select Sheet --</option>
+                ${sheetNames.map(name => `<option value="${name}" ${name === 'User Act' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Call Sheets Data:</label>
+              <select id="map-calls-sheet" class="form-control">
+                <option value="">-- Select Sheet --</option>
+                ${sheetNames.map(name => `<option value="${name}" ${name === 'Calls' ? 'selected' : ''}>${name} (${sheets[name].length} rows)</option>`).join('')}
+              </select>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div style="display:flex;gap:12px;">
-        <button class="btn" onclick="window.confirmMapping()" style="flex:1;">Continue with Mapping</button>
-        <button class="btn" onclick="window.uploadInProgress = false; window.showingMappingUI = false; window.showUploadDialog()" style="background:#6B7280;">Cancel</button>
-      </div>
+        <div style="display:flex;gap:12px;">
+          <button class="btn" onclick="window.confirmMapping()" style="flex:1;">Continue with Mapping</button>
+          <button class="btn" onclick="window.uploadInProgress = false; window.showingMappingUI = false; window.showUploadDialog()" style="background:#6B7280;">Cancel</button>
+        </div>
 
-      <div id="mapping-status" style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:10px;display:none;">
-        <div id="mapping-message"></div>
+        <div id="mapping-status" style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:10px;display:none;">
+          <div id="mapping-message"></div>
+        </div>
       </div>
     </div>
   `;
