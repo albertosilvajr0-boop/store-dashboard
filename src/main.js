@@ -164,8 +164,19 @@ window.addEventListener('visibilitychange', () => {
 });
 
 onAuthStateChanged(auth, async (user) => {
+  // Check if already initialized to prevent duplicate navigation
+  if (window.hasInitialized) {
+    console.log('Auth state changed but already initialized - skipping navigation');
+    // Still update user data if needed
+    if (!user) {
+      window.userData = null;
+    }
+    return;
+  }
+
   if (!user) {
     window.userData = null;
+    window.hasInitialized = true;
     showLogin();
     return;
   }
@@ -206,9 +217,17 @@ onAuthStateChanged(auth, async (user) => {
       await startSession();
     } catch (_) {}
 
+    // Check if upload/mapping is in progress before showing dashboard
+    if (window.uploadInProgress || window.showingMappingUI) {
+      console.log('Upload/mapping in progress - skipping dashboard navigation');
+      return;
+    }
+
+    window.hasInitialized = true;
     showDashboard();
   } catch (err) {
     console.error('Auth init error:', err);
+    window.hasInitialized = true;
     showLogin();
   }
 });
@@ -955,38 +974,3 @@ window.processUploadWithMapping = processUploadWithMapping;
 window.uploadInProgress = false;
 window.hasInitialized = false;
 window.showingMappingUI = false;
-
-// Only auto-show dashboard/login on initial auth state, not during uploads
-onAuthStateChanged(auth, (user) => {
-  // Check and set hasInitialized IMMEDIATELY to prevent race conditions
-  if (window.hasInitialized) {
-    console.log('Auth state changed but already initialized - skipping');
-    return;
-  }
-
-  // Delay to ensure all synchronous code has finished and flags are properly set
-  setTimeout(() => {
-    console.log('Auth state changed, user:', user?.email, 'uploadInProgress:', window.uploadInProgress, 'hasInitialized:', window.hasInitialized, 'showingMappingUI:', window.showingMappingUI);
-
-    // Check again after timeout
-    if (window.hasInitialized) {
-      console.log('Skipping auto-navigation - already initialized');
-      return;
-    }
-
-    if (window.uploadInProgress || window.showingMappingUI) {
-      console.log('Skipping auto-navigation - upload/mapping in progress');
-      return;
-    }
-
-    // First time - initialize and show appropriate screen
-    window.hasInitialized = true;
-    if (user) {
-      console.log('Auto-showing dashboard for authenticated user');
-      showDashboard();
-    } else {
-      console.log('Auto-showing login for unauthenticated user');
-      showLogin();
-    }
-  }, 0);
-});
