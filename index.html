@@ -256,24 +256,28 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
 
       function rowHTML(person, index, type) {
         const name = person.name || '';
-        const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
-        const allowed = canViewName(name);
-        const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', '${type}')"` : '';
-        const style = allowed ? '' : 'opacity:0.6; cursor:not-allowed;';
-        const shownCount = person.shown_count ?? person.shown ?? 0;
-        const right = (type === 'Sales')
-          ? `${person.sales || 0} Sales • Cr ${person.created || 0} • Sh ${shownCount}`
-          : `${(person.shows_count ?? person.shows ?? 0)} Shows`;
+  const rankClass = index === 0 ? 'gold'
+                  : index === 1 ? 'silver'
+                  : index === 2 ? 'bronze' : '';
+  const allowed = canViewName(name);
+  const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', '${type}')"` : '';
+  const style = allowed ? '' : 'opacity:0.6; cursor:not-allowed;';
 
-        return `
-          <div class="leaderboard-item" ${clickAttr} style="${style}">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <div class="rank ${rankClass}">${index + 1}</div>
-              <div class="name">${name}</div>
-            </div>
-            <div class="score">${right}</div>
-          </div>
-        `;
+  // ✅ Sales shows Sales • Cr • Sh (counts). BDC shows Shows (count).
+  const shownCount = person.shown_count ?? person.shown ?? 0;
+  const right = (type === 'Sales')
+    ? `${person.sales || 0} Sales • Cr ${person.created || 0} • Sh ${shownCount}`
+    : `${(person.shows_count ?? person.shows ?? 0)} Shows`;
+
+  return `
+    <div class="leaderboard-item" ${clickAttr} style="${style}">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="rank ${rankClass}">${index + 1}</div>
+        <div class="name">${name}</div>
+      </div>
+      <div class="score">${right}</div>
+    </div>
+  `;
       }
 
       document.getElementById('app').innerHTML = `
