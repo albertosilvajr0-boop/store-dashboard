@@ -260,10 +260,12 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
                   : index === 1 ? 'silver'
                   : index === 2 ? 'bronze' : '';
   const allowed = canViewName(name);
-  const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', '${type}')"` : '';
+  const clickAttr = allowed
+    ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', '${type}')"`
+    : '';
   const style = allowed ? '' : 'opacity:0.6; cursor:not-allowed;';
 
-  // ✅ Sales shows Sales • Cr • Sh (counts). BDC shows Shows (count).
+  // Sales: Sales • Cr • Sh (counts)  |  BDC: Shows (count)
   const shownCount = person.shown_count ?? person.shown ?? 0;
   const right = (type === 'Sales')
     ? `${person.sales || 0} Sales • Cr ${person.created || 0} • Sh ${shownCount}`
