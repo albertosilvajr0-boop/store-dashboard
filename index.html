@@ -108,7 +108,7 @@
     // GAS Web App URL
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRf4KkWsC8EBN6G6ybStLKBNqmnu-Rjow4aZ_NWpSaRY7Q8JlxFaTsTsAW2Ny76dCS/exec';
 
-    /* ==== CRASH REPORTER (ADD ONCE) ==== */
+    /* ==== CRASH REPORTER ==== */
     window.addEventListener('error', (e) => {
       const app = document.getElementById('app');
       if (!app) return;
@@ -126,11 +126,9 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
     });
 
     /* === ACCESS HELPERS & SESSION === */
-    const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com'; // you are the only superadmin
+    const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
 
-    function authHeaders() {
-      return window.sessionToken ? { Authorization: `Bearer ${window.sessionToken}` } : {};
-    }
+    function authHeaders() { return window.sessionToken ? { Authorization: `Bearer ${window.sessionToken}` } : {}; }
     function isAdmin()   { return window.userData?.role === 'admin' || window.userData?.role === 'superadmin'; }
     function isManager() { return window.userData?.role === 'manager'; }
     function canViewName(targetName) {
@@ -139,10 +137,7 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
       if (isAdmin() || isManager()) return true;
       return mine && n === mine;
     }
-    function makeSessionToken({ name, role }) {
-      const payload = { name, role };
-      return btoa(JSON.stringify(payload));
-    }
+    function makeSessionToken({ name, role }) { return btoa(JSON.stringify({ name, role })); }
 
     /************ UI helpers ************/
     function showLoading(on=true) {
@@ -163,31 +158,18 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
       document.getElementById('userModal').style.display = 'grid';
       loadUsers();
     }
-    function closeUserModal() {
-      document.getElementById('userModal').style.display = 'none';
-    }
+    function closeUserModal() { document.getElementById('userModal').style.display = 'none'; }
 
     /************ Auth ************/
     async function login() {
       const email = document.getElementById('email')?.value?.trim();
       const password = document.getElementById('password')?.value?.trim();
       const errEl = document.getElementById('error-message');
-      if (!email || !password) {
-        if (errEl) errEl.textContent = 'Enter email and password.';
-        return;
-      }
-      try {
-        showLoading(true);
-        await signInWithEmailAndPassword(auth, email, password);
-      } catch (e) {
-        if (errEl) errEl.textContent = e.message || 'Login failed';
-        showLogin();
-      }
+      if (!email || !password) { if (errEl) errEl.textContent = 'Enter email and password.'; return; }
+      try { showLoading(true); await signInWithEmailAndPassword(auth, email, password); }
+      catch (e) { if (errEl) errEl.textContent = e.message || 'Login failed'; showLogin(); }
     }
-    async function logout() {
-      await signOut(auth);
-      showLogin();
-    }
+    async function logout() { await signOut(auth); showLogin(); }
 
     /* ========= Session logging ========= */
     let currentSessionRef = null;
@@ -205,106 +187,53 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
         endedAt: null,
         durationSec: null,
         ua: navigator.userAgent || ''
-      }).then(ref => { currentSessionRef = ref; sessionClosed = false; })
-        .catch(()=>{});
+      }).then(ref => { currentSessionRef = ref; sessionClosed = false; }).catch(()=>{});
     }
-
     async function endSession() {
       if (!currentSessionRef || sessionClosed) return;
       sessionClosed = true;
       try {
         const end = new Date();
-        await updateDoc(currentSessionRef, {
-          endedAt: serverTimestamp(),
-          endedAtClient: end,
-          durationSec: null
-        });
+        await updateDoc(currentSessionRef, { endedAt: serverTimestamp(), endedAtClient: end, durationSec: null });
       } catch(_) {}
     }
-
     window.addEventListener('pagehide', endSession);
-    window.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') endSession();
-    });
+    window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') endSession(); });
 
-    // Authentication state observer (FULL REPLACEMENT)
+    // Auth state
     onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        window.userData = null;
-        showLogin();
-        return;
-      }
-
+      if (!user) { window.userData = null; showLogin(); return; }
       try {
-        // Read or create Firestore user profile
         const userRef = doc(db, 'users', user.uid);
         let snap = await getDoc(userRef);
-
         if (!snap.exists()) {
-          await setDoc(userRef, {
-            email: user.email || '',
-            role: (user.email === SUPERADMIN_EMAIL) ? 'superadmin' : 'user',
-            linkedName: '',
-            createdAt: new Date()
-          });
+          await setDoc(userRef, { email: user.email || '', role: (user.email === SUPERADMIN_EMAIL) ? 'superadmin' : 'user', linkedName: '', createdAt: new Date() });
           snap = await getDoc(userRef);
         }
-
         const data = snap.data() || {};
         let role = data.role || 'user';
-
-        // Auto-ensure superadmin for your address
-        if (user.email === SUPERADMIN_EMAIL && role !== 'superadmin') {
-          role = 'superadmin';
-          await setDoc(userRef, { role }, { merge: true });
-        }
-
-        // Persist in window for downstream calls
-        window.userData = {
-          email: user.email || '',
-          uid: user.uid,
-          role,
-          linkedName: data.linkedName || ''
-        };
-
-        // Build frontend session token (used by Apps Script)
+        if (user.email === SUPERADMIN_EMAIL && role !== 'superadmin') { role = 'superadmin'; await setDoc(userRef, { role }, { merge: true }); }
+        window.userData = { email: user.email || '', uid: user.uid, role, linkedName: data.linkedName || '' };
         const sessionName = window.userData.linkedName || window.userData.email;
         window.sessionToken = makeSessionToken({ name: sessionName, role });
-
-        // Start a session log (non-blocking)
         try { await startSession(); } catch (_) {}
-
-        // Paint the app
         showDashboard();
-
-      } catch (err) {
-        console.error('Auth init error:', err);
-        // Fall back gracefully
-        showLogin();
-      }
+      } catch (err) { console.error('Auth init error:', err); showLogin(); }
     });
 
-    // Show dashboard (NO custom headers; use ?session=)
+    // Dashboard fetch
     async function showDashboard() {
       if (!window.userData) { showLogin(); return; }
-
       try {
         showLoading(true);
-
         const url = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken || '')}`;
-        const resp = await fetch(url);            // <-- no headers here
+        const resp = await fetch(url);
         const raw  = await resp.text();
-
-        let result;
-        try { result = JSON.parse(raw); } catch {
-          throw new Error(`Non-JSON response from GAS.\nHTTP ${resp.status}\n\n${raw}`);
-        }
+        let result; try { result = JSON.parse(raw); } catch { throw new Error(`Non-JSON response from GAS.\nHTTP ${resp.status}\n\n${raw}`); }
         if (!result.ok) throw new Error(result.error || 'Backend returned ok:false');
-
         window.dashboardData = result;
         renderDashboard(result);
         prefetchForDashboard(result);
-
       } catch (err) {
         console.error('Dashboard error:', err);
         document.getElementById('app').innerHTML = `
@@ -316,41 +245,35 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
             </div>
           </div>
         `;
-      } finally {
-        showLoading(false);
-      }
+      } finally { showLoading(false); }
     }
 
+    // ---- Render (single source of truth) ----
     function renderDashboard(data) {
-      // Show ALL sales; keep BDC top-10
       const salesLB = (data.sales || []);
       const bdcLB   = (data.bdc   || []).slice(0, 10);
       const me = window.userData || {};
 
       function rowHTML(person, index, type) {
-          const name = person.name || '';
-  const rankClass = index === 0 ? 'gold'
-                  : index === 1 ? 'silver'
-                  : index === 2 ? 'bronze' : '';
-  const allowed = canViewName(name);
-  const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', '${type}')"` : '';
-  const style = allowed ? '' : 'opacity:0.6; cursor:not-allowed;';
+        const name = person.name || '';
+        const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
+        const allowed = canViewName(name);
+        const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', '${type}')"` : '';
+        const style = allowed ? '' : 'opacity:0.6; cursor:not-allowed;';
+        const shownCount = person.shown_count ?? person.shown ?? 0;
+        const right = (type === 'Sales')
+          ? `${person.sales || 0} Sales • Cr ${person.created || 0} • Sh ${shownCount}`
+          : `${(person.shows_count ?? person.shows ?? 0)} Shows`;
 
-  // Sales shows Sales • Cr • Sh (counts). BDC shows Shows (count).
-  const shownCount = person.shown_count ?? person.shown ?? 0;
-  const right = (type === 'Sales')
-    ? `${person.sales || 0} Sales • Cr ${person.created || 0} • Sh ${shownCount}`
-    : `${(person.shows_count ?? person.shows ?? 0)} Shows`;
-
-  return `
-    <div class="leaderboard-item" ${clickAttr} style="${style}">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <div class="rank ${rankClass}">${index + 1}</div>
-        <div class="name">${name}</div>
-      </div>
-      <div class="score">${right}</div>
-    </div>
-  `;
+        return `
+          <div class="leaderboard-item" ${clickAttr} style="${style}">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="rank ${rankClass}">${index + 1}</div>
+              <div class="name">${name}</div>
+            </div>
+            <div class="score">${right}</div>
+          </div>
+        `;
       }
 
       document.getElementById('app').innerHTML = `
@@ -385,7 +308,7 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
       `;
     }
 
-    // Person "1on1" page — uses {block,lastDay,prNotes} from API and renders inside #content
+    // ---- Person 1:1 ----
     async function showPersonDetails(name, type) {
       const contentEl = document.getElementById('content');
       if (contentEl) {
@@ -394,11 +317,9 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
             Loading ${name}…
           </div>`;
       }
-
       try {
         const result = await fetchPerson(name);
         if (!result?.ok) throw new Error(result?.error || 'Failed to load person details');
-
         const payload = result.data || {};
         const b   = payload.block || {};
         const day = payload.lastDay || {};
@@ -443,7 +364,6 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
             </div>
           </div>
         `;
-
         if (contentEl) contentEl.innerHTML = html;
       } catch (e) {
         if (contentEl) {
@@ -457,7 +377,7 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
       }
     }
 
-    // Call Sheets — with ✓/✗ + Date In (date only)
+    // ---- Call Sheets ----
     async function viewCallSheets(name) {
       const contentEl = document.getElementById('content');
       if (contentEl) {
@@ -466,44 +386,28 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
             Loading call sheets for ${name}…
           </div>`;
       }
-
       try {
         showLoading?.(true);
-
         const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
         const resp = await fetch(url, { cache: 'no-store' });
         const result = await resp.json();
         if (!result.ok) throw new Error(result.error || 'Failed to load call sheets');
 
         const rows = result.data?.calls || [];
-
-        // Helpers
         const tzDateOnly = (value) => {
           if (!value) return '-';
-          try {
-            const d = (value instanceof Date) ? value : new Date(value);
-            if (!isNaN(d.getTime())) return d.toLocaleDateString();
-            return String(value).split('T')[0] || String(value);
-          } catch (_) {
-            return String(value);
-          }
+          try { const d = (value instanceof Date) ? value : new Date(value); if (!isNaN(d.getTime())) return d.toLocaleDateString(); return String(value).split('T')[0] || String(value); }
+          catch (_) { return String(value); }
         };
-        const yesNoIcon = (flag, lastWorkDay) => {
-          return flag
-            ? `<span title="Sales rep called on last work day${lastWorkDay ? ' ('+lastWorkDay+')' : ''}" style="color:#16a34a;font-size:18px;">&#10003;</span>`
-            : `<span title="No sales-rep call on last work day${lastWorkDay ? ' ('+lastWorkDay+')' : ''}" style="color:#dc2626;font-size:18px;">&#10007;</span>`;
-        };
+        const yesNoIcon = (flag, lastWorkDay) => flag
+          ? `<span title="Sales rep called on last work day${lastWorkDay ? ' ('+lastWorkDay+')' : ''}" style="color:#16a34a;font-size:18px;">&#10003;</span>`
+          : `<span title="No sales-rep call on last work day${lastWorkDay ? ' ('+lastWorkDay+')' : ''}" style="color:#dc2626;font-size:18px;">&#10007;</span>`;
 
         const trs = rows.map(r => {
-          const customer = r.link
-            ? `<a href="${r.link}" target="_blank" rel="noopener">${r.name || '-'}</a>`
-            : (r.name || '-');
-
+          const customer = r.link ? `<a href="${r.link}" target="_blank" rel="noopener">${r.name || '-'}</a>` : (r.name || '-');
           return `
             <tr style="border-top:1px solid #e5e7eb;">
-              <td style="padding:10px;width:36px;text-align:center;">
-                ${yesNoIcon(!!r.repCalledLastWorkDay, r.lastWorkDay || '')}
-              </td>
+              <td style="padding:10px;width:36px;text-align:center;">${yesNoIcon(!!r.repCalledLastWorkDay, r.lastWorkDay || '')}</td>
               <td style="padding:10px;">${customer}</td>
               <td style="padding:10px;">${r.phone || '-'}</td>
               <td style="padding:10px;">${r.email || '-'}</td>
@@ -550,12 +454,8 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
             </div>
           </div>
         `;
-
         if (contentEl) contentEl.innerHTML = html;
-
-        // Keep your link-click logger so the Manager Dashboard has data
         if (typeof attachClickLogger === 'function') attachClickLogger();
-
       } catch (e) {
         if (contentEl) {
           contentEl.innerHTML = `
@@ -565,9 +465,7 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
             </div>
           `;
         }
-      } finally {
-        showLoading?.(false);
-      }
+      } finally { showLoading?.(false); }
     }
 
     /************ User Management ************/
@@ -613,26 +511,13 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
 
       try {
         showLoading(true);
-
-        // Use the SECONDARY auth so we don't knock out the current session
         const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-
-        // Create Firestore profile (in your main DB)
-        await setDoc(doc(db, 'users', cred.user.uid), {
-          email, role, linkedName,
-          createdAt: new Date(),
-          createdBy: window.userData.email
-        });
-
-        // Clean up fields + keep admin logged in
+        await setDoc(doc(db, 'users', cred.user.uid), { email, role, linkedName, createdAt: new Date(), createdBy: window.userData.email });
         document.getElementById('newUserEmail').value = '';
         document.getElementById('newUserPassword').value = '';
         document.getElementById('newUserLinked').value = '';
         document.getElementById('newUserRole').value = 'user';
-
-        // Sign the secondary auth out (does NOT affect primary auth)
         await signOut(secondaryAuth);
-
         await loadUsers();
         alert('User added successfully!');
       } catch (error) {
@@ -645,15 +530,9 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
       if (!isAdmin()) { alert('Only admins can delete users.'); return; }
       if (role === 'admin' || role === 'superadmin' || email === SUPERADMIN_EMAIL) { alert('Cannot delete admins or the superadmin.'); return; }
       if (!confirm('Are you sure you want to delete this user?')) return;
-
-      try {
-        showLoading(true);
-        await deleteDoc(doc(db, 'users', uid));
-        await loadUsers();
-        alert('User deleted successfully!');
-      } catch (error) {
-        alert('Error deleting user: ' + error.message);
-      } finally { showLoading(false); }
+      try { showLoading(true); await deleteDoc(doc(db, 'users', uid)); await loadUsers(); alert('User deleted successfully!'); }
+      catch (error) { alert('Error deleting user: ' + error.message); }
+      finally { showLoading(false); }
     }
 
     /************ Login screen ************/
@@ -677,8 +556,8 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
     }
 
     // ---- Lightweight client-side cache & prefetch ----
-    const personCache = new Map();        // key: name  -> payload from /person
-    const callListCache = new Map();      // key: name  -> payload from /calls_for
+    const personCache = new Map();
+    const callListCache = new Map();
     function cacheKey(name) { return (name || '').toUpperCase().trim(); }
 
     async function fetchPerson(name) {
@@ -690,7 +569,6 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
       if (data?.ok) personCache.set(key, data);
       return data;
     }
-
     async function fetchCalls(name) {
       const key = cacheKey(name);
       if (callListCache.has(key)) return callListCache.get(key);
@@ -700,14 +578,12 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
       if (data?.ok) callListCache.set(key, data);
       return data;
     }
-
     function prefetchPerson(name) {
       if (!name) return;
       const key = cacheKey(name);
       if (personCache.has(key)) return;
       fetchPerson(name).catch(() => {});
     }
-
     function prefetchForDashboard(data) {
       const topSales = (data.sales || []).slice(0, 3).map(x => x.name);
       const topBDC   = (data.bdc   || []).slice(0, 3).map(x => x.name);
