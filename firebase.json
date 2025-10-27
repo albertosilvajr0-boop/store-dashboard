@@ -1,0 +1,13 @@
+{
+  "hosting": {
+    "site": "store-dashboard-2025",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "cleanUrls": true,
+    "trailingSlash": false
+  }
+}
