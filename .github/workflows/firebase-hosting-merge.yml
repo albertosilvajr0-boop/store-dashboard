@@ -1,0 +1,28 @@
+name: Deploy to Firebase Hosting on merge
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # No build step needed since you have a plain index.html
+      # If you later add a build, insert it here.
+
+      - name: Deploy to Firebase Hosting (live)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STORE_DASHBOARD_2025 }}
+          channelId: live
+          projectId: store-dashboard-2025
+          entryPoint: ./   # index.html is at repo root
