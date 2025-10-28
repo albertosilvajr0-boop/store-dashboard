@@ -242,7 +242,7 @@ ${(e?.error && e.error.stack) ? e.error.stack : ''}
             <div style="padding: 50px; text-align: center; color: red; background:#fff; border-radius:16px;">
               <h2>Error Loading Dashboard</h2>
               <p style="white-space:pre-wrap;">${err.message}</p>
-              <button class="btn" onclick="showDashboard()" style="max-width:200px;margin:20px auto;">Retry</button>
+              <button class="btn" onclick="window.showDashboard()" style="max-width:200px;margin:20px auto;">Retry</button>
             </div>
           </div>
         `;
@@ -339,7 +339,7 @@ function renderDashboard(data) {
         const isSales = (b.type || type) === 'Sales';
 
         const html = `
-          <button onclick="showDashboard()" class="btn" style="background:#6B7280;margin-bottom:16px;">← Back to Leaderboard</button>
+          <button onclick="window.showDashboard()" class="btn" style="background:#6B7280;margin-bottom:16px;">← Back to Leaderboard</button>
 
           <div class="leaderboard-card" style="padding:24px;">
             <h2 style="margin-top:0;">${b.name || name}</h2>
