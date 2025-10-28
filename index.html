@@ -21,8 +21,12 @@
     .admin-btn { background:#10b981; }
     .admin-btn:hover { background:#059669; }
 
-    .leaderboard-section { margin-top:20px; }
-    .leaderboard-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:18px; }
+    /* NEW: switcher + chips */
+    .switcher { display:flex; align-items:center; gap:8px; margin:16px 0 10px; }
+    .seg { border:1px solid rgba(255,255,255,.25); color:#fff; padding:8px 12px; border-radius:999px; cursor:pointer; font-weight:800; background:rgba(0,0,0,.25); }
+    .seg.active { background:#fff; color:#111827; border-color:#fff; }
+    .hint { color:#e5e7eb; font-size:12px; }
+
     .leaderboard-card { background:var(--card); border-radius:16px; box-shadow:0 12px 24px rgba(0,0,0,.12); padding:16px; }
     .leaderboard-card h2 { margin:4px 0 12px; color:var(--text); display:flex; align-items:center; gap:8px; }
     .leaderboard-list { display:flex; flex-direction:column; gap:2px; }
@@ -32,11 +36,17 @@
     .gold { background:linear-gradient(135deg,#f59e0b,#fbbf24); }
     .silver { background:linear-gradient(135deg,#9ca3af,#e5e7eb); color:#111827; }
     .bronze { background:linear-gradient(135deg,#b45309,#f59e0b); }
-    .name { color:#111827; font-weight:600; }
-    .score { color:#6b7280; font-weight:600; }
-
-    /* helper text styles */
+    .name { color:#111827; font-weight:700; letter-spacing:.3px; }
     .muted { color:#6b7280; font-size:14px; }
+
+    /* NEW: stat chips */
+    .chips { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+    .pill { font-size:12px; font-weight:800; padding:3px 8px; border-radius:999px; background:#eef6ff; color:#0b5cab; border:1px solid #dbeafe; }
+    .pill.sales { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+    .pill.calls { background:#e0f2fe; color:#075985; border-color:#bae6fd; }
+    .pill.texts { background:#ecfdf5; color:#065f46; border-color:#bbf7d0; }
+    .pill.appt { background:#f1f5f9; color:#334155; border-color:#e2e8f0; }
+
     #app { margin:0 auto; }
   </style>
 </head>
@@ -51,6 +61,9 @@
     function isAdmin()   { return (window.userData?.role === 'admin' || window.userData?.role === 'superadmin'); }
     function isManager() { return (window.userData?.role === 'manager'); }
     function canViewName(targetName){ const mine=(window.userData?.linkedName||'').toUpperCase(); if(isAdmin()||isManager())return true; return mine && (String(targetName||'').toUpperCase()===mine); }
+
+    // NEW: local UI state for toggle (default to 'sales')
+    const state = { mode: 'sales', raw: null };
 
     // ─────────────────────────────────────────────────────────────
     // Core: Dashboard fetch + render
@@ -70,7 +83,7 @@
 
         if (!result?.ok) throw new Error(result?.error || 'Backend returned ok:false');
 
-        window.dashboardData = result;
+        state.raw = result; // save once
         renderDashboard(result);
 
         try { prefetchForDashboard(result); } catch(_) {}
@@ -90,41 +103,73 @@
       }
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Render (single source of truth): Sales → "Sales • Cr • Sh"
-    // ─────────────────────────────────────────────────────────────
-    function renderDashboard(data) {
-      // Show ALL sales; keep BDC top-10
-      const salesLB = (data.sales || []);
-      const bdcLB   = (data.bdc   || []).slice(0, 10);
+    // Helpers for sorting
+    const shownVal = x => x.shown_count ?? x.shown ?? x.shows ?? x.shows_count ?? 0;
+    const sortSales = arr => [...(arr||[])].sort((a,b)=>(b.sales??0)-(a.sales??0) || String(a.name||'').localeCompare(String(b.name||'')));
+    const sortBDC   = arr => [...(arr||[])].sort((a,b)=> shownVal(b) - shownVal(a) || String(a.name||'').localeCompare(String(b.name||'')));
 
-      const me = window.userData || {};
+    // Small chip helper
+    const chip = (label, value, cls='') => `<span class="pill ${cls}">${label}: <strong>${value}</strong></span>`;
 
-      function rowHTML(person, index, type) {
-        const name      = person.name || '';
-        const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
-        const allowed   = canViewName(name);
-        const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', '${type}')"` : '';
-        const style     = allowed ? '' : 'opacity:0.6; cursor:not-allowed;';
+    // Row builder for each mode
+    function rowHTML(person, idx, mode){
+      const name = person.name || '';
+      const rankClass = idx===0?'gold':idx===1?'silver':idx===2?'bronze':'';
+      const allowed = canViewName(name);
+      const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g,"\\'")}', '${mode.toUpperCase()}')"` : '';
+      const style = allowed ? '' : 'opacity:.6; cursor:not-allowed;';
 
-        // counts for Sales
-        const createdCount = person.created ?? 0;
-        const shownCount   = person.shown_count ?? person.shown ?? 0;
-
-        const right = (type === 'Sales')
-          ? `${person.sales || 0} Sales • Cr ${createdCount} • Sh ${shownCount}`
-          : `${(person.shows_count ?? person.shows ?? 0)} Shows`;
-
+      if(mode==='sales'){
+        const sales  = person.sales ?? 0;
+        const calls  = person.calls ?? 0;
+        const texts  = person.texts ?? 0;
+        const made   = person.created ?? 0;
+        const shown  = shownVal(person);
         return `
           <div class="leaderboard-item" ${clickAttr} style="${style}">
             <div style="display:flex; align-items:center; gap:10px;">
-              <div class="rank ${rankClass}">${index + 1}</div>
+              <div class="rank ${rankClass}">${idx + 1}</div>
               <div class="name">${name}</div>
             </div>
-            <div class="score">${right}</div>
-          </div>
-        `;
+            <div class="chips">
+              ${chip('Sales', sales, 'sales')}
+              ${chip('Calls', calls, 'calls')}
+              ${chip('Texts', texts, 'texts')}
+              ${chip('Appts Made', made, 'appt')}
+              ${chip('Appts Shown', shown, 'appt')}
+            </div>
+          </div>`;
+      } else {
+        const calls  = person.calls ?? 0;
+        const texts  = person.texts ?? 0;
+        const made   = person.created ?? 0;
+        const shown  = shownVal(person);
+        return `
+          <div class="leaderboard-item" ${clickAttr} style="${style}">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="rank ${rankClass}">${idx + 1}</div>
+              <div class="name">${name}</div>
+            </div>
+            <div class="chips">
+              ${chip('Appts Shown', shown, 'appt')}
+              ${chip('Appts Made', made, 'appt')}
+              ${chip('Calls', calls, 'calls')}
+              ${chip('Texts', texts, 'texts')}
+            </div>
+          </div>`;
       }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Render: SINGLE leaderboard with toggle
+    // ─────────────────────────────────────────────────────────────
+    function renderDashboard(data) {
+      const me = window.userData || {};
+      const salesLB = sortSales(data.sales || []);
+      const bdcLB   = sortBDC(data.bdc   || []);
+
+      const activeMode = state.mode; // 'sales' | 'bdc'
+      const activeList = activeMode==='sales' ? salesLB : bdcLB;
 
       document.getElementById('app').innerHTML = `
         <div class="header"><h1>Store Performance Dashboard</h1></div>
@@ -142,27 +187,33 @@
           </div>
         </div>
 
-        <div class="leaderboard-section" id="content">
-          <div class="leaderboard-grid">
-            <div class="leaderboard-card">
-              <h2>🏆 Sales Leaderboard</h2>
-              <div class="leaderboard-list">
-                ${salesLB.length ? salesLB.map((p, i) => rowHTML(p, i, 'Sales')).join('') :
-                  '<p style="text-align:center;color:#999;">No sales data</p>'}
-              </div>
-            </div>
-            <div class="leaderboard-card">
-              <h2>📞 BDC Leaderboard</h2>
-              ${bdcLB.length ? bdcLB.map((p, i) => rowHTML(p, i, 'BDC')).join('') :
-                '<p style="text-align:center;color:#999;">No BDC data</p>'}
-            </div>
+        <div class="switcher">
+          <button class="seg ${activeMode==='sales'?'active':''}" onclick="window.setMode('sales')">Sales</button>
+          <button class="seg ${activeMode==='bdc'  ?'active':''}" onclick="window.setMode('bdc')">BDC</button>
+          <span class="hint">Tip: Click a name to open their 1:1</span>
+        </div>
+
+        <div class="leaderboard-card" id="content">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <h2>${activeMode==='sales'?'🏆 Sales Leaderboard':'📞 BDC Leaderboard'}</h2>
+            <div class="muted">${activeMode==='sales'?'Sorted by Sales (MTD)':'Sorted by Appts Shown (MTD)'}</div>
+          </div>
+          <div class="leaderboard-list">
+            ${activeList.length ? activeList.map((p,i)=>rowHTML(p,i,activeMode)).join('') :
+              '<p style="text-align:center;color:#999;">No data</p>'}
           </div>
         </div>
       `;
     }
 
+    // Allow toggle without re-fetch
+    function setMode(mode){
+      state.mode = mode;
+      if(state.raw) renderDashboard(state.raw);
+    }
+
     // ─────────────────────────────────────────────────────────────
-    // Person 1:1
+    // Person 1:1 (unchanged)
     // ─────────────────────────────────────────────────────────────
     async function showPersonDetails(name, type) {
       const contentEl = document.getElementById('content');
@@ -245,7 +296,7 @@
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Calls list (unchanged, minimal safe stub)
+    // Calls list (unchanged)
     // ─────────────────────────────────────────────────────────────
     async function viewCallSheets(name) {
       const contentEl = document.getElementById('content');
@@ -328,7 +379,7 @@
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Prefetch helper (called after render), and a tiny fetch stub
+    // Prefetch helper (unchanged), and a tiny fetch stub
     // ─────────────────────────────────────────────────────────────
     function prefetchForDashboard(data) {
       try {
@@ -354,11 +405,10 @@
     window.showPersonDetails    = showPersonDetails;
     window.viewCallSheets       = viewCallSheets;
     window.prefetchForDashboard = prefetchForDashboard;
+    window.setMode              = setMode;
 
-    // Kick off the dashboard (if you already gate this by auth, you can remove)
+    // Kick off the dashboard
     showDashboard();
   </script>
 </body>
 </html>
-
-
