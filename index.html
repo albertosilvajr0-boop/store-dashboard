@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Store Performance Dashboard</title>
-  <!-- prevent favicon console noise -->
   <link rel="icon" href="data:;base64,=">
   <style>
     :root{
@@ -15,10 +14,10 @@
     html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#fff;color:var(--ink);}
     .container{max-width:1100px;margin:28px auto 80px;padding:0 20px;}
 
-    /* Topbar */
     .topbar{
       background:linear-gradient(135deg,var(--brand1),var(--brand2));
-      border-radius:18px; padding:18px 20px; color:#fff; display:flex; align-items:center; gap:14px; justify-content:space-between;
+      border-radius:18px; padding:18px 20px; color:#fff;
+      display:flex; align-items:center; gap:14px; justify-content:space-between;
       box-shadow:0 10px 24px rgba(0,0,0,.10);
     }
     .title{font-size:28px; font-weight:900; margin:0;}
@@ -27,13 +26,11 @@
     .logout-btn{background:var(--danger);} .logout-btn:hover{background:var(--dangerH);}
     .admin-btn{background:var(--ok);} .admin-btn:hover{background:var(--okH);}
 
-    /* Switcher */
     .switcher{display:flex;gap:8px;margin:14px 0 10px;}
     .seg{border:1px solid rgba(0,0,0,.08); color:#111; padding:8px 12px; border-radius:999px; cursor:pointer; font-weight:800; background:#fff;}
     .seg.active{background:#111827; color:#fff; border-color:#111827;}
     .hint{color:#6b7280; font-size:12px; margin-left:8px; display:flex; align-items:center;}
 
-    /* Cards / Rows */
     .card{background:#fff;border-radius:16px;box-shadow:0 10px 24px rgba(0,0,0,.08);padding:16px;border:1px solid var(--line);}
     .titleRow{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
     .titleRow h2{margin:0;font-size:18px;display:flex;align-items:center;gap:10px;}
@@ -85,23 +82,13 @@
     </div>
   </div>
 
-  <!-- Firebase (auto-config via Hosting) -->
+  <!-- Firebase (auto-init via Hosting) -->
   <script src="/__/firebase/10.12.2/firebase-app-compat.js"></script>
   <script src="/__/firebase/10.12.2/firebase-auth-compat.js"></script>
   <script src="/__/firebase/init.js?useEmulator=false"></script>
 
-  <!-- If you prefer manual config instead of Hosting auto-init, replace the 3 tags above with:
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <!-- Apps Script backend base -->
   <script>
-    // Paste your firebaseConfig here if not on Hosting:
-    // firebase.initializeApp({ apiKey:"", authDomain:"", projectId:"", appId:"", ... });
-  </script>
-  -->
-
-  <!-- Backend URL & app code -->
-  <script>
-    // Your live Apps Script Web App URL:
     window.SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxRf4KkWsC8EBN6G6ybStLKBNqmnu-Rjow4aZ_NWpSaRY7Q8JlxFaTsTsAW2Ny76dCS/exec";
   </script>
 
@@ -109,59 +96,51 @@
     const SCRIPT_URL = window.SCRIPT_URL || '';
     const state = { mode: 'sales', raw: null, idToken: null };
 
-    // ====== Auth state handling (Firebase) ======
+    // Firebase Auth
     const auth = firebase.auth();
-
-    function onAuth(user){
-      if(!user){
-        renderLogin();
-        return;
-      }
-      user.getIdToken(/*forceRefresh=*/true).then(async (idToken)=>{
-        state.idToken = idToken;
-        // Store email for header
-        window.userData = { email: user.email };
-        // Try to fetch profile (role, linkedName) to enable admin + 1:1 permissions
+    auth.onAuthStateChanged(async (user)=>{
+      if(!user){ renderLogin(); return; }
+      try{
+        state.idToken = await user.getIdToken(/*forceRefresh=*/true);
+        window.userData = { email: user.email }; // basic header display
+        // Try to enrich with role/linkedName (optional)
         try{
-          const prof = await fetchJSON(profileURL(), { headers: authHeaders() });
-          if(prof?.ok && prof.data?.user){
-            Object.assign(window.userData, prof.data.user); // expect {role, linkedName}
-          }
-        }catch(_){}
+          const prof = await getJSON(profileURL()); // no headers → no preflight
+          if(prof?.ok && prof.data?.user) Object.assign(window.userData, prof.data.user);
+        }catch{}
         renderShell();
-        loadLeaderboards();
-      }).catch((_e)=>renderLogin("Failed to obtain ID token. Please sign in again."));
-    }
-
-    auth.onAuthStateChanged(onAuth);
+        await loadLeaderboards();
+      }catch(e){
+        renderLogin("Failed to obtain ID token. Please sign in again.");
+      }
+    });
 
     async function signInEmailPassword(email, password){
       await auth.signInWithEmailAndPassword(email, password);
     }
     async function signOut(){
-      try{ await auth.signOut(); }catch(_){}
+      try{ await auth.signOut(); }catch{}
       state.idToken = null;
       window.userData = {};
+      location.reload();
     }
 
-    // ====== URLs with idToken & session handling ======
+    // Build URLs with idToken as a *query parameter* only (no headers → no preflight)
     const withId = (u) => `${u}${u.includes('?')?'&':'?'}idToken=${encodeURIComponent(state.idToken||'')}`;
-    const lbURL   = () => withId(`${SCRIPT_URL}?route=leaderboards`);
-    const usersURL= () => withId(`${SCRIPT_URL}?route=users`);
-    const personURL= (name)=> withId(`${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}`);
-    const callsURL = (name)=> withId(`${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}`);
-    const profileURL= ()=> withId(`${SCRIPT_URL}?route=profile`);
+    const lbURL     = () => withId(`${SCRIPT_URL}?route=leaderboards`);
+    const usersURL  = () => withId(`${SCRIPT_URL}?route=users`);
+    const personURL = (name)=> withId(`${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}`);
+    const callsURL  = (name)=> withId(`${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}`);
+    const profileURL= () => withId(`${SCRIPT_URL}?route=profile`);
 
-    const authHeaders = ()=> state.idToken ? { Authorization: `Bearer ${state.idToken}` } : {};
-
-    // ====== Fetch helper ======
-    async function fetchJSON(url, opts={}){
-      const resp = await fetch(url, { cache:'no-store', ...opts });
-      const txt  = await resp.text();
+    // Simple GET JSON helper (no custom headers)
+    async function getJSON(url){
+      const resp = await fetch(url, { cache:'no-store' });
+      const txt = await resp.text();
       try{ return JSON.parse(txt); }catch(e){ throw new Error(`Non-JSON response\nHTTP ${resp.status}\n\n${txt}`); }
     }
 
-    // ====== Role helpers ======
+    // Roles / permissions
     const isAdmin   = () => (window.userData?.role==='admin'||window.userData?.role==='superadmin');
     const isManager = () => (window.userData?.role==='manager');
     function canViewName(targetName){
@@ -170,7 +149,7 @@
       return mine && (String(targetName||'').toUpperCase()===mine);
     }
 
-    // ====== Views (Login / App Shell) ======
+    // Views
     function renderLogin(errMsg=""){
       const el=document.getElementById('root');
       el.innerHTML = `
@@ -193,13 +172,13 @@
           ${errMsg ? `<div class="err">${errMsg}</div>` : ""}
         </div>`;
       document.getElementById('loginBtn').addEventListener('click', async ()=>{
-        const email = (document.getElementById('email')?.value||"").trim();
-        const pwd   = (document.getElementById('pwd')?.value||"").trim();
+        const email=(document.getElementById('email')?.value||"").trim();
+        const pwd=(document.getElementById('pwd')?.value||"").trim();
         if(!email||!pwd){ renderLogin("Please enter both email and password."); return; }
         try{ await signInEmailPassword(email, pwd); }
         catch(e){ renderLogin(e?.message || "Sign-in failed."); }
       });
-      const onEnter = (e)=>{ if(e.key==='Enter') document.getElementById('loginBtn').click(); };
+      const onEnter=(e)=>{ if(e.key==='Enter') document.getElementById('loginBtn').click(); };
       document.getElementById('email').addEventListener('keydown', onEnter);
       document.getElementById('pwd').addEventListener('keydown', onEnter);
     }
@@ -227,15 +206,12 @@
       document.getElementById('whoamiEmail').textContent = window.userData?.email || '';
       if (isAdmin()) document.getElementById('adminBtn').style.display = 'inline-block';
       document.getElementById('adminBtn')?.addEventListener('click', showUserModal);
-      document.getElementById('logoutBtn').addEventListener('click', async ()=>{
-        await signOut();
-        location.reload();
-      });
+      document.getElementById('logoutBtn').addEventListener('click', signOut);
       document.getElementById('segSales').addEventListener('click', ()=>setMode('sales'));
       document.getElementById('segBDC').addEventListener('click', ()=>setMode('bdc'));
     }
 
-    // ====== Leaderboards ======
+    // Leaderboards
     const shownVal = x => x.shown ?? x.shows ?? x.shows_count ?? 0;
     const sortSales = arr => [...(arr||[])].sort((a,b)=>(b.sales??0)-(a.sales??0)||String(a.name||'').localeCompare(String(b.name||'')));
     const sortBDC   = arr => [...(arr||[])].sort((a,b)=>shownVal(b)-shownVal(a)||String(a.name||'').localeCompare(String(b.name||'')));
@@ -273,9 +249,9 @@
     }
 
     function renderLeaderboards(data){
-      if(!state.raw) state.raw = data;
-      const salesLB = sortSales(data.sales || []);
-      const bdcLB   = sortBDC(data.bdc   || []);
+      state.raw = data || state.raw;
+      const salesLB = sortSales(state.raw?.sales || []);
+      const bdcLB   = sortBDC(state.raw?.bdc   || []);
       const active  = state.mode==='sales' ? salesLB : bdcLB;
 
       document.getElementById('segSales').classList.toggle('active', state.mode==='sales');
@@ -291,11 +267,14 @@
         </div>`;
     }
 
-    function setMode(mode){ state.mode=mode; renderLeaderboards(state.raw); }
+    function setMode(mode){
+      state.mode = mode;
+      if(state.raw) renderLeaderboards(); // no error if data not loaded yet
+    }
 
     async function loadLeaderboards(){
       try{
-        const data = await fetchJSON(lbURL(), { headers: authHeaders() });
+        const data = await getJSON(lbURL());
         if(!data?.ok) throw new Error(data?.error||'Failed to load');
         renderLeaderboards(data);
       }catch(err){
@@ -308,12 +287,12 @@
       }
     }
 
-    // ====== 1:1 + Call Sheets (exposed to window for onclick) ======
+    // 1:1 & Call Sheets (GET, no headers)
     window.showPersonDetails = async function(name, type){
-      const el = document.getElementById('content');
-      el.innerHTML = `<div class="card" style="padding:24px; text-align:center;">Loading ${name}…</div>`;
+      const el=document.getElementById('content');
+      el.innerHTML = `<div class="card" style="padding:24px;text-align:center;">Loading ${name}…</div>`;
       try{
-        const result = await fetchJSON(personURL(name), { headers: authHeaders() });
+        const result = await getJSON(personURL(name));
         if(!result?.ok) throw new Error(result?.error||'Failed to load person details');
         const payload = result.data || {};
         const b = payload.block || {};
@@ -358,10 +337,10 @@
     };
 
     window.viewCallSheets = async function(name){
-      const el = document.getElementById('content');
-      el.innerHTML = `<div class="card" style="padding:24px; text-align:center;">Loading call sheets for ${name}…</div>`;
+      const el=document.getElementById('content');
+      el.innerHTML = `<div class="card" style="padding:24px;text-align:center;">Loading call sheets for ${name}…</div>`;
       try{
-        const result = await fetchJSON(callsURL(name), { headers: authHeaders() });
+        const result = await getJSON(callsURL(name));
         if(!result?.ok) throw new Error(result?.error||'Failed to load call sheets');
         const rows = result.data?.calls || [];
         const tzDateOnly = v => { if(!v) return '-'; try{ const d=(v instanceof Date)?v:new Date(v); return isNaN(d)?String(v):(d.toLocaleDateString()); }catch{ return String(v); }};
@@ -411,14 +390,14 @@
       }
     };
 
-    // ====== User Management modal ======
+    // User management (GET, no headers)
     async function showUserModal(){
-      const bd = document.getElementById('umBackdrop');
-      const body = document.getElementById('umBody');
+      const bd=document.getElementById('umBackdrop');
+      const body=document.getElementById('umBody');
       bd.style.display='flex';
       body.textContent='Loading users…';
       try{
-        const res = await fetchJSON(usersURL(), { headers: authHeaders() });
+        const res = await getJSON(usersURL());
         if(!res?.ok) throw new Error(res?.error||'Failed to load users');
         const list = res.data?.users || [];
         body.innerHTML = `
@@ -448,12 +427,10 @@
     }
     function closeUserModal(){ document.getElementById('umBackdrop').style.display='none'; }
 
-    // ====== Public helpers ======
-    window.showDashboard = loadLeaderboards; // used by Retry
+    window.showDashboard = loadLeaderboards;
     window.showUserModal = showUserModal;
     window.closeUserModal = closeUserModal;
 
   </script>
-
 </body>
 </html>
