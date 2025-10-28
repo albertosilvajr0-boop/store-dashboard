@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Store Performance Dashboard</title>
+  <!-- prevent favicon console noise -->
   <link rel="icon" href="data:;base64,=">
   <style>
     :root{
@@ -84,24 +85,83 @@
     </div>
   </div>
 
-  <!-- 🔧 Backend URL & safe defaults -->
+  <!-- Firebase (auto-config via Hosting) -->
+  <script src="/__/firebase/10.12.2/firebase-app-compat.js"></script>
+  <script src="/__/firebase/10.12.2/firebase-auth-compat.js"></script>
+  <script src="/__/firebase/init.js?useEmulator=false"></script>
+
+  <!-- If you prefer manual config instead of Hosting auto-init, replace the 3 tags above with:
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script>
+    // Paste your firebaseConfig here if not on Hosting:
+    // firebase.initializeApp({ apiKey:"", authDomain:"", projectId:"", appId:"", ... });
+  </script>
+  -->
+
+  <!-- Backend URL & app code -->
   <script>
     // Your live Apps Script Web App URL:
     window.SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxRf4KkWsC8EBN6G6ybStLKBNqmnu-Rjow4aZ_NWpSaRY7Q8JlxFaTsTsAW2Ny76dCS/exec";
-
-    // Persisted session (if any)
-    try{
-      window.sessionToken = localStorage.getItem('sessionToken') || "";
-      window.userData     = JSON.parse(localStorage.getItem('userData')||"{}");
-    }catch{ window.sessionToken=""; window.userData={}; }
   </script>
 
   <script type="module">
-    const SCRIPT_URL   = window.SCRIPT_URL || '';
-    const LOGIN_ROUTES = ["login"]; // add alternates if your GAS uses a different route name e.g. "signin"
-    const state = { mode: 'sales', raw: null };
+    const SCRIPT_URL = window.SCRIPT_URL || '';
+    const state = { mode: 'sales', raw: null, idToken: null };
 
-    // ====== Auth / Role helpers ======
+    // ====== Auth state handling (Firebase) ======
+    const auth = firebase.auth();
+
+    function onAuth(user){
+      if(!user){
+        renderLogin();
+        return;
+      }
+      user.getIdToken(/*forceRefresh=*/true).then(async (idToken)=>{
+        state.idToken = idToken;
+        // Store email for header
+        window.userData = { email: user.email };
+        // Try to fetch profile (role, linkedName) to enable admin + 1:1 permissions
+        try{
+          const prof = await fetchJSON(profileURL(), { headers: authHeaders() });
+          if(prof?.ok && prof.data?.user){
+            Object.assign(window.userData, prof.data.user); // expect {role, linkedName}
+          }
+        }catch(_){}
+        renderShell();
+        loadLeaderboards();
+      }).catch((_e)=>renderLogin("Failed to obtain ID token. Please sign in again."));
+    }
+
+    auth.onAuthStateChanged(onAuth);
+
+    async function signInEmailPassword(email, password){
+      await auth.signInWithEmailAndPassword(email, password);
+    }
+    async function signOut(){
+      try{ await auth.signOut(); }catch(_){}
+      state.idToken = null;
+      window.userData = {};
+    }
+
+    // ====== URLs with idToken & session handling ======
+    const withId = (u) => `${u}${u.includes('?')?'&':'?'}idToken=${encodeURIComponent(state.idToken||'')}`;
+    const lbURL   = () => withId(`${SCRIPT_URL}?route=leaderboards`);
+    const usersURL= () => withId(`${SCRIPT_URL}?route=users`);
+    const personURL= (name)=> withId(`${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}`);
+    const callsURL = (name)=> withId(`${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}`);
+    const profileURL= ()=> withId(`${SCRIPT_URL}?route=profile`);
+
+    const authHeaders = ()=> state.idToken ? { Authorization: `Bearer ${state.idToken}` } : {};
+
+    // ====== Fetch helper ======
+    async function fetchJSON(url, opts={}){
+      const resp = await fetch(url, { cache:'no-store', ...opts });
+      const txt  = await resp.text();
+      try{ return JSON.parse(txt); }catch(e){ throw new Error(`Non-JSON response\nHTTP ${resp.status}\n\n${txt}`); }
+    }
+
+    // ====== Role helpers ======
     const isAdmin   = () => (window.userData?.role==='admin'||window.userData?.role==='superadmin');
     const isManager = () => (window.userData?.role==='manager');
     function canViewName(targetName){
@@ -110,7 +170,7 @@
       return mine && (String(targetName||'').toUpperCase()===mine);
     }
 
-    // ====== Views ======
+    // ====== Views (Login / App Shell) ======
     function renderLogin(errMsg=""){
       const el=document.getElementById('root');
       el.innerHTML = `
@@ -120,21 +180,26 @@
         </div>
         <div class="loginWrap card">
           <h2 style="margin:0 0 8px;">Sign in</h2>
-          <p class="muted" style="margin-top:0;">Use your work email and access key.</p>
+          <p class="muted" style="margin-top:0;">Use your work email and password (Firebase Auth).</p>
           <div class="field">
             <label for="email">Email</label>
             <input id="email" type="email" placeholder="you@dealer.com" autocomplete="username" />
           </div>
           <div class="field">
-            <label for="pwd">Access Key / Password</label>
+            <label for="pwd">Password</label>
             <input id="pwd" type="password" placeholder="••••••••" autocomplete="current-password" />
           </div>
           <button class="btn" id="loginBtn">Sign in</button>
           ${errMsg ? `<div class="err">${errMsg}</div>` : ""}
         </div>`;
-      document.getElementById('loginBtn').addEventListener('click', doLogin);
-      // Enter key
-      const onEnter = (e)=>{ if(e.key==='Enter') doLogin(); };
+      document.getElementById('loginBtn').addEventListener('click', async ()=>{
+        const email = (document.getElementById('email')?.value||"").trim();
+        const pwd   = (document.getElementById('pwd')?.value||"").trim();
+        if(!email||!pwd){ renderLogin("Please enter both email and password."); return; }
+        try{ await signInEmailPassword(email, pwd); }
+        catch(e){ renderLogin(e?.message || "Sign-in failed."); }
+      });
+      const onEnter = (e)=>{ if(e.key==='Enter') document.getElementById('loginBtn').click(); };
       document.getElementById('email').addEventListener('keydown', onEnter);
       document.getElementById('pwd').addEventListener('keydown', onEnter);
     }
@@ -147,7 +212,7 @@
           <div style="display:flex; gap:10px; align-items:center;">
             <span class="muted">Welcome, <strong id="whoamiEmail"></strong></span>
             <button id="adminBtn" class="admin-btn" style="display:none;">User Management</button>
-            <button class="logout-btn" onclick="logout()">Logout</button>
+            <button class="logout-btn" id="logoutBtn">Logout</button>
           </div>
         </div>
 
@@ -162,70 +227,15 @@
       document.getElementById('whoamiEmail').textContent = window.userData?.email || '';
       if (isAdmin()) document.getElementById('adminBtn').style.display = 'inline-block';
       document.getElementById('adminBtn')?.addEventListener('click', showUserModal);
+      document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+        await signOut();
+        location.reload();
+      });
       document.getElementById('segSales').addEventListener('click', ()=>setMode('sales'));
       document.getElementById('segBDC').addEventListener('click', ()=>setMode('bdc'));
     }
 
-    // ====== Data fetchers ======
-    async function fetchJSON(url, opts){
-      const resp = await fetch(url, opts);
-      const txt  = await resp.text();
-      try{ return JSON.parse(txt); }catch(e){ throw new Error(`Non-JSON response\nHTTP ${resp.status}\n\n${txt}`); }
-    }
-    async function fetchLeaderboards(){
-      if(!SCRIPT_URL) throw new Error('SCRIPT_URL is not defined on window.');
-      const u = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken||'')}`;
-      const data = await fetchJSON(u, { cache:'no-store' });
-      if(!data?.ok) throw new Error(data?.error||'Backend returned ok:false');
-      return data;
-    }
-    async function fetchUsers(){
-      const u = `${SCRIPT_URL}?route=users&session=${encodeURIComponent(window.sessionToken||'')}`;
-      return fetchJSON(u, { cache:'no-store' });
-    }
-    async function fetchPerson(name){
-      const u = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken||'')}`;
-      return fetchJSON(u, { cache:'no-store' });
-    }
-    async function fetchCallsFor(name){
-      const u = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken||'')}`;
-      return fetchJSON(u, { cache:'no-store' });
-    }
-
-    // ====== Login flow ======
-    async function doLogin(){
-      const email = (document.getElementById('email')?.value||"").trim();
-      const pwd   = (document.getElementById('pwd')?.value||"").trim();
-      if(!email || !pwd){ renderLogin("Please enter both email and access key."); return; }
-
-      let lastErr = "Login failed.";
-      for(const route of LOGIN_ROUTES){
-        try{
-          const url = `${SCRIPT_URL}?route=${encodeURIComponent(route)}`;
-          const res = await fetchJSON(url, {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ email, password: pwd })
-          });
-          if(res?.ok && (res.sessionToken || res.data?.sessionToken)){
-            const token = res.sessionToken || res.data.sessionToken;
-            const user  = res.user || res.data?.user || { email: res.email||email, role: res.role, linkedName: res.linkedName };
-            window.sessionToken = token;
-            window.userData     = user || {};
-            try{
-              localStorage.setItem('sessionToken', token);
-              localStorage.setItem('userData', JSON.stringify(window.userData));
-            }catch(_){}
-            boot(); // proceed to app
-            return;
-          }
-          lastErr = res?.error || lastErr;
-        }catch(e){ lastErr = e?.message || String(e); }
-      }
-      renderLogin(lastErr || "Login failed.");
-    }
-
-    // ====== Sorting & row builder ======
+    // ====== Leaderboards ======
     const shownVal = x => x.shown ?? x.shows ?? x.shows_count ?? 0;
     const sortSales = arr => [...(arr||[])].sort((a,b)=>(b.sales??0)-(a.sales??0)||String(a.name||'').localeCompare(String(b.name||'')));
     const sortBDC   = arr => [...(arr||[])].sort((a,b)=>shownVal(b)-shownVal(a)||String(a.name||'').localeCompare(String(b.name||'')));
@@ -234,7 +244,7 @@
     function rowHTML(person, i, mode){
       const name = person.name || '';
       const rk   = i===0 ? 'gold' : i===1 ? 'silver' : i===2 ? 'bronze' : '';
-      const allowed  = canViewName(name); // login-gated
+      const allowed  = canViewName(name);
       const clickAttr= allowed ? `onclick="showPersonDetails('${name.replace(/'/g,"\\'")}', '${mode.toUpperCase()}')"` : '';
       const style    = allowed ? '' : 'opacity:.6; cursor:not-allowed;';
 
@@ -262,14 +272,12 @@
       }
     }
 
-    // ====== Renderers ======
     function renderLeaderboards(data){
       if(!state.raw) state.raw = data;
       const salesLB = sortSales(data.sales || []);
       const bdcLB   = sortBDC(data.bdc   || []);
       const active  = state.mode==='sales' ? salesLB : bdcLB;
 
-      // shell & switcher active state already mounted
       document.getElementById('segSales').classList.toggle('active', state.mode==='sales');
       document.getElementById('segBDC').classList.toggle('active', state.mode==='bdc');
 
@@ -285,52 +293,10 @@
 
     function setMode(mode){ state.mode=mode; renderLeaderboards(state.raw); }
 
-    // ====== User Management modal ======
-    async function showUserModal(){
-      const bd = document.getElementById('umBackdrop');
-      const body = document.getElementById('umBody');
-      bd.style.display='flex';
-      body.textContent='Loading users…';
+    async function loadLeaderboards(){
       try{
-        const res = await fetchUsers();
-        if(!res?.ok) throw new Error(res?.error||'Failed to load users');
-        const list = res.data?.users || [];
-        body.innerHTML = `
-          <div class="muted" style="margin-bottom:6px;">Total: ${list.length}</div>
-          <div style="max-height:380px; overflow:auto; border:1px solid #eef2f7; border-radius:10px;">
-            <table style="width:100%; border-collapse:collapse;">
-              <thead>
-                <tr style="background:#f8fafc;">
-                  <th style="text-align:left; padding:10px; border-bottom:1px solid #eee;">Email</th>
-                  <th style="text-align:left; padding:10px; border-bottom:1px solid #eee;">Linked Name</th>
-                  <th style="text-align:left; padding:10px; border-bottom:1px solid #eee;">Role</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${list.map(u=>`
-                  <tr>
-                    <td style="padding:10px;border-top:1px solid #f1f5f9;">${u.email||'-'}</td>
-                    <td style="padding:10px;border-top:1px solid #f1f5f9;">${u.linkedName||'-'}</td>
-                    <td style="padding:10px;border-top:1px solid #f1f5f9;">${u.role||'-'}</td>
-                  </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>`;
-      }catch(e){
-        body.innerHTML = `<div style="color:#dc2626;">${e?.message||e}</div>`;
-      }
-    }
-    function closeUserModal(){ document.getElementById('umBackdrop').style.display='none'; }
-
-    // ====== Page boot ======
-    async function boot(){
-      if(!window.sessionToken){
-        renderLogin();
-        return;
-      }
-      renderShell();
-      try{
-        const data = await fetchLeaderboards();
+        const data = await fetchJSON(lbURL(), { headers: authHeaders() });
+        if(!data?.ok) throw new Error(data?.error||'Failed to load');
         renderLeaderboards(data);
       }catch(err){
         document.getElementById('content').innerHTML = `
@@ -342,18 +308,12 @@
       }
     }
 
-    // expose for onclick usage
-    window.setMode = setMode;
-    window.showUserModal = showUserModal;
-    window.closeUserModal = closeUserModal;
-    window.showDashboard = boot; // used by Retry
-
-    // 1:1 + call sheets (need global for onclick)
+    // ====== 1:1 + Call Sheets (exposed to window for onclick) ======
     window.showPersonDetails = async function(name, type){
       const el = document.getElementById('content');
       el.innerHTML = `<div class="card" style="padding:24px; text-align:center;">Loading ${name}…</div>`;
       try{
-        const result = await fetchPerson(name);
+        const result = await fetchJSON(personURL(name), { headers: authHeaders() });
         if(!result?.ok) throw new Error(result?.error||'Failed to load person details');
         const payload = result.data || {};
         const b = payload.block || {};
@@ -401,7 +361,7 @@
       const el = document.getElementById('content');
       el.innerHTML = `<div class="card" style="padding:24px; text-align:center;">Loading call sheets for ${name}…</div>`;
       try{
-        const result = await fetchCallsFor(name);
+        const result = await fetchJSON(callsURL(name), { headers: authHeaders() });
         if(!result?.ok) throw new Error(result?.error||'Failed to load call sheets');
         const rows = result.data?.calls || [];
         const tzDateOnly = v => { if(!v) return '-'; try{ const d=(v instanceof Date)?v:new Date(v); return isNaN(d)?String(v):(d.toLocaleDateString()); }catch{ return String(v); }};
@@ -451,22 +411,49 @@
       }
     };
 
-    // Start app (login gate respected)
-    boot();
-
-    // expose boot for Retry button
-    window.showDashboard = boot;
-  </script>
-
-  <script>
-    // Works with the login gate: wipes session and returns to login
-    function logout(){
-      try{ localStorage.removeItem('sessionToken'); localStorage.removeItem('userData'); }catch(e){}
-      window.sessionToken=''; window.userData={};
-      location.reload();
+    // ====== User Management modal ======
+    async function showUserModal(){
+      const bd = document.getElementById('umBackdrop');
+      const body = document.getElementById('umBody');
+      bd.style.display='flex';
+      body.textContent='Loading users…';
+      try{
+        const res = await fetchJSON(usersURL(), { headers: authHeaders() });
+        if(!res?.ok) throw new Error(res?.error||'Failed to load users');
+        const list = res.data?.users || [];
+        body.innerHTML = `
+          <div class="muted" style="margin-bottom:6px;">Total: ${list.length}</div>
+          <div style="max-height:380px; overflow:auto; border:1px solid #eef2f7; border-radius:10px;">
+            <table style="width:100%; border-collapse:collapse;">
+              <thead>
+                <tr style="background:#f8fafc;">
+                  <th style="text-align:left; padding:10px; border-bottom:1px solid #eee;">Email</th>
+                  <th style="text-align:left; padding:10px; border-bottom:1px solid #eee;">Linked Name</th>
+                  <th style="text-align:left; padding:10px; border-bottom:1px solid #eee;">Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${list.map(u=>`
+                  <tr>
+                    <td style="padding:10px;border-top:1px solid #f1f5f9;">${u.email||'-'}</td>
+                    <td style="padding:10px;border-top:1px solid #f1f5f9;">${u.linkedName||'-'}</td>
+                    <td style="padding:10px;border-top:1px solid #f1f5f9;">${u.role||'-'}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      }catch(e){
+        body.innerHTML = `<div style="color:#dc2626;">${e?.message||e}</div>`;
+      }
     }
-    // Modal close helper (non-module)
     function closeUserModal(){ document.getElementById('umBackdrop').style.display='none'; }
+
+    // ====== Public helpers ======
+    window.showDashboard = loadLeaderboards; // used by Retry
+    window.showUserModal = showUserModal;
+    window.closeUserModal = closeUserModal;
+
   </script>
+
 </body>
 </html>
