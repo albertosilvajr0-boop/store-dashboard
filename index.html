@@ -7,125 +7,155 @@
   <style>
     :root {
       --bg1:#6a11cb; --bg2:#2575fc;
-      --card:#ffffff; --text:#1f2937; --muted:#6b7280;
+      --card:#ffffff; --text:#111827; --muted:#6b7280;
+      --pill:#0ea5e9; --pill2:#10b981;
     }
     html, body { height:100%; margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:linear-gradient(135deg,var(--bg1),var(--bg2)); }
     .container { max-width:1100px; margin:40px auto; padding:0 20px; }
-    .header { color:#fff; text-align:center; margin:20px 0 10px; }
-    .header h1 { margin:0; font-size:36px; }
+    .header { color:#fff; text-align:center; margin:10px 0 16px; }
+    .header h1 { margin:0; font-size:34px; }
     .user-info { display:flex; align-items:center; justify-content:space-between; background:rgba(0,0,0,.65); color:#fff; border-radius:12px; padding:10px 16px; }
     .btn { background:#2563eb; color:#fff; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
     .btn:hover { background:#1d4ed8; }
-    .logout-btn { background:#ef4444; }
-    .logout-btn:hover { background:#dc2626; }
-    .admin-btn { background:#10b981; }
-    .admin-btn:hover { background:#059669; }
+    .logout-btn { background:#ef4444; } .logout-btn:hover { background:#dc2626; }
+    .admin-btn { background:#10b981; } .admin-btn:hover { background:#059669; }
 
-    .leaderboard-section { margin-top:20px; }
-    .leaderboard-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:18px; }
-    .leaderboard-card { background:var(--card); border-radius:16px; box-shadow:0 12px 24px rgba(0,0,0,.12); padding:16px; }
-    .leaderboard-card h2 { margin:4px 0 12px; color:var(--text); display:flex; align-items:center; gap:8px; }
-    .leaderboard-list { display:flex; flex-direction:column; gap:2px; }
-    .leaderboard-item { display:flex; align-items:center; justify-content:space-between; padding:12px 10px; border-radius:10px; cursor:pointer; transition:transform .05s ease, background .2s; }
-    .leaderboard-item:hover { background:#f3f4f6; transform:translateY(-1px); }
-    .rank { width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-weight:700; color:#fff; background:#9ca3af; margin-right:10px; }
+    .switcher { display:flex; gap:8px; margin:18px 0 6px; }
+    .seg { border:1px solid rgba(255,255,255,.25); color:#fff; padding:8px 12px; border-radius:999px; cursor:pointer; font-weight:700; backdrop-filter: blur(8px); }
+    .seg.active { background:#fff; color:#111827; border-color:#fff; }
+    .hint { color:#e5e7eb; font-size:12px; margin-left:8px; }
+
+    .card { background:var(--card); border-radius:16px; box-shadow:0 12px 24px rgba(0,0,0,.12); padding:16px; }
+    .titleRow { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+    .titleRow h2 { margin:0; color:var(--text); font-size:18px; display:flex; align-items:center; gap:10px; }
+
+    .list { display:flex; flex-direction:column; gap:4px; }
+    .row { display:flex; align-items:center; justify-content:space-between; padding:12px 10px; border-radius:10px; cursor:pointer; transition:transform .06s ease, background .2s; }
+    .row:hover { background:#f3f4f6; transform:translateY(-1px); }
+    .left { display:flex; align-items:center; gap:10px; }
+    .rank { width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-weight:700; color:#fff; background:#9ca3af; }
     .gold { background:linear-gradient(135deg,#f59e0b,#fbbf24); }
     .silver { background:linear-gradient(135deg,#9ca3af,#e5e7eb); color:#111827; }
     .bronze { background:linear-gradient(135deg,#b45309,#f59e0b); }
-    .name { color:#111827; font-weight:600; }
-    .score { color:#6b7280; font-weight:600; }
-
-    /* helper text styles */
-    .muted { color:#6b7280; font-size:14px; }
-    #app { margin:0 auto; }
+    .name { color:#111827; font-weight:700; }
+    .right { text-align:right; }
+    .chips { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+    .pill { font-size:12px; font-weight:700; padding:3px 8px; border-radius:999px; background:#e5f3ff; color:#0b5cab; }
+    .pill.sales { background:#fef3c7; color:#92400e; }
+    .pill.calls { background:#e0f2fe; color:#075985; }
+    .pill.texts { background:#ecfdf5; color:#065f46; }
+    .pill.appt { background:#f1f5f9; color:#334155; }
+    .muted { color:#6b7280; font-size:13px; }
   </style>
 </head>
 <body>
   <div id="app" class="container"></div>
 
   <script type="module">
-    // ─────────────────────────────────────────────────────────────
-    // Minimal helpers – keep your existing ones if you have them
-    // ─────────────────────────────────────────────────────────────
-    const SCRIPT_URL = window.SCRIPT_URL || ''; // your Apps Script web app URL should already be on window.SCRIPT_URL
-    function isAdmin()   { return (window.userData?.role === 'admin' || window.userData?.role === 'superadmin'); }
-    function isManager() { return (window.userData?.role === 'manager'); }
-    function canViewName(targetName){ const mine=(window.userData?.linkedName||'').toUpperCase(); if(isAdmin()||isManager())return true; return mine && (String(targetName||'').toUpperCase()===mine); }
+    // GAS endpoint (already set by you elsewhere)
+    const SCRIPT_URL = window.SCRIPT_URL || '';
+    const state = { mode: 'sales', raw: null }; // 'sales' | 'bdc'
 
-    // ─────────────────────────────────────────────────────────────
-    // Core: Dashboard fetch + render
-    // ─────────────────────────────────────────────────────────────
-    async function showDashboard() {
-      try { if (typeof showLoading === 'function') showLoading(true); } catch(_) {}
+    function isAdmin(){ return (window.userData?.role==='admin'||window.userData?.role==='superadmin'); }
+    function isManager(){ return (window.userData?.role==='manager'); }
+    function canViewName(targetName){
+      const mine=(window.userData?.linkedName||'').toUpperCase();
+      if(isAdmin()||isManager())return true;
+      return mine && (String(targetName||'').toUpperCase()===mine);
+    }
 
-      try {
-        if (!SCRIPT_URL) throw new Error('SCRIPT_URL is not defined on window.');
-        const url  = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken || '')}`;
-        const resp = await fetch(url, { cache: 'no-store' });
-        const raw  = await resp.text();
+    async function fetchLeaderboards(){
+      if(!SCRIPT_URL) throw new Error('SCRIPT_URL is not defined on window.');
+      const url = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken||'')}`;
+      const resp = await fetch(url, { cache: 'no-store' });
+      const text = await resp.text();
+      let data; try{ data=JSON.parse(text);}catch(e){ throw new Error(`Non-JSON from GAS\nHTTP ${resp.status}\n\n${text}`); }
+      if(!data?.ok) throw new Error(data?.error||'Backend returned ok:false');
+      return data;
+    }
 
-        let result;
-        try { result = JSON.parse(raw); }
-        catch (e) { throw new Error(`Non-JSON response from GAS.\nHTTP ${resp.status}\n\n${raw}`); }
+    function sortSales(arr){
+      // desc by sales, then alpha
+      return [...(arr||[])].sort((a,b)=>(b.sales??0)-(a.sales??0)||String(a.name||'').localeCompare(String(b.name||'')));
+    }
+    function sortBDC(arr){
+      // desc by shown/shows/shows_count, then alpha
+      const shown = x => x.shown ?? x.shows ?? x.shows_count ?? 0;
+      return [...(arr||[])].sort((a,b)=>shown(b)-shown(a)||String(a.name||'').localeCompare(String(b.name||'')));
+    }
 
-        if (!result?.ok) throw new Error(result?.error || 'Backend returned ok:false');
+    function chip(label, value, cls=''){
+      return `<span class="pill ${cls}">${label}: <strong>${value}</strong></span>`;
+    }
 
-        window.dashboardData = result;
-        renderDashboard(result);
+    function rowHTML(person, i, mode){
+      const name = person.name || '';
+      const rankClass = i===0 ? 'gold' : i===1 ? 'silver' : i===2 ? 'bronze' : '';
+      const allowed = canViewName(name);
+      const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g,"\\'")}', '${mode.toUpperCase()}')"` : '';
+      const style = allowed ? '' : 'opacity:.6; cursor:not-allowed;';
 
-        try { prefetchForDashboard(result); } catch(_) {}
-      } catch (err) {
-        console.error('Dashboard error:', err);
-        document.getElementById('app').innerHTML = `
-          <div class="container">
-            <div style="padding:50px;text-align:center;color:red;background:#fff;border-radius:16px;">
-              <h2>Error Loading Dashboard</h2>
-              <p style="white-space:pre-wrap;">${err?.message || err}</p>
-              <button class="btn" onclick="window.showDashboard()" style="max-width:200px;margin:20px auto;">Retry</button>
+      if(mode==='sales'){
+        const sales = person.sales ?? 0;
+        const calls = person.calls ?? 0;
+        const texts = person.texts ?? 0;
+        const created = person.created ?? 0;
+        const shown = person.shown ?? person.shown_count ?? 0;
+        return `
+          <div class="row" ${clickAttr} style="${style}">
+            <div class="left">
+              <div class="rank ${rankClass}">${i+1}</div>
+              <div class="name">${name}</div>
+            </div>
+            <div class="right">
+              <div class="chips">
+                ${chip('Sales', sales, 'sales')}
+                ${chip('Calls', calls, 'calls')}
+                ${chip('Texts', texts, 'texts')}
+                ${chip('Appts Made', created, 'appt')}
+                ${chip('Appts Shown', shown, 'appt')}
+              </div>
             </div>
           </div>
         `;
-      } finally {
-        try { if (typeof showLoading === 'function') showLoading(false); } catch(_) {}
+      } else {
+        // BDC
+        const calls = person.calls ?? 0;    // may be 0 until backend adds it
+        const texts = person.texts ?? 0;    // may be 0 until backend adds it
+        const created = person.created ?? 0;
+        const shown = person.shown ?? person.shows ?? person.shows_count ?? 0;
+        return `
+          <div class="row" ${clickAttr} style="${style}">
+            <div class="left">
+              <div class="rank ${rankClass}">${i+1}</div>
+              <div class="name">${name}</div>
+            </div>
+            <div class="right">
+              <div class="chips">
+                ${chip('Appts Shown', shown, 'appt')}
+                ${chip('Appts Made', created, 'appt')}
+                ${chip('Calls', calls, 'calls')}
+                ${chip('Texts', texts, 'texts')}
+              </div>
+            </div>
+          </div>
+        `;
       }
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Render (single source of truth): Sales → "Sales • Cr • Sh"
-    // ─────────────────────────────────────────────────────────────
-    function renderDashboard(data) {
-      // Show ALL sales; keep BDC top-10
-      const salesLB = (data.sales || []);
-      const bdcLB   = (data.bdc   || []).slice(0, 10);
-
+    function render(data){
       const me = window.userData || {};
+      // Save raw once
+      if(!state.raw) state.raw = data;
 
-      function rowHTML(person, index, type) {
-        const name      = person.name || '';
-        const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
-        const allowed   = canViewName(name);
-        const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', '${type}')"` : '';
-        const style     = allowed ? '' : 'opacity:0.6; cursor:not-allowed;';
+      // Derive lists with correct sort
+      const salesLB = sortSales(data.sales || []);
+      const bdcLB   = sortBDC(data.bdc   || []);
 
-        // counts for Sales
-        const createdCount = person.created ?? 0;
-        const shownCount   = person.shown_count ?? person.shown ?? 0;
+      // Active list
+      const activeList = state.mode==='sales' ? salesLB : bdcLB;
 
-        const right = (type === 'Sales')
-          ? `${person.sales || 0} Sales • Cr ${createdCount} • Sh ${shownCount}`
-          : `${(person.shows_count ?? person.shows ?? 0)} Shows`;
-
-        return `
-          <div class="leaderboard-item" ${clickAttr} style="${style}">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <div class="rank ${rankClass}">${index + 1}</div>
-              <div class="name">${name}</div>
-            </div>
-            <div class="score">${right}</div>
-          </div>
-        `;
-      }
-
+      // HTML
       document.getElementById('app').innerHTML = `
         <div class="header"><h1>Store Performance Dashboard</h1></div>
 
@@ -142,61 +172,50 @@
           </div>
         </div>
 
-        <div class="leaderboard-section" id="content">
-          <div class="leaderboard-grid">
-            <div class="leaderboard-card">
-              <h2>🏆 Sales Leaderboard</h2>
-              <div class="leaderboard-list">
-                ${salesLB.length ? salesLB.map((p, i) => rowHTML(p, i, 'Sales')).join('') :
-                  '<p style="text-align:center;color:#999;">No sales data</p>'}
-              </div>
+        <div class="switcher">
+          <button class="seg ${state.mode==='sales'?'active':''}" onclick="setMode('sales')">Sales</button>
+          <button class="seg ${state.mode==='bdc'?'active':''}" onclick="setMode('bdc')">BDC</button>
+          <span class="hint">Tip: Click a name to open their 1:1</span>
+        </div>
+
+        <div id="content" class="card">
+          <div class="titleRow">
+            <h2>${state.mode==='sales' ? '🏆 Sales Leaderboard' : '📞 BDC Leaderboard'}</h2>
+            <div class="muted">
+              ${state.mode==='sales'
+                ? 'Sorted by Sales (MTD)'
+                : 'Sorted by Appts Shown (MTD)'}
             </div>
-            <div class="leaderboard-card">
-              <h2>📞 BDC Leaderboard</h2>
-              ${bdcLB.length ? bdcLB.map((p, i) => rowHTML(p, i, 'BDC')).join('') :
-                '<p style="text-align:center;color:#999;">No BDC data</p>'}
-            </div>
+          </div>
+          <div class="list">
+            ${activeList.length
+              ? activeList.map((p,i)=>rowHTML(p,i,state.mode)).join('')
+              : `<p class="muted" style="text-align:center;">No ${state.mode.toUpperCase()} data</p>`}
           </div>
         </div>
       `;
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Person 1:1
-    // ─────────────────────────────────────────────────────────────
+    // Person 1:1 (unchanged from your previous build)
     async function showPersonDetails(name, type) {
       const contentEl = document.getElementById('content');
-      if (contentEl) {
-        contentEl.innerHTML = `
-          <div class="leaderboard-card" style="padding:24px; text-align:center;">
-            Loading ${name}…
-          </div>`;
-      }
-
+      if (contentEl) contentEl.innerHTML = `<div class="card" style="padding:24px; text-align:center;">Loading ${name}…</div>`;
       try {
-        const result = await fetchPerson(name);
+        const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken||'')}`;
+        const resp = await fetch(url, { cache:'no-store' });
+        const result = await resp.json();
         if (!result?.ok) throw new Error(result?.error || 'Failed to load person details');
-
         const payload = result.data || {};
-        const b   = payload.block || {};
+        const b = payload.block || {};
         const day = payload.lastDay || {};
-        const note = payload.prNotes || {};
         const isSales = (b.type || type) === 'Sales';
-
         const html = `
-          <button onclick="window.showDashboard()" class="btn" style="background:#6B7280;margin-bottom:16px;">
-            ← Back to Leaderboard
-          </button>
-
-          <div class="leaderboard-card" style="padding:24px;">
-            <h2 style="margin-top:0;">${b.name || name}</h2>
-            <div style="color:#6b7280;margin-bottom:12px;">
-              ${b.type || type || '-'} • ${b.workingDays || 0} working days (MTD)
-            </div>
-
+          <button onclick="window.showDashboard()" class="btn" style="background:#6B7280;margin-bottom:16px;">← Back to Leaderboard</button>
+          <div class="card" style="padding:24px;">
+            <h2 style="margin:0 0 6px;">${b.name || name}</h2>
+            <div class="muted" style="margin-bottom:14px;">${b.type || type || '-'} • ${b.workingDays || 0} working days (MTD)</div>
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:16px;">
               <div><div class="muted">Total Calls (MTD)</div><div style="font-weight:700">${b.callsMTD || 0}</div></div>
-
               ${isSales ? `
                 <div><div class="muted">Sales (MTD)</div><div style="font-weight:700">${b.salesMTD || 0}</div></div>
                 <div><div class="muted">Texts (MTD)</div><div style="font-weight:700">${b.textsMTD || 0}</div></div>
@@ -205,12 +224,11 @@
               ` : `
                 <div><div class="muted">Appts Shown (MTD)</div><div style="font-weight:700">${b.shownMTD || 0}</div></div>
                 <div><div class="muted">Appts Created (MTD)</div><div style="font-weight:700">${b.createdMTD || 0}</div></div>
+                <div><div class="muted">Texts (MTD)</div><div style="font-weight:700">${b.textsMTD || 0}</div></div>
               `}
-
               <div><div class="muted">Leads In Name (MTD)</div><div style="font-weight:700">${b.leadsInNameMTD || 0}</div></div>
               <div><div class="muted">Avg Talk</div><div style="font-weight:700">${b.avgTalk || '0:00'}</div></div>
             </div>
-
             <div style="margin-top:18px; background:#f8fafc; border-radius:10px; padding:14px;">
               <div style="font-weight:600; margin-bottom:6px;">Last Work Day</div>
               <div style="display:flex; gap:18px; flex-wrap:wrap;">
@@ -220,77 +238,51 @@
                 ${isSales ? `<div><span class="muted">Sales:</span> ${day.sales ?? 0}</div>` : ''}
               </div>
             </div>
-
-            ${note.wins ? `<div style="margin-top:12px; background:#d9ead3; border-radius:10px; padding:12px;">${note.wins}</div>` : ''}
-            ${note.opportunities ? `<div style="margin-top:12px; background:#ffe599; border-radius:10px; padding:12px;">${note.opportunities}</div>` : ''}
-
             <div style="display:flex; gap:12px; margin-top:20px;">
               <button class="btn" onclick="viewCallSheets('${(b.name || name).replace(/'/g, "\\'")}')">📊 View Call Sheets</button>
             </div>
           </div>
         `;
         if (contentEl) contentEl.innerHTML = html;
-
       } catch (e) {
-        if (contentEl) {
-          contentEl.innerHTML = `
-            <div style="background:#fff;border-radius:16px;padding:40px;color:#dc2626; text-align:center;">
-              <h2>Error Loading Details</h2>
-              <p>${e?.message || e}</p>
-              <button class="btn" onclick="window.showDashboard()" style="margin-top:12px;background:#6B7280;">← Back to Leaderboard</button>
-            </div>
-          `;
-        }
+        if (contentEl) contentEl.innerHTML = `
+          <div class="card" style="padding:40px;color:#dc2626; text-align:center;">
+            <h2>Error Loading Details</h2>
+            <p>${e?.message || e}</p>
+            <button class="btn" onclick="window.showDashboard()" style="margin-top:12px;background:#6B7280;">← Back to Leaderboard</button>
+          </div>`;
       }
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Calls list (unchanged, minimal safe stub)
-    // ─────────────────────────────────────────────────────────────
-    async function viewCallSheets(name) {
+    async function viewCallSheets(name){
       const contentEl = document.getElementById('content');
-      if (contentEl) {
-        contentEl.innerHTML = `
-          <div class="leaderboard-card" style="padding:24px; text-align:center;">
-            Loading call sheets for ${name}…
-          </div>`;
-      }
+      if (contentEl) contentEl.innerHTML = `<div class="card" style="padding:24px; text-align:center;">Loading call sheets for ${name}…</div>`;
       try {
         const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
         const resp = await fetch(url, { cache: 'no-store' });
         const result = await resp.json();
         if (!result?.ok) throw new Error(result?.error || 'Failed to load call sheets');
         const rows = result.data?.calls || [];
-
-        const tzDateOnly = (v) => {
-          if (!v) return '-';
-          try { const d=(v instanceof Date)?v:new Date(v); return isNaN(d)?String(v):(d.toLocaleDateString()); }
-          catch { return String(v); }
-        };
-
-        const trs = rows.map(r => {
-          const customer = r.link ? `<a href="${r.link}" target="_blank" rel="noopener">${r.name || '-'}</a>` : (r.name || '-');
-          return `
-            <tr style="border-top:1px solid #e5e7eb;">
-              <td style="padding:10px;">${customer}</td>
-              <td style="padding:10px;">${r.phone || '-'}</td>
-              <td style="padding:10px;">${r.email || '-'}</td>
-              <td style="padding:10px;">${r.salesPerson || '-'}</td>
-              <td style="padding:10px;">${r.bdcAgent || '-'}</td>
-              <td style="padding:10px;">${r.source || '-'}</td>
-              <td style="padding:10px;">${tzDateOnly(r.dateIn || r.date)}</td>
-              <td style="padding:10px;">${r.leadAge ?? '-'}</td>
-              <td style="padding:10px;">${r.daysSince ?? '-'}</td>
-              <td style="padding:10px;">${r.bucket || '-'}</td>
-              <td style="padding:10px;">${r.status || '-'}</td>
-              <td style="padding:10px;">${r.reason || '-'}</td>
-            </tr>`;
-        }).join('');
-
+        const tzDateOnly = v => { if(!v) return '-'; try{ const d=(v instanceof Date)?v:new Date(v); return isNaN(d)?String(v):(d.toLocaleDateString()); }catch{ return String(v); }};
+        const trs = rows.map(r=>`
+          <tr style="border-top:1px solid #e5e7eb;">
+            <td style="padding:10px;">${r.link ? `<a href="${r.link}" target="_blank" rel="noopener">${r.name||'-'}</a>` : (r.name||'-')}</td>
+            <td style="padding:10px;">${r.phone||'-'}</td>
+            <td style="padding:10px;">${r.email||'-'}</td>
+            <td style="padding:10px;">${r.salesPerson||'-'}</td>
+            <td style="padding:10px;">${r.bdcAgent||'-'}</td>
+            <td style="padding:10px;">${r.source||'-'}</td>
+            <td style="padding:10px;">${tzDateOnly(r.dateIn||r.date)}</td>
+            <td style="padding:10px;">${r.leadAge??'-'}</td>
+            <td style="padding:10px;">${r.daysSince??'-'}</td>
+            <td style="padding:10px;">${r.bucket||'-'}</td>
+            <td style="padding:10px;">${r.status||'-'}</td>
+            <td style="padding:10px;">${r.reason||'-'}</td>
+          </tr>`).join('');
         const html = `
-          <div class="leaderboard-card" style="padding:24px;">
-            <button onclick="window.showPersonDetails('${name.replace(/'/g, "\\'")}')" class="btn" style="background:#6B7280;margin-bottom:12px;">← Back to ${name}</button>
-            <h2 style="margin-top:0;">Call Sheets - ${name}</h2>
+          <div class="card" style="padding:24px;">
+            <button onclick="window.showPersonDetails('${name.replace(/'/g,"\\'")}')" class="btn" style="background:#6B7280;margin-bottom:12px;">← Back to ${name}</button>
+            <h2 style="margin:0 0 10px;">Call Sheets - ${name}</h2>
             <div style="overflow:auto;">
               <table style="width:100%; border-collapse:collapse;">
                 <thead>
@@ -317,45 +309,39 @@
           </div>`;
         if (contentEl) contentEl.innerHTML = html;
       } catch (e) {
-        if (contentEl) {
-          contentEl.innerHTML = `
-            <div style="background:#fff;border-radius:16px;padding:40px;color:#dc2626; text-align:center;">
-              <h2>Error Loading Call Sheets</h2>
-              <p>${e?.message || e}</p>
-            </div>`;
-        }
+        if (contentEl) contentEl.innerHTML = `<div class="card" style="padding:40px;color:#dc2626; text-align:center;"><h2>Error Loading Call Sheets</h2><p>${e?.message||e}</p></div>`;
       }
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Prefetch helper (called after render), and a tiny fetch stub
-    // ─────────────────────────────────────────────────────────────
-    function prefetchForDashboard(data) {
-      try {
-        const names = [
-          ...(data.sales || []).slice(0,3).map(p=>p.name),
-          ...(data.bdc   || []).slice(0,3).map(p=>p.name),
-          ...(window.userData?.linkedName ? [window.userData.linkedName] : [])
-        ].filter(Boolean);
-        names.forEach(n => fetchPerson(n).catch(()=>{}));
-      } catch{}
+    // switcher handlers + expose for onclick
+    function setMode(mode){
+      state.mode = mode;
+      render(state.raw);
+    }
+    async function showDashboard(){
+      try{ if (typeof showLoading==='function') showLoading(true); }catch(_){}
+      try{
+        const data = await fetchLeaderboards();
+        render(data);
+      }catch(err){
+        document.getElementById('app').innerHTML = `
+          <div class="container">
+            <div class="card" style="padding:50px;text-align:center;color:#dc2626;">
+              <h2>Error Loading Dashboard</h2>
+              <p style="white-space:pre-wrap;">${err?.message||err}</p>
+              <button class="btn" onclick="window.showDashboard()" style="max-width:200px;margin:20px auto;">Retry</button>
+            </div>
+          </div>`;
+      }finally{
+        try{ if (typeof showLoading==='function') showLoading(false); }catch(_){}
+      }
     }
 
-    async function fetchPerson(name) {
-      const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-      const resp = await fetch(url, { cache: 'no-store' });
-      return resp.json();
-    }
+    window.showDashboard = showDashboard;
+    window.showPersonDetails = showPersonDetails;
+    window.viewCallSheets = viewCallSheets;
+    window.setMode = setMode;
 
-    // ─────────────────────────────────────────────────────────────
-    // Expose handlers used by inline onclick (important for modules)
-    // ─────────────────────────────────────────────────────────────
-    window.showDashboard        = showDashboard;
-    window.showPersonDetails    = showPersonDetails;
-    window.viewCallSheets       = viewCallSheets;
-    window.prefetchForDashboard = prefetchForDashboard;
-
-    // Kick off the dashboard (if you already gate this by auth, you can remove)
     showDashboard();
   </script>
 </body>
