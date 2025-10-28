@@ -1,7 +1,9 @@
 name: Deploy to Firebase Hosting on merge
+
 on:
   push:
     branches: [ "main" ]
+
 permissions:
   contents: read
   id-token: write
@@ -13,11 +15,13 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      # 🔐 Authenticate to Google Cloud with the service-account JSON secret
       - name: Google Auth (JSON key)
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STORE_DASHBOARD_2025 }}
 
+      # 🚀 Deploy with firebase-tools
       - name: Deploy to Firebase Hosting (live)
         run: |
           npx --yes firebase-tools@14.22.0 deploy \
