@@ -14,10 +14,10 @@
     html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#fff;color:var(--ink);}
     .container{max-width:1100px;margin:28px auto 80px;padding:0 20px;}
 
+    /* Topbar */
     .topbar{
       background:linear-gradient(135deg,var(--brand1),var(--brand2));
-      border-radius:18px; padding:18px 20px; color:#fff;
-      display:flex; align-items:center; gap:14px; justify-content:space-between;
+      border-radius:18px; padding:18px 20px; color:#fff; display:flex; align-items:center; gap:14px; justify-content:space-between;
       box-shadow:0 10px 24px rgba(0,0,0,.10);
     }
     .title{font-size:28px; font-weight:900; margin:0;}
@@ -26,11 +26,13 @@
     .logout-btn{background:var(--danger);} .logout-btn:hover{background:var(--dangerH);}
     .admin-btn{background:var(--ok);} .admin-btn:hover{background:var(--okH);}
 
+    /* Switcher */
     .switcher{display:flex;gap:8px;margin:14px 0 10px;}
     .seg{border:1px solid rgba(0,0,0,.08); color:#111; padding:8px 12px; border-radius:999px; cursor:pointer; font-weight:800; background:#fff;}
     .seg.active{background:#111827; color:#fff; border-color:#111827;}
     .hint{color:#6b7280; font-size:12px; margin-left:8px; display:flex; align-items:center;}
 
+    /* Cards / Rows */
     .card{background:#fff;border-radius:16px;box-shadow:0 10px 24px rgba(0,0,0,.08);padding:16px;border:1px solid var(--line);}
     .titleRow{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
     .titleRow h2{margin:0;font-size:18px;display:flex;align-items:center;gap:10px;}
@@ -68,7 +70,7 @@
 <body>
   <div class="container" id="root"></div>
 
-  <!-- User Management Modal -->
+  <!-- User Management Modal (admin only) -->
   <div class="modal-backdrop" id="umBackdrop" aria-hidden="true">
     <div class="modal">
       <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -89,25 +91,38 @@
 
   <!-- Apps Script backend base -->
   <script>
+    // Your live Apps Script Web App URL:
     window.SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxRf4KkWsC8EBN6G6ybStLKBNqmnu-Rjow4aZ_NWpSaRY7Q8JlxFaTsTsAW2Ny76dCS/exec";
   </script>
 
   <script type="module">
-    const SCRIPT_URL = window.SCRIPT_URL || '';
-    const state = { mode: 'sales', raw: null, idToken: null };
+    /************ CONFIG ************/
+    const SCRIPT_URL     = window.SCRIPT_URL || '';
+    const PROFILE_ROUTE  = "profile";      // ← change only if your backend uses a different route name
+    const USERS_ROUTE    = "users";
+    const PERSON_ROUTE   = "person";
+    const CALLS_ROUTE    = "calls_for";
+    const LB_ROUTE       = "leaderboards";
+    /********************************/
 
-    // Firebase Auth
-    const auth = firebase.auth();
+    const state = { mode:'sales', raw:null, idToken:null };
+    const auth  = firebase.auth();
+
+    /** ----------------------- AUTH ----------------------- **/
     auth.onAuthStateChanged(async (user)=>{
       if(!user){ renderLogin(); return; }
       try{
-        state.idToken = await user.getIdToken(/*forceRefresh=*/true);
-        window.userData = { email: user.email }; // basic header display
-        // Try to enrich with role/linkedName (optional)
+        state.idToken = await user.getIdToken(true);
+        // minimal identity for header
+        window.userData = { email: user.email };
+        // fetch role + linkedName to enforce permissions like before
         try{
-          const prof = await getJSON(profileURL()); // no headers → no preflight
-          if(prof?.ok && prof.data?.user) Object.assign(window.userData, prof.data.user);
-        }catch{}
+          const prof = await getJSON(withId(`${SCRIPT_URL}?route=${PROFILE_ROUTE}`));
+          if(prof?.ok && prof.data?.user){
+            // expected shape: { role:'admin'|'manager'|'user', linkedName:'SAMANTHA HOUSTON', ... }
+            Object.assign(window.userData, prof.data.user);
+          }
+        }catch(_){}
         renderShell();
         await loadLeaderboards();
       }catch(e){
@@ -115,41 +130,34 @@
       }
     });
 
-    async function signInEmailPassword(email, password){
-      await auth.signInWithEmailAndPassword(email, password);
-    }
-    async function signOut(){
-      try{ await auth.signOut(); }catch{}
-      state.idToken = null;
-      window.userData = {};
-      location.reload();
-    }
+    async function signIn(email, password){ await auth.signInWithEmailAndPassword(email, password); }
+    async function signOut(){ try{ await auth.signOut(); }catch{} state.idToken=null; window.userData={}; location.reload(); }
 
-    // Build URLs with idToken as a *query parameter* only (no headers → no preflight)
-    const withId = (u) => `${u}${u.includes('?')?'&':'?'}idToken=${encodeURIComponent(state.idToken||'')}`;
-    const lbURL     = () => withId(`${SCRIPT_URL}?route=leaderboards`);
-    const usersURL  = () => withId(`${SCRIPT_URL}?route=users`);
-    const personURL = (name)=> withId(`${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}`);
-    const callsURL  = (name)=> withId(`${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}`);
-    const profileURL= () => withId(`${SCRIPT_URL}?route=profile`);
+    /** ----------------------- URL helpers (no headers → no preflight) ----------------------- **/
+    const withId      = (u) => `${u}${u.includes('?')?'&':'?'}idToken=${encodeURIComponent(state.idToken||'')}`;
+    const lbURL       = () => withId(`${SCRIPT_URL}?route=${LB_ROUTE}`);
+    const usersURL    = () => withId(`${SCRIPT_URL}?route=${USERS_ROUTE}`);
+    const personURL   = (name)=> withId(`${SCRIPT_URL}?route=${PERSON_ROUTE}&name=${encodeURIComponent(name)}`);
+    const callsURL    = (name)=> withId(`${SCRIPT_URL}?route=${CALLS_ROUTE}&name=${encodeURIComponent(name)}`);
+    const profileURL  = () => withId(`${SCRIPT_URL}?route=${PROFILE_ROUTE}`);
 
-    // Simple GET JSON helper (no custom headers)
     async function getJSON(url){
       const resp = await fetch(url, { cache:'no-store' });
-      const txt = await resp.text();
+      const txt  = await resp.text();
       try{ return JSON.parse(txt); }catch(e){ throw new Error(`Non-JSON response\nHTTP ${resp.status}\n\n${txt}`); }
     }
 
-    // Roles / permissions
-    const isAdmin   = () => (window.userData?.role==='admin'||window.userData?.role==='superadmin');
+    /** ----------------------- PERMISSIONS ----------------------- **/
+    const isAdmin   = () => (window.userData?.role==='admin' || window.userData?.role==='superadmin');
     const isManager = () => (window.userData?.role==='manager');
     function canViewName(targetName){
-      const mine=(window.userData?.linkedName||'').toUpperCase();
-      if(isAdmin()||isManager())return true;
-      return mine && (String(targetName||'').toUpperCase()===mine);
+      if (isAdmin() || isManager()) return true;
+      const mine = (window.userData?.linkedName || '').trim().toUpperCase();
+      const theirs = (targetName || '').trim().toUpperCase();
+      return mine && theirs && mine === theirs; // exact match like before
     }
 
-    // Views
+    /** ----------------------- VIEWS ----------------------- **/
     function renderLogin(errMsg=""){
       const el=document.getElementById('root');
       el.innerHTML = `
@@ -173,9 +181,9 @@
         </div>`;
       document.getElementById('loginBtn').addEventListener('click', async ()=>{
         const email=(document.getElementById('email')?.value||"").trim();
-        const pwd=(document.getElementById('pwd')?.value||"").trim();
+        const pwd  =(document.getElementById('pwd')?.value||"").trim();
         if(!email||!pwd){ renderLogin("Please enter both email and password."); return; }
-        try{ await signInEmailPassword(email, pwd); }
+        try{ await signIn(email, pwd); }
         catch(e){ renderLogin(e?.message || "Sign-in failed."); }
       });
       const onEnter=(e)=>{ if(e.key==='Enter') document.getElementById('loginBtn').click(); };
@@ -204,18 +212,19 @@
         <div id="content" class="card"></div>
       `;
       document.getElementById('whoamiEmail').textContent = window.userData?.email || '';
-      if (isAdmin()) document.getElementById('adminBtn').style.display = 'inline-block';
-      document.getElementById('adminBtn')?.addEventListener('click', showUserModal);
+      // Admin visibility exactly per role from profile
+      document.getElementById('adminBtn').style.display = isAdmin() ? 'inline-block' : 'none';
+      document.getElementById('adminBtn').addEventListener('click', showUserModal);
       document.getElementById('logoutBtn').addEventListener('click', signOut);
       document.getElementById('segSales').addEventListener('click', ()=>setMode('sales'));
       document.getElementById('segBDC').addEventListener('click', ()=>setMode('bdc'));
     }
 
-    // Leaderboards
-    const shownVal = x => x.shown ?? x.shows ?? x.shows_count ?? 0;
+    /** ----------------------- LEADERBOARDS ----------------------- **/
+    const shownVal  = x => x.shown ?? x.shows ?? x.shows_count ?? 0;
     const sortSales = arr => [...(arr||[])].sort((a,b)=>(b.sales??0)-(a.sales??0)||String(a.name||'').localeCompare(String(b.name||'')));
     const sortBDC   = arr => [...(arr||[])].sort((a,b)=>shownVal(b)-shownVal(a)||String(a.name||'').localeCompare(String(b.name||'')));
-    const chip = (label, value, cls='') => `<span class="pill ${cls}">${label}: <strong>${value}</strong></span>`;
+    const chip      = (label, value, cls='') => `<span class="pill ${cls}">${label}: <strong>${value}</strong></span>`;
 
     function rowHTML(person, i, mode){
       const name = person.name || '';
@@ -249,7 +258,7 @@
     }
 
     function renderLeaderboards(data){
-      state.raw = data || state.raw;
+      if(!state.raw) state.raw = data;
       const salesLB = sortSales(state.raw?.sales || []);
       const bdcLB   = sortBDC(state.raw?.bdc   || []);
       const active  = state.mode==='sales' ? salesLB : bdcLB;
@@ -267,10 +276,7 @@
         </div>`;
     }
 
-    function setMode(mode){
-      state.mode = mode;
-      if(state.raw) renderLeaderboards(); // no error if data not loaded yet
-    }
+    function setMode(mode){ state.mode=mode; if(state.raw) renderLeaderboards(state.raw); }
 
     async function loadLeaderboards(){
       try{
@@ -287,10 +293,10 @@
       }
     }
 
-    // 1:1 & Call Sheets (GET, no headers)
+    /** ----------------------- 1:1 + CALL SHEETS ----------------------- **/
     window.showPersonDetails = async function(name, type){
-      const el=document.getElementById('content');
-      el.innerHTML = `<div class="card" style="padding:24px;text-align:center;">Loading ${name}…</div>`;
+      const el = document.getElementById('content');
+      el.innerHTML = `<div class="card" style="padding:24px; text-align:center;">Loading ${name}…</div>`;
       try{
         const result = await getJSON(personURL(name));
         if(!result?.ok) throw new Error(result?.error||'Failed to load person details');
@@ -337,8 +343,8 @@
     };
 
     window.viewCallSheets = async function(name){
-      const el=document.getElementById('content');
-      el.innerHTML = `<div class="card" style="padding:24px;text-align:center;">Loading call sheets for ${name}…</div>`;
+      const el = document.getElementById('content');
+      el.innerHTML = `<div class="card" style="padding:24px; text-align:center;">Loading call sheets for ${name}…</div>`;
       try{
         const result = await getJSON(callsURL(name));
         if(!result?.ok) throw new Error(result?.error||'Failed to load call sheets');
@@ -390,10 +396,10 @@
       }
     };
 
-    // User management (GET, no headers)
+    /** ----------------------- USER MANAGEMENT (admin only) ----------------------- **/
     async function showUserModal(){
-      const bd=document.getElementById('umBackdrop');
-      const body=document.getElementById('umBody');
+      const bd = document.getElementById('umBackdrop');
+      const body = document.getElementById('umBody');
       bd.style.display='flex';
       body.textContent='Loading users…';
       try{
@@ -427,6 +433,7 @@
     }
     function closeUserModal(){ document.getElementById('umBackdrop').style.display='none'; }
 
+    /** ----------------------- PUBLIC EXPORTS & BOOT ----------------------- **/
     window.showDashboard = loadLeaderboards;
     window.showUserModal = showUserModal;
     window.closeUserModal = closeUserModal;
