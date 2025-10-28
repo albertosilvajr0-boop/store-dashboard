@@ -302,49 +302,21 @@ showDashboard();
 
 // Show dashboard (NO custom headers; use ?session=)
 async function showDashboard() {
-  // If you use a loading helper, keep it; otherwise this is harmless
-  try { showLoading?.(true); } catch (_) {}
+if (!window.userData) { showLogin(); return; }
 
-  try {
-    // pull leaderboards from Apps Script
-    const url = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken || '')}`;
-    const resp = await fetch(url, { cache: 'no-store' });
-    const raw  = await resp.text();
 
-    let result;
-    try {
-      result = JSON.parse(raw);
-    } catch (e) {
-      throw new Error(`Non-JSON response from GAS.\nHTTP ${resp.status}\n\n${raw}`);
-    }
+try {
+showLoading(true);
 
-    if (!result?.ok) {
-      throw new Error(result?.error || 'Backend returned ok:false');
-    }
 
-    // store + render
-    window.dashboardData = result;
-    renderDashboard(result);
+const url = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken || '')}`;
+const resp = await fetch(url); // <-- no headers here
+const raw = await resp.text();
 
-    // optional: prefetch a few people for the 1:1 view
-    try { prefetchForDashboard(result); } catch (_) {}
 
-  } catch (err) {
-    console.error('Dashboard error:', err);
-    document.getElementById('app').innerHTML = `
-      <div class="container">
-        <div style="padding: 50px; text-align: center; color: red; background:#fff; border-radius:16px;">
-          <h2>Error Loading Dashboard</h2>
-          <p style="white-space:pre-wrap;">${err?.message || err}</p>
-          <button class="btn" onclick="window.showDashboard()" style="max-width:200px;margin:20px auto;">
-            Retry
-          </button>
-        </div>
-      </div>
-    `;
-  } finally {
-    try { showLoading?.(false); } catch (_) {}
-  }
+let result;
+try { result = JSON.parse(raw); } catch {
+throw new Error(`Non-JSON response from GAS.\nHTTP ${resp.status}\n\n${raw}`);
 }
 if (!result.ok) throw new Error(result.error || 'Backend returned ok:false');
 
@@ -361,7 +333,7 @@ document.getElementById('app').innerHTML = `
 <div style="padding: 50px; text-align: center; color: red; background:#fff; border-radius:16px;">
 <h2>Error Loading Dashboard</h2>
 <p style="white-space:pre-wrap;">${err.message}</p>
-<button class="btn" onclick="()" style="max-width:200px;margin:20px auto;">Retry</button>
+<button class="btn" onclick="showDashboard()" style="max-width:200px;margin:20px auto;">Retry</button>
 </div>
 </div>
 `;
@@ -374,74 +346,63 @@ showLoading(false);
 
 
 function renderDashboard(data) {
-  // Show ALL sales; keep BDC top-10
-  const salesLB = (data.sales || []);          // no slice
-  const bdcLB   = (data.bdc  || []).slice(0, 10);
+// Show ALL sales; keep BDC top-10
+const salesLB = (data.sales || []); // ← no slice
+const bdcLB = (data.bdc || []).slice(0, 10);
 
-  const me = window.userData || {};
 
-  function rowHTML(person, index, type) {
-    const name      = person.name || '';
-    const rankClass = index === 0 ? 'gold'
-                    : index === 1 ? 'silver'
-                    : index === 2 ? 'bronze' : '';
-    const allowed   = canViewName(name);
-    const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', '${type}')"` : '';
-    const style     = allowed ? '' : 'opacity:0.6; cursor:not-allowed;';
+const me = window.userData || {};
 
-    // ✅ pull counts safely for Sales
-    const createdCount = person.created ?? 0;
-    const shownCount   = person.shown_count ?? person.shown ?? 0;
 
-    // ✅ Sales: "Sales • Cr • Sh", BDC: "Shows"
-    const right = (type === 'Sales')
-      ? `${person.sales || 0} Sales • Cr ${createdCount} • Sh ${shownCount}`
-      : `${(person.shows_count ?? person.shows ?? 0)} Shows`;
+function rowHTML(person, index, type) {
+const name = person.name || '';
+const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
+const allowed = canViewName(name);
+const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', '${type}')"` : '';
+const style = allowed ? '' : 'opacity:0.6; cursor:not-allowed;';
+const right = type === 'Sales' ? `${person.sales || 0} Sales` : `${person.shows || 0} Shows`;
+return `
+<div class="leaderboard-item" ${clickAttr} style="${style}">
+<div style="display:flex; align-items:center; gap:10px;">
+<div class="rank ${rankClass}">${index + 1}</div>
+<div class="name">${name}</div>
+</div>
+<div class="score">${right}</div>
+</div>
+`;
+}
 
-    return `
-      <div class="leaderboard-item" ${clickAttr} style="${style}">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div class="rank ${rankClass}">${index + 1}</div>
-          <div class="name">${name}</div>
-        </div>
-        <div class="score">${right}</div>
-      </div>
-    `;
-  }
 
-  document.getElementById('app').innerHTML = `
-    <div class="header"><h1>Store Performance Dashboard</h1></div>
+document.getElementById('app').innerHTML = `
+<div class="header"><h1>Store Performance Dashboard</h1></div>
 
-    <div class="user-info">
-      <div>
-        Welcome, <strong>${me.email || ''}</strong>
-        ${isAdmin() ? '<span style="color:#a7f3d0;"> (Admin)</span>' :
-          (isManager() ? '<span style="color:#93c5fd;"> (Manager)</span>' : '')}
-        ${me.linkedName ? ` • Linked: <strong>${me.linkedName}</strong>` : ''}
-      </div>
-      <div>
-        ${isAdmin() ? '<button class="admin-btn" onclick="showUserModal()">User Management</button>' : ''}
-        <button class="logout-btn" onclick="logout()" style="margin-left:10px;">Logout</button>
-      </div>
-    </div>
 
-    <div class="leaderboard-section" id="content">
-      <div class="leaderboard-grid">
-        <div class="leaderboard-card">
-          <h2>🏆 Sales Leaderboard</h2>
-          <div class="leaderboard-list">
-            ${salesLB.length ? salesLB.map((p, i) => rowHTML(p, i, 'Sales')).join('') :
-              '<p style="text-align:center;color:#999;">No sales data</p>'}
-          </div>
-        </div>
-        <div class="leaderboard-card">
-          <h2>📞 BDC Leaderboard</h2>
-          ${bdcLB.length ? bdcLB.map((p, i) => rowHTML(p, i, 'BDC')).join('') :
-            '<p style="text-align:center;color:#999;">No BDC data</p>'}
-        </div>
-      </div>
-    </div>
-  `;
+<div class="user-info">
+<div>
+Welcome, <strong>${me.email || ''}</strong>
+${isAdmin() ? '<span style="color:#a7f3d0;"> (Admin)</span>' : (isManager() ? '<span style="color:#93c5fd;"> (Manager)</span>' : '')}
+${me.linkedName ? ` • Linked: <strong>${me.linkedName}</strong>` : ''}
+</div>
+<div>
+${isAdmin() ? '<button class="admin-btn" onclick="showUserModal()">User Management</button>' : ''}
+<button class="logout-btn" onclick="logout()" style="margin-left:10px;">Logout</button>
+</div>
+</div>
+
+
+<div class="leaderboard-section" id="content">
+<div class="leaderboard-grid">
+<div class="leaderboard-card">
+<h2>🏆 Sales Leaderboard</h2>
+<div class="leaderboard-list">${salesLB.length ? salesLB.map((p, i) => rowHTML(p, i, 'Sales')).join('') : '<p style="text-align:center;color:#999;">No sales data</p>'}</div>
+</div>
+<div class="leaderboard-card">
+<h2>📞 BDC Leaderboard</h2>
+${bdcLB.length ? bdcLB.map((p, i) => rowHTML(p, i, 'BDC')).join('') : '<p style="text-align:center;color:#999;">No BDC data</p>'}
+</div>
+</div>
+</div>
+`;
 }
 
 
@@ -451,93 +412,84 @@ function renderDashboard(data) {
 // Person "1on1" page — load inside #content (no full-page wipe)
 // Person "1on1" page — uses {block,lastDay,prNotes} from API and renders inside #content
 async function showPersonDetails(name, type) {
-  const contentEl = document.getElementById('content');
-  if (contentEl) {
-    contentEl.innerHTML = `
-      <div class="leaderboard-card" style="padding:24px; text-align:center;">
-        Loading ${name}…
-      </div>`;
-  }
-
-  try {
-    const result = await fetchPerson(name);
-    if (!result?.ok) throw new Error(result?.error || 'Failed to load person details');
-
-    const payload = result.data || {};
-    const b   = payload.block   || {};
-    const day = payload.lastDay || {};
-    const note = payload.prNotes || {};
-    const isSales = (b.type || type) === 'Sales';
-
-    const html = `
-      <button onclick="window.showDashboard()" class="btn" style="background:#6B7280;margin-bottom:16px;">
-        ← Back to Leaderboard
-      </button>
-
-      <div class="leaderboard-card" style="padding:24px;">
-        <h2 style="margin-top:0;">${b.name || name}</h2>
-        <div style="color:#6b7280;margin-bottom:12px;">
-          ${b.type || type || '-'} • ${b.workingDays || 0} working days (MTD)
-        </div>
-
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:16px;">
-          <div>
-            <div class="muted">Total Calls (MTD)</div>
-            <div style="font-weight:700">${b.callsMTD || 0}</div>
-          </div>
-
-          ${isSales ? `
-            <div><div class="muted">Sales (MTD)</div><div style="font-weight:700">${b.salesMTD || 0}</div></div>
-            <div><div class="muted">Texts (MTD)</div><div style="font-weight:700">${b.textsMTD || 0}</div></div>
-            <div><div class="muted">Appts Created (MTD)</div><div style="font-weight:700">${b.createdMTD || 0}</div></div>
-            <div><div class="muted">Appts Shown (MTD)</div><div style="font-weight:700">${b.shownMTD || 0}</div></div>
-          ` : `
-            <div><div class="muted">Appts Shown (MTD)</div><div style="font-weight:700">${b.shownMTD || 0}</div></div>
-            <div><div class="muted">Appts Created (MTD)</div><div style="font-weight:700">${b.createdMTD || 0}</div></div>
-          `}
-
-          <div><div class="muted">Leads In Name (MTD)</div><div style="font-weight:700">${b.leadsInNameMTD || 0}</div></div>
-          <div><div class="muted">Avg Talk</div><div style="font-weight:700">${b.avgTalk || '0:00'}</div></div>
-        </div>
-
-        <div style="margin-top:18px; background:#f8fafc; border-radius:10px; padding:14px;">
-          <div style="font-weight:600; margin-bottom:6px;">Last Work Day</div>
-          <div style="display:flex; gap:18px; flex-wrap:wrap;">
-            <div><span class="muted">Date:</span> ${day.dateKey || '-'}</div>
-            <div><span class="muted">Calls:</span> ${day.calls || 0}</div>
-            <div><span class="muted">Avg Talk:</span> ${day.avgTalkMSS || '0:00'}</div>
-            ${isSales ? `<div><span class="muted">Sales:</span> ${day.sales ?? 0}</div>` : ''}
-          </div>
-        </div>
-
-        ${note.wins ? `<div style="margin-top:12px; background:#d9ead3; border-radius:10px; padding:12px;">${note.wins}</div>` : ''}
-        ${note.opportunities ? `<div style="margin-top:12px; background:#ffe599; border-radius:10px; padding:12px;">${note.opportunities}</div>` : ''}
-
-        <div style="display:flex; gap:12px; margin-top:20px;">
-          <button class="btn" onclick="viewCallSheets('${(b.name || name).replace(/'/g, "\\'")}')">
-            📊 View Call Sheets
-          </button>
-        </div>
-      </div>
-    `;
-
-    if (contentEl) contentEl.innerHTML = html;
-
-  } catch (e) {
-    if (contentEl) {
-      contentEl.innerHTML = `
-        <div style="background:#fff;border-radius:16px;padding:40px;color:#dc2626; text-align:center;">
-          <h2>Error Loading Details</h2>
-          <p>${e?.message || e}</p>
-          <button class="btn" onclick="window.showDashboard()" style="margin-top:12px;background:#6B7280;">
-            ← Back to Leaderboard
-          </button>
-        </div>
-      `;
-    }
-  }
+const contentEl = document.getElementById('content');
+if (contentEl) {
+contentEl.innerHTML = `
+<div class="leaderboard-card" style="padding:24px; text-align:center;">
+Loading ${name}…
+</div>`;
 }
 
+
+try {
+const result = await fetchPerson(name);
+if (!result?.ok) throw new Error(result?.error || 'Failed to load person details');
+
+
+const payload = result.data || {};
+const b = payload.block || {};
+const day = payload.lastDay || {};
+const note = payload.prNotes || {};
+const isSales = (b.type || type) === 'Sales';
+
+
+const html = `
+<button onclick="showDashboard()" class="btn" style="background:#6B7280;margin-bottom:16px;">← Back to Leaderboard</button>
+
+
+<div class="leaderboard-card" style="padding:24px;">
+<h2 style="margin-top:0;">${b.name || name}</h2>
+<div style="color:#6b7280;margin-bottom:12px;">${b.type || type || '-'} • ${b.workingDays || 0} working days (MTD)</div>
+
+
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:16px;">
+<div><div class="muted">Total Calls (MTD)</div><div style="font-weight:700">${b.callsMTD || 0}</div></div>
+${isSales ? `
+<div><div class="muted">Sales (MTD)</div><div style="font-weight:700">${b.salesMTD || 0}</div></div>
+<div><div class="muted">Texts (MTD)</div><div style="font-weight:700">${b.textsMTD || 0}</div></div>
+` : `
+<div><div class="muted">Appts Shown (MTD)</div><div style="font-weight:700">${b.shownMTD || 0}</div></div>
+<div><div class="muted">Appts Created (MTD)</div><div style="font-weight:700">${b.createdMTD || 0}</div></div>
+`}
+<div><div class="muted">Leads In Name (MTD)</div><div style="font-weight:700">${b.leadsInNameMTD || 0}</div></div>
+<div><div class="muted">Avg Talk</div><div style="font-weight:700">${b.avgTalk || '0:00'}</div></div>
+</div>
+
+
+<div style="margin-top:18px; background:#f8fafc; border-radius:10px; padding:14px;">
+<div style="font-weight:600; margin-bottom:6px;">Last Work Day</div>
+<div style="display:flex; gap:18px; flex-wrap:wrap;">
+<div><span class="muted">Date:</span> ${day.dateKey || '-'}</div>
+<div><span class="muted">Calls:</span> ${day.calls || 0}</div>
+<div><span class="muted">Avg Talk:</span> ${day.avgTalkMSS || '0:00'}</div>
+${isSales ? `<div><span class="muted">Sales:</span> ${day.sales ?? 0}</div>` : ''}
+</div>
+</div>
+
+
+${note.wins ? `<div style="margin-top:12px; background:#d9ead3; border-radius:10px; padding:12px;">${note.wins}</div>` : ''}
+${note.opportunities ? `<div style="margin-top:12px; background:#ffe599; border-radius:10px; padding:12px;">${note.opportunities}</div>` : ''}
+
+
+<div style="display:flex; gap:12px; margin-top:20px;">
+<button class="btn" onclick="viewCallSheets('${(b.name || name).replace(/'/g, "\\'")}')">📊 View Call Sheets</button>
+</div>
+</div>
+`;
+
+
+if (contentEl) contentEl.innerHTML = html;
+} catch (e) {
+if (contentEl) {
+contentEl.innerHTML = `
+<div style="background:#fff;border-radius:16px;padding:40px;color:#dc2626; text-align:center;">
+<h2>Error Loading Details</h2>
+<p>${e.message}</p>
+</div>
+`;
+}
+}
+}
 
 
 
@@ -811,11 +763,11 @@ window.addUser = addUser;
 window.deleteUser = deleteUser;
 window.showPersonDetails = showPersonDetails;
 window.viewCallSheets = viewCallSheets;
-window. = ;
-window.prefetchForDashboard = prefetchForDashboard;
+window.showDashboard = showDashboard;
+
 
 /************ Boot ************/
-if (auth.currentUser) { (); } else { showLogin(); }
+if (auth.currentUser) { showDashboard(); } else { showLogin(); }
 </script>
 </body>
 </html>
