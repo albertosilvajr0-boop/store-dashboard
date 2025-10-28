@@ -11,18 +11,21 @@ permissions:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # No build step needed since you have a plain index.html
-      # If you later add a build, insert it here.
-
-      - name: Deploy to Firebase Hosting (live)
-        uses: FirebaseExtended/action-hosting-deploy@v0
+      # 🔐 Authenticate to Google Cloud using your service-account JSON secret
+      - name: Google Auth (JSON key)
+        uses: google-github-actions/auth@v2
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STORE_DASHBOARD_2025 }}
-          channelId: live
-          projectId: store-dashboard-2025
-          entryPoint: ./   # index.html is at repo root
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STORE_DASHBOARD_2025 }}
+
+      # 🚀 Deploy with firebase-tools
+      - name: Deploy to Firebase Hosting (live)
+        run: |
+          npx --yes firebase-tools@14.22.0 deploy \
+            --only hosting \
+            --project store-dashboard-2025 \
+            --non-interactive
