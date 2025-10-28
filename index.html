@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Store Performance Dashboard</title>
+  <link rel="icon" href="data:;base64,=">
   <style>
     :root {
       --bg1:#6a11cb; --bg2:#2575fc;
@@ -52,6 +53,11 @@
 </head>
 <body>
   <div id="app" class="container"></div>
+
+  <!-- ADD THIS: your Apps Script URL -->
+  <script>
+    window.SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxRf4KkWsC8EBN6G6ybStLKBNqmnu-Rjow4aZ_NWpSaRY7Q8JlxFaTsTsAW2Ny76dCS/exec";
+  </script>
 
   <script type="module">
     // ─────────────────────────────────────────────────────────────
@@ -213,7 +219,7 @@
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Person 1:1 (unchanged)
+    // Person 1:1 (unchanged from your version)
     // ─────────────────────────────────────────────────────────────
     async function showPersonDetails(name, type) {
       const contentEl = document.getElementById('content');
