@@ -13,6 +13,8 @@
     }
     html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#fff;color:var(--ink);}
     .container{max-width:1100px;margin:28px auto 80px;padding:0 20px;}
+
+    /* Topbar */
     .topbar{
       background:linear-gradient(135deg,var(--brand1),var(--brand2));
       border-radius:18px; padding:18px 20px; color:#fff; display:flex; align-items:center; gap:14px; justify-content:space-between;
@@ -23,10 +25,14 @@
     .btn:hover{background:var(--btnH);}
     .logout-btn{background:var(--danger);} .logout-btn:hover{background:var(--dangerH);}
     .admin-btn{background:var(--ok);} .admin-btn:hover{background:var(--okH);}
+
+    /* Switcher */
     .switcher{display:flex;gap:8px;margin:14px 0 10px;}
     .seg{border:1px solid rgba(0,0,0,.08); color:#111; padding:8px 12px; border-radius:999px; cursor:pointer; font-weight:800; background:#fff;}
     .seg.active{background:#111827; color:#fff; border-color:#111827;}
     .hint{color:#6b7280; font-size:12px; margin-left:8px; display:flex; align-items:center;}
+
+    /* Cards / Rows */
     .card{background:#fff;border-radius:16px;box-shadow:0 10px 24px rgba(0,0,0,.08);padding:16px;border:1px solid var(--line);}
     .titleRow{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
     .titleRow h2{margin:0;font-size:18px;display:flex;align-items:center;gap:10px;}
@@ -52,28 +58,17 @@
     .modal h3{margin:0 0 8px;}
     .closeX{background:transparent;border:none;font-size:22px;cursor:pointer;}
 
+    /* Login */
+    .loginWrap{max-width:520px;margin:40px auto;}
+    .field{display:flex;flex-direction:column;margin-bottom:12px;}
+    .field label{font-weight:700;margin-bottom:6px;}
+    .field input{padding:10px 12px;border:1px solid #d1d5db;border-radius:10px;font-size:15px;}
+    .err{color:#dc2626;margin-top:10px;}
     a.inline{color:#2563eb;text-decoration:none;} a.inline:hover{text-decoration:underline;}
   </style>
 </head>
 <body>
-  <div class="container" id="root">
-    <div class="topbar">
-      <h1 class="title">Store Performance Dashboard</h1>
-      <div style="display:flex; gap:10px; align-items:center;">
-        <span id="whoami" class="muted">Welcome, <strong id="whoamiEmail"></strong></span>
-        <button id="adminBtn" class="admin-btn" style="display:none;">User Management</button>
-        <button class="logout-btn" onclick="logout()">Logout</button>
-      </div>
-    </div>
-
-    <div class="switcher">
-      <button class="seg active" id="segSales">Sales</button>
-      <button class="seg" id="segBDC">BDC</button>
-      <span class="hint">Tip: Click a name to open their 1:1</span>
-    </div>
-
-    <div id="content" class="card"></div>
-  </div>
+  <div class="container" id="root"></div>
 
   <!-- User Management Modal -->
   <div class="modal-backdrop" id="umBackdrop" aria-hidden="true">
@@ -91,114 +86,190 @@
 
   <!-- 🔧 Backend URL & safe defaults -->
   <script>
+    // Your live Apps Script Web App URL:
     window.SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxRf4KkWsC8EBN6G6ybStLKBNqmnu-Rjow4aZ_NWpSaRY7Q8JlxFaTsTsAW2Ny76dCS/exec";
-    window.sessionToken = window.sessionToken || (localStorage.getItem('sessionToken') || "");
-    try{ window.userData = window.userData || JSON.parse(localStorage.getItem('userData')||"{}"); }catch{ window.userData = window.userData || {}; }
+
+    // Persisted session (if any)
+    try{
+      window.sessionToken = localStorage.getItem('sessionToken') || "";
+      window.userData     = JSON.parse(localStorage.getItem('userData')||"{}");
+    }catch{ window.sessionToken=""; window.userData={}; }
   </script>
 
   <script type="module">
-    const SCRIPT_URL = window.SCRIPT_URL || '';
+    const SCRIPT_URL   = window.SCRIPT_URL || '';
+    const LOGIN_ROUTES = ["login"]; // add alternates if your GAS uses a different route name e.g. "signin"
     const state = { mode: 'sales', raw: null };
 
     // ====== Auth / Role helpers ======
-    function isAdmin(){ return (window.userData?.role==='admin'||window.userData?.role==='superadmin'); }
-    function isManager(){ return (window.userData?.role==='manager'); }
+    const isAdmin   = () => (window.userData?.role==='admin'||window.userData?.role==='superadmin');
+    const isManager = () => (window.userData?.role==='manager');
     function canViewName(targetName){
       const mine=(window.userData?.linkedName||'').toUpperCase();
       if(isAdmin()||isManager())return true;
       return mine && (String(targetName||'').toUpperCase()===mine);
     }
 
-    // ====== UI boot ======
-    const segSales = document.getElementById('segSales');
-    const segBDC   = document.getElementById('segBDC');
-    segSales.addEventListener('click', ()=>setMode('sales'));
-    segBDC.addEventListener('click', ()=>setMode('bdc'));
-    const whoamiEmailEl = document.getElementById('whoamiEmail');
-    whoamiEmailEl.textContent = window.userData?.email || '';
-    if (isAdmin()) document.getElementById('adminBtn').style.display = 'inline-block';
-    document.getElementById('adminBtn').addEventListener('click', showUserModal);
+    // ====== Views ======
+    function renderLogin(errMsg=""){
+      const el=document.getElementById('root');
+      el.innerHTML = `
+        <div class="topbar">
+          <h1 class="title">Store Performance Dashboard</h1>
+          <div></div>
+        </div>
+        <div class="loginWrap card">
+          <h2 style="margin:0 0 8px;">Sign in</h2>
+          <p class="muted" style="margin-top:0;">Use your work email and access key.</p>
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" type="email" placeholder="you@dealer.com" autocomplete="username" />
+          </div>
+          <div class="field">
+            <label for="pwd">Access Key / Password</label>
+            <input id="pwd" type="password" placeholder="••••••••" autocomplete="current-password" />
+          </div>
+          <button class="btn" id="loginBtn">Sign in</button>
+          ${errMsg ? `<div class="err">${errMsg}</div>` : ""}
+        </div>`;
+      document.getElementById('loginBtn').addEventListener('click', doLogin);
+      // Enter key
+      const onEnter = (e)=>{ if(e.key==='Enter') doLogin(); };
+      document.getElementById('email').addEventListener('keydown', onEnter);
+      document.getElementById('pwd').addEventListener('keydown', onEnter);
+    }
+
+    function renderShell(){
+      const el=document.getElementById('root');
+      el.innerHTML = `
+        <div class="topbar">
+          <h1 class="title">Store Performance Dashboard</h1>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <span class="muted">Welcome, <strong id="whoamiEmail"></strong></span>
+            <button id="adminBtn" class="admin-btn" style="display:none;">User Management</button>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+          </div>
+        </div>
+
+        <div class="switcher">
+          <button class="seg active" id="segSales">Sales</button>
+          <button class="seg" id="segBDC">BDC</button>
+          <span class="hint">Tip: Click a name to open their 1:1</span>
+        </div>
+
+        <div id="content" class="card"></div>
+      `;
+      document.getElementById('whoamiEmail').textContent = window.userData?.email || '';
+      if (isAdmin()) document.getElementById('adminBtn').style.display = 'inline-block';
+      document.getElementById('adminBtn')?.addEventListener('click', showUserModal);
+      document.getElementById('segSales').addEventListener('click', ()=>setMode('sales'));
+      document.getElementById('segBDC').addEventListener('click', ()=>setMode('bdc'));
+    }
 
     // ====== Data fetchers ======
+    async function fetchJSON(url, opts){
+      const resp = await fetch(url, opts);
+      const txt  = await resp.text();
+      try{ return JSON.parse(txt); }catch(e){ throw new Error(`Non-JSON response\nHTTP ${resp.status}\n\n${txt}`); }
+    }
     async function fetchLeaderboards(){
       if(!SCRIPT_URL) throw new Error('SCRIPT_URL is not defined on window.');
-      const url = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken||'')}`;
-      const resp = await fetch(url, { cache: 'no-store' });
-      const text = await resp.text();
-      let data; try{ data=JSON.parse(text);}catch(e){ throw new Error(`Non-JSON from GAS\nHTTP ${resp.status}\n\n${text}`); }
+      const u = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken||'')}`;
+      const data = await fetchJSON(u, { cache:'no-store' });
       if(!data?.ok) throw new Error(data?.error||'Backend returned ok:false');
       return data;
     }
-
     async function fetchUsers(){
-      const url = `${SCRIPT_URL}?route=users&session=${encodeURIComponent(window.sessionToken||'')}`;
-      const resp = await fetch(url, { cache:'no-store' });
-      return resp.json();
+      const u = `${SCRIPT_URL}?route=users&session=${encodeURIComponent(window.sessionToken||'')}`;
+      return fetchJSON(u, { cache:'no-store' });
     }
-
     async function fetchPerson(name){
-      const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken||'')}`;
-      const resp = await fetch(url, { cache:'no-store' });
-      return resp.json();
+      const u = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken||'')}`;
+      return fetchJSON(u, { cache:'no-store' });
+    }
+    async function fetchCallsFor(name){
+      const u = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken||'')}`;
+      return fetchJSON(u, { cache:'no-store' });
     }
 
-    async function fetchCallsFor(name){
-      const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken||'')}`;
-      const resp = await fetch(url, { cache:'no-store' });
-      return resp.json();
+    // ====== Login flow ======
+    async function doLogin(){
+      const email = (document.getElementById('email')?.value||"").trim();
+      const pwd   = (document.getElementById('pwd')?.value||"").trim();
+      if(!email || !pwd){ renderLogin("Please enter both email and access key."); return; }
+
+      let lastErr = "Login failed.";
+      for(const route of LOGIN_ROUTES){
+        try{
+          const url = `${SCRIPT_URL}?route=${encodeURIComponent(route)}`;
+          const res = await fetchJSON(url, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ email, password: pwd })
+          });
+          if(res?.ok && (res.sessionToken || res.data?.sessionToken)){
+            const token = res.sessionToken || res.data.sessionToken;
+            const user  = res.user || res.data?.user || { email: res.email||email, role: res.role, linkedName: res.linkedName };
+            window.sessionToken = token;
+            window.userData     = user || {};
+            try{
+              localStorage.setItem('sessionToken', token);
+              localStorage.setItem('userData', JSON.stringify(window.userData));
+            }catch(_){}
+            boot(); // proceed to app
+            return;
+          }
+          lastErr = res?.error || lastErr;
+        }catch(e){ lastErr = e?.message || String(e); }
+      }
+      renderLogin(lastErr || "Login failed.");
     }
 
     // ====== Sorting & row builder ======
     const shownVal = x => x.shown ?? x.shows ?? x.shows_count ?? 0;
-    function sortSales(arr){return [...(arr||[])].sort((a,b)=>(b.sales??0)-(a.sales??0)||String(a.name||'').localeCompare(String(b.name||'')));}
-    function sortBDC(arr){return [...(arr||[])].sort((a,b)=>shownVal(b)-shownVal(a)||String(a.name||'').localeCompare(String(b.name||'')));}
-
+    const sortSales = arr => [...(arr||[])].sort((a,b)=>(b.sales??0)-(a.sales??0)||String(a.name||'').localeCompare(String(b.name||'')));
+    const sortBDC   = arr => [...(arr||[])].sort((a,b)=>shownVal(b)-shownVal(a)||String(a.name||'').localeCompare(String(b.name||'')));
     const chip = (label, value, cls='') => `<span class="pill ${cls}">${label}: <strong>${value}</strong></span>`;
 
     function rowHTML(person, i, mode){
       const name = person.name || '';
-      const rk = i===0?'gold':i===1?'silver':i===2?'bronze':'';
-      const allowed = canViewName(name);
-      const clickAttr = allowed ? `onclick="showPersonDetails('${name.replace(/'/g,"\\'")}', '${mode.toUpperCase()}')"` : '';
-      const style = allowed ? '' : 'opacity:.6; cursor:not-allowed;';
+      const rk   = i===0 ? 'gold' : i===1 ? 'silver' : i===2 ? 'bronze' : '';
+      const allowed  = canViewName(name); // login-gated
+      const clickAttr= allowed ? `onclick="showPersonDetails('${name.replace(/'/g,"\\'")}', '${mode.toUpperCase()}')"` : '';
+      const style    = allowed ? '' : 'opacity:.6; cursor:not-allowed;';
+
       if(mode==='sales'){
-        const sales = person.sales ?? 0, calls = person.calls ?? 0, texts = person.texts ?? 0, created = person.created ?? 0, shown = person.shown ?? person.shown_count ?? 0;
+        const sales=person.sales??0, calls=person.calls??0, texts=person.texts??0, created=person.created??0, shown=person.shown??person.shown_count??0;
         return `<div class="row" ${clickAttr} style="${style}">
           <div class="left"><div class="rank ${rk}">${i+1}</div><div class="name">${name}</div></div>
-          <div class="right">
-            <div class="chips">
-              ${chip('Sales', sales,'sales')}
-              ${chip('Calls', calls,'calls')}
-              ${chip('Texts', texts,'texts')}
-              ${chip('Appts Made', created,'appt')}
-              ${chip('Appts Shown', shown,'appt')}
-            </div>
-          </div>
-        </div>`;
+          <div class="right"><div class="chips">
+            ${chip('Sales', sales,'sales')}
+            ${chip('Calls', calls,'calls')}
+            ${chip('Texts', texts,'texts')}
+            ${chip('Appts Made', created,'appt')}
+            ${chip('Appts Shown', shown,'appt')}
+          </div></div></div>`;
       } else {
-        const calls = person.calls ?? 0, texts = person.texts ?? 0, created = person.created ?? 0, shown = shownVal(person);
+        const calls=person.calls??0, texts=person.texts??0, created=person.created??0, shown=shownVal(person);
         return `<div class="row" ${clickAttr} style="${style}">
           <div class="left"><div class="rank ${rk}">${i+1}</div><div class="name">${name}</div></div>
-          <div class="right">
-            <div class="chips">
-              ${chip('Appts Shown', shown,'appt')}
-              ${chip('Appts Made', created,'appt')}
-              ${chip('Calls', calls,'calls')}
-              ${chip('Texts', texts,'texts')}
-            </div>
-          </div>
-        </div>`;
+          <div class="right"><div class="chips">
+            ${chip('Appts Shown', shown,'appt')}
+            ${chip('Appts Made', created,'appt')}
+            ${chip('Calls', calls,'calls')}
+            ${chip('Texts', texts,'texts')}
+          </div></div></div>`;
       }
     }
 
     // ====== Renderers ======
-    function render(data){
+    function renderLeaderboards(data){
       if(!state.raw) state.raw = data;
       const salesLB = sortSales(data.sales || []);
       const bdcLB   = sortBDC(data.bdc   || []);
       const active  = state.mode==='sales' ? salesLB : bdcLB;
 
-      // segment UI state
+      // shell & switcher active state already mounted
       document.getElementById('segSales').classList.toggle('active', state.mode==='sales');
       document.getElementById('segBDC').classList.toggle('active', state.mode==='bdc');
 
@@ -212,10 +283,73 @@
         </div>`;
     }
 
-    function setMode(mode){ state.mode=mode; render(state.raw); }
+    function setMode(mode){ state.mode=mode; renderLeaderboards(state.raw); }
 
-    // ====== 1:1 and Call Sheets ======
-    async function showPersonDetails(name, type){
+    // ====== User Management modal ======
+    async function showUserModal(){
+      const bd = document.getElementById('umBackdrop');
+      const body = document.getElementById('umBody');
+      bd.style.display='flex';
+      body.textContent='Loading users…';
+      try{
+        const res = await fetchUsers();
+        if(!res?.ok) throw new Error(res?.error||'Failed to load users');
+        const list = res.data?.users || [];
+        body.innerHTML = `
+          <div class="muted" style="margin-bottom:6px;">Total: ${list.length}</div>
+          <div style="max-height:380px; overflow:auto; border:1px solid #eef2f7; border-radius:10px;">
+            <table style="width:100%; border-collapse:collapse;">
+              <thead>
+                <tr style="background:#f8fafc;">
+                  <th style="text-align:left; padding:10px; border-bottom:1px solid #eee;">Email</th>
+                  <th style="text-align:left; padding:10px; border-bottom:1px solid #eee;">Linked Name</th>
+                  <th style="text-align:left; padding:10px; border-bottom:1px solid #eee;">Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${list.map(u=>`
+                  <tr>
+                    <td style="padding:10px;border-top:1px solid #f1f5f9;">${u.email||'-'}</td>
+                    <td style="padding:10px;border-top:1px solid #f1f5f9;">${u.linkedName||'-'}</td>
+                    <td style="padding:10px;border-top:1px solid #f1f5f9;">${u.role||'-'}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      }catch(e){
+        body.innerHTML = `<div style="color:#dc2626;">${e?.message||e}</div>`;
+      }
+    }
+    function closeUserModal(){ document.getElementById('umBackdrop').style.display='none'; }
+
+    // ====== Page boot ======
+    async function boot(){
+      if(!window.sessionToken){
+        renderLogin();
+        return;
+      }
+      renderShell();
+      try{
+        const data = await fetchLeaderboards();
+        renderLeaderboards(data);
+      }catch(err){
+        document.getElementById('content').innerHTML = `
+          <div class="card" style="padding:50px;text-align:center;color:#dc2626;">
+            <h2>Error Loading Dashboard</h2>
+            <p style="white-space:pre-wrap;">${err?.message||err}</p>
+            <button class="btn" onclick="window.showDashboard()" style="max-width:200px;margin:20px auto;">Retry</button>
+          </div>`;
+      }
+    }
+
+    // expose for onclick usage
+    window.setMode = setMode;
+    window.showUserModal = showUserModal;
+    window.closeUserModal = closeUserModal;
+    window.showDashboard = boot; // used by Retry
+
+    // 1:1 + call sheets (need global for onclick)
+    window.showPersonDetails = async function(name, type){
       const el = document.getElementById('content');
       el.innerHTML = `<div class="card" style="padding:24px; text-align:center;">Loading ${name}…</div>`;
       try{
@@ -225,7 +359,7 @@
         const b = payload.block || {};
         const day = payload.lastDay || {};
         const isSales = (b.type || type) === 'Sales';
-        const html = `
+        el.innerHTML = `
           <button class="btn" style="background:#6B7280;margin-bottom:16px;" onclick="window.showDashboard()">← Back to Leaderboard</button>
           <div class="card" style="padding:24px;">
             <h2 style="margin:0 0 6px;">${b.name || name}</h2>
@@ -258,12 +392,12 @@
               <button class="btn" onclick="viewCallSheets('${(b.name || name).replace(/'/g, "\\'")}')">📊 View Call Sheets</button>
             </div>
           </div>`;
-        el.innerHTML = html;
       }catch(e){
         el.innerHTML = `<div class="card" style="padding:40px;color:#dc2626;text-align:center;"><h2>Error Loading Details</h2><p>${e?.message||e}</p><button class="btn" onclick="window.showDashboard()" style="margin-top:12px;background:#6B7280;">← Back to Leaderboard</button></div>`;
       }
-    }
-    async function viewCallSheets(name){
+    };
+
+    window.viewCallSheets = async function(name){
       const el = document.getElementById('content');
       el.innerHTML = `<div class="card" style="padding:24px; text-align:center;">Loading call sheets for ${name}…</div>`;
       try{
@@ -315,77 +449,24 @@
       }catch(e){
         el.innerHTML = `<div class="card" style="padding:40px;color:#dc2626;text-align:center;"><h2>Error Loading Call Sheets</h2><p>${e?.message||e}</p></div>`;
       }
-    }
+    };
 
-    // ====== User Management modal ======
-    async function showUserModal(){
-      const bd = document.getElementById('umBackdrop');
-      const body = document.getElementById('umBody');
-      bd.style.display='flex';
-      body.textContent='Loading users…';
-      try{
-        const res = await fetchUsers();
-        if(!res?.ok) throw new Error(res?.error||'Failed to load users');
-        const list = res.data?.users || [];
-        body.innerHTML = `
-          <div class="muted" style="margin-bottom:6px;">Total: ${list.length}</div>
-          <div style="max-height:380px; overflow:auto; border:1px solid #eef2f7; border-radius:10px;">
-            <table style="width:100%; border-collapse:collapse;">
-              <thead>
-                <tr style="background:#f8fafc;">
-                  <th style="text-align:left; padding:10px; border-bottom:1px solid #eee;">Email</th>
-                  <th style="text-align:left; padding:10px; border-bottom:1px solid #eee;">Linked Name</th>
-                  <th style="text-align:left; padding:10px; border-bottom:1px solid #eee;">Role</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${list.map(u=>`
-                  <tr>
-                    <td style="padding:10px;border-top:1px solid #f1f5f9;">${u.email||'-'}</td>
-                    <td style="padding:10px;border-top:1px solid #f1f5f9;">${u.linkedName||'-'}</td>
-                    <td style="padding:10px;border-top:1px solid #f1f5f9;">${u.role||'-'}</td>
-                  </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>`;
-      }catch(e){
-        body.innerHTML = `<div style="color:#dc2626;">${e?.message||e}</div>`;
-      }
-    }
-    function closeUserModal(){ document.getElementById('umBackdrop').style.display='none'; }
+    // Start app (login gate respected)
+    boot();
 
-    // ====== Public exports for onclicks ======
-    window.setMode = setMode;
-    window.showDashboard = showDashboard;
-    window.showPersonDetails = showPersonDetails;
-    window.viewCallSheets = viewCallSheets;
-    window.showUserModal = showUserModal;
-    window.closeUserModal = closeUserModal;
-
-    // ====== Boot ======
-    async function showDashboard(){
-      try{
-        const data = await fetchLeaderboards();
-        render(data);
-      }catch(err){
-        document.getElementById('content').innerHTML = `
-          <div class="card" style="padding:50px;text-align:center;color:#dc2626;">
-            <h2>Error Loading Dashboard</h2>
-            <p style="white-space:pre-wrap;">${err?.message||err}</p>
-            <button class="btn" onclick="window.showDashboard()" style="max-width:200px;margin:20px auto;">Retry</button>
-          </div>`;
-      }
-    }
-    showDashboard();
+    // expose boot for Retry button
+    window.showDashboard = boot;
   </script>
 
   <script>
-    // Logout that works with both memory & localStorage
+    // Works with the login gate: wipes session and returns to login
     function logout(){
       try{ localStorage.removeItem('sessionToken'); localStorage.removeItem('userData'); }catch(e){}
       window.sessionToken=''; window.userData={};
       location.reload();
     }
+    // Modal close helper (non-module)
+    function closeUserModal(){ document.getElementById('umBackdrop').style.display='none'; }
   </script>
 </body>
 </html>
