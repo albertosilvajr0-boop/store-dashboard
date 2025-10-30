@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Full Leaderboard • Store Dashboard</title>
+  <!-- Firebase (same versions you use on index.html) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#9ca3af; --accent:#22c55e; --chip:#1f2937; --chipOn:#10b981;}
+    html,body {margin:0; height:100%; background:#0b1220; color:#e5e7eb; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;}
+    .wrap {max-width:1200px; margin:0 auto; padding:24px;}
+    header {display:flex; align-items:center; gap:12px; margin-bottom:16px;}
+    h1 {font-size:20px; margin:0; letter-spacing:.3px;}
+    .spacer {flex:1;}
+    a.btn, button.btn {background:#334155; color:#e5e7eb; padding:10px 14px; border-radius:10px; text-decoration:none; border:none; cursor:pointer;}
+    a.btn:hover, button.btn:hover {filter:brightness(1.1);}
+    .modebar {display:flex; gap:8px; margin:12px 0 20px;}
+    .chip {padding:8px 12px; border-radius:999px; background:var(--chip); cursor:pointer; user-select:none; font-weight:600;}
+    .chip.active {background:var(--chipOn); color:#062216;}
+    .card {background:#0f1629; border:1px solid #1f2937; border-radius:14px; padding:16px;}
+    table {width:100%; border-collapse:collapse;}
+    th, td {padding:10px 8px; border-bottom:1px solid #1f2937; text-align:left; font-size:14px;}
+    th {color:#cbd5e1; font-weight:700;}
+    td.num {text-align:right; font-variant-numeric: tabular-nums;}
+    .name {display:flex; gap:8px; align-items:center;}
+    .rank {width:28px; text-align:right; opacity:.6;}
+    .muted {color:var(--muted);}
+    .notice {margin:10px 0 18px; color:#cbd5e1; font-size:13px;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Full Leaderboard</h1>
+      <div class="spacer"></div>
+      <a class="btn" href="/">← Back to Dashboard</a>
+      <button id="logoutBtn" class="btn" title="Sign out">Logout</button>
+    </header>
+
+    <div class="modebar">
+      <div id="chipSales" class="chip active">Sales</div>
+      <div id="chipBdc" class="chip">BDC</div>
+    </div>
+    <div class="notice muted" id="notice">Viewing Sales leaderboard (sorted by Sales, desc).</div>
+
+    <div class="card">
+      <table id="lb">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+/* --------- COPY THESE FROM YOUR EXISTING index.html --------- */
+const firebaseConfig = window.firebaseConfig || {
+  // If you don't keep this on window, paste your exact config here.
+  // apiKey: "...", authDomain: "...", projectId: "...", etc.
+};
+const SCRIPT_URL = window.SCRIPT_URL || "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+firebase.initializeApp(firebaseConfig);
+/* ------------------------------------------------------------ */
+
+const auth = firebase.auth();
+const state = {
+  mode: 'sales', // 'sales' or 'bdc'
+  data: { sales: [], bdc: [] },
+  user: null,
+};
+
+// UI elements
+const chipSales = document.getElementById('chipSales');
+const chipBdc   = document.getElementById('chipBdc');
+const thead     = document.getElementById('thead');
+const tbody     = document.getElementById('tbody');
+const notice    = document.getElementById('notice');
+const logoutBtn = document.getElementById('logoutBtn');
+
+// Events
+chipSales.addEventListener('click', () => setMode('sales'));
+chipBdc.addEventListener('click',   () => setMode('bdc'));
+logoutBtn.addEventListener('click', () => auth.signOut());
+
+function setMode(m) {
+  if (state.mode === m) return;
+  state.mode = m;
+  chipSales.classList.toggle('active', m === 'sales');
+  chipBdc.classList.toggle('active', m === 'bdc');
+  if (m === 'sales') {
+    notice.textContent = 'Viewing Sales leaderboard (sorted by Sales, desc).';
+  } else {
+    notice.textContent = 'Viewing BDC leaderboard (sorted by Appts Shown, desc).';
+  }
+  render();
+}
+
+function safeNum(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function sortRows(rows, mode) {
+  // Sales: sort by `sales` desc; BDC: sort by `shown` desc
+  if (mode === 'sales') {
+    return [...rows].sort((a,b) => safeNum(b.sales) - safeNum(a.sales));
+  } else {
+    // Support `shown` or `shows` field names
+    return [...rows].sort((a,b) => (safeNum(b.shown ?? b.shows) - safeNum(a.shown ?? a.shows)));
+  }
+}
+
+function headHTML(mode) {
+  if (mode === 'sales') {
+    return `
+      <tr>
+        <th class="rank">#</th>
+        <th>Name</th>
+        <th class="num">Calls</th>
+        <th class="num">Texts</th>
+        <th class="num">Appts Created</th>
+        <th class="num">Appts Shown</th>
+        <th class="num">Sales</th>
+      </tr>`;
+  }
+  return `
+    <tr>
+      <th class="rank">#</th>
+      <th>Name</th>
+      <th class="num">Calls</th>
+      <th class="num">Texts</th>
+      <th class="num">Appts Created</th>
+      <th class="num">Appts Shown</th>
+    </tr>`;
+}
+
+function rowHTML(row, i, mode) {
+  const name = row.name || row.fullName || row.displayName || row.email || '—';
+  const calls  = safeNum(row.calls);
+  const texts  = safeNum(row.texts);
+  const created = safeNum(row.created ?? row.created_count);
+  const shown   = safeNum(row.shown ?? row.shows ?? row.shows_count);
+  const sales   = safeNum(row.sales);
+
+  if (mode === 'sales') {
+    return `
+      <tr>
+        <td class="rank">${i+1}</td>
+        <td class="name">${name}</td>
+        <td class="num">${calls}</td>
+        <td class="num">${texts}</td>
+        <td class="num">${created}</td>
+        <td class="num">${shown}</td>
+        <td class="num"><strong>${sales}</strong></td>
+      </tr>`;
+  }
+  // BDC
+  return `
+    <tr>
+      <td class="rank">${i+1}</td>
+      <td class="name">${name}</td>
+      <td class="num">${calls}</td>
+      <td class="num">${texts}</td>
+      <td class="num">${created}</td>
+      <td class="num"><strong>${shown}</strong></td>
+    </tr>`;
+}
+
+function render() {
+  thead.innerHTML = headHTML(state.mode);
+  const rows = sortRows(state.mode === 'sales' ? state.data.sales : state.data.bdc, state.mode);
+  tbody.innerHTML = rows.map((r, i) => rowHTML(r, i, state.mode)).join('');
+}
+
+async function fetchLeaderboards(idToken) {
+  const url = `${SCRIPT_URL}?route=leaderboards`;
+  const res = await fetch(url, {
+    headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+
+  // Defensive normalization so the page works with today’s payloads
+  const sales = Array.isArray(data.sales) ? data.sales : [];
+  let bdc    = Array.isArray(data.bdc) ? data.bdc : [];
+
+  // If backend doesn’t yet provide calls/texts for BDC, fill zeros
+  bdc = bdc.map(x => ({ calls:0, texts:0, ...x }));
+
+  state.data = { sales, bdc };
+  render();
+}
+
+// Auth gate
+auth.onAuthStateChanged(async (user) => {
+  if (!user) {
+    // If your app has a login page/flow, redirect there:
+    window.location.href = '/';
+    return;
+  }
+  state.user = user;
+  try {
+    const token = await user.getIdToken(/* forceRefresh */ false);
+    await fetchLeaderboards(token);
+  } catch (err) {
+    console.error(err);
+    notice.textContent = 'Failed to load leaderboards. Please try again.';
+  }
+});
+</script>
+</body>
+</html>
