@@ -1,35 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Full Leaderboard • Store Dashboard</title>
-  <!-- Firebase (same versions you use on index.html) -->
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
-
-  <style>
-    :root { --bg:#0f172a; --card:#111827; --muted:#9ca3af; --accent:#22c55e; --chip:#1f2937; --chipOn:#10b981;}
-    html,body {margin:0; height:100%; background:#0b1220; color:#e5e7eb; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;}
-    .wrap {max-width:1200px; margin:0 auto; padding:24px;}
-    header {display:flex; align-items:center; gap:12px; margin-bottom:16px;}
-    h1 {font-size:20px; margin:0; letter-spacing:.3px;}
-    .spacer {flex:1;}
-    a.btn, button.btn {background:#334155; color:#e5e7eb; padding:10px 14px; border-radius:10px; text-decoration:none; border:none; cursor:pointer;}
-    a.btn:hover, button.btn:hover {filter:brightness(1.1);}
-    .modebar {display:flex; gap:8px; margin:12px 0 20px;}
-    .chip {padding:8px 12px; border-radius:999px; background:var(--chip); cursor:pointer; user-select:none; font-weight:600;}
-    .chip.active {background:var(--chipOn); color:#062216;}
-    .card {background:#0f1629; border:1px solid #1f2937; border-radius:14px; padding:16px;}
-    table {width:100%; border-collapse:collapse;}
-    th, td {padding:10px 8px; border-bottom:1px solid #1f2937; text-align:left; font-size:14px;}
-    th {color:#cbd5e1; font-weight:700;}
-    td.num {text-align:right; font-variant-numeric: tabular-nums;}
-    .name {display:flex; gap:8px; align-items:center;}
-    .rank {width:28px; text-align:right; opacity:.6;}
-    .muted {color:var(--muted);}
-    .notice {margin:10px 0 18px; color:#cbd5e1; font-size:13px;}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Full Leaderboard • Store Dashboard</title>
+<style>
+  :root { --bg:#0b1220; --card:#0f1629; --muted:#94a3b8; --line:#1f2937; --chip:#1f2937; --chipOn:#10b981; }
+  html,body { margin:0; height:100%; background:#0b1220; color:#e5e7eb; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+  .wrap { max-width:1200px; margin:0 auto; padding:24px; }
+  header { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+  h1 { font-size:22px; margin:0; letter-spacing:.2px; }
+  .spacer { flex:1; }
+  a.btn, button.btn { background:#334155; color:#e5e7eb; padding:10px 14px; border-radius:10px; text-decoration:none; border:none; cursor:pointer; }
+  a.btn:hover, button.btn:hover { filter:brightness(1.1); }
+  .modebar { display:flex; gap:8px; margin:12px 0 18px; }
+  .chip { padding:8px 12px; border-radius:999px; background:var(--chip); cursor:pointer; user-select:none; font-weight:700; }
+  .chip.active { background:var(--chipOn); color:#052e21; }
+  .notice { margin:0 0 14px; color:#cbd5e1; font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { padding:10px 8px; border-bottom:1px solid var(--line); text-align:left; font-size:14px; }
+  th { color:#cbd5e1; font-weight:700; }
+  td.num { text-align:right; font-variant-numeric: tabular-nums; }
+  .name { display:flex; gap:8px; align-items:center; }
+  .rank { width:28px; text-align:right; opacity:.65; }
+  .muted { color:var(--muted); }
+  .empty { height:40px; border:1px solid var(--line); border-radius:12px; }
+</style>
 </head>
 <body>
   <div class="wrap">
@@ -37,7 +34,7 @@
       <h1>Full Leaderboard</h1>
       <div class="spacer"></div>
       <a class="btn" href="/">← Back to Dashboard</a>
-      <button id="logoutBtn" class="btn" title="Sign out">Logout</button>
+      <button id="logoutBtn" class="btn">Logout</button>
     </header>
 
     <div class="modebar">
@@ -54,24 +51,37 @@
     </div>
   </div>
 
-<script>
-/* --------- COPY THESE FROM YOUR EXISTING index.html --------- */
-const firebaseConfig = window.firebaseConfig || {
-  // If you don't keep this on window, paste your exact config here.
-  // apiKey: "...", authDomain: "...", projectId: "...", etc.
-};
-const SCRIPT_URL = window.SCRIPT_URL || "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
-firebase.initializeApp(firebaseConfig);
-/* ------------------------------------------------------------ */
+<script type="module">
+/* ---------- Firebase (same as index.html) ---------- */
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
+import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
-const auth = firebase.auth();
-const state = {
-  mode: 'sales', // 'sales' or 'bdc'
-  data: { sales: [], bdc: [] },
-  user: null,
+const firebaseConfig = {
+  apiKey: "AIzaSyC74YFnCKeO5TjmPa4H4BMm_pFwohOVAX4",
+  authDomain: "store-dashboard-2025.firebaseapp.com",
+  projectId: "store-dashboard-2025",
+  storageBucket: "store-dashboard-2025.firebasestorage.app",
+  messagingSenderId: "556566448299",
+  appId: "1:556566448299:web:a2cbe4dda5d21fc6c5cfee",
+  measurementId: "G-0D5JMNGE4S"
 };
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRf4KkWsC8EBN6G6ybStLKBNqmnu-Rjow4aZ_NWpSaRY7Q8JlxFaTsTsAW2Ny76dCS/exec';
 
-// UI elements
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
+
+/* ---------- Small helpers copied from index.html pattern ---------- */
+function makeSessionToken({ name, role }) {
+  const payload = { name, role };
+  return btoa(JSON.stringify(payload));
+}
+function isAdmin(userData){ return userData?.role === 'admin' || userData?.role === 'superadmin'; }
+
+/* ---------- UI refs ---------- */
 const chipSales = document.getElementById('chipSales');
 const chipBdc   = document.getElementById('chipBdc');
 const thead     = document.getElementById('thead');
@@ -79,37 +89,99 @@ const tbody     = document.getElementById('tbody');
 const notice    = document.getElementById('notice');
 const logoutBtn = document.getElementById('logoutBtn');
 
-// Events
+logoutBtn.addEventListener('click', () => signOut(auth));
 chipSales.addEventListener('click', () => setMode('sales'));
 chipBdc.addEventListener('click',   () => setMode('bdc'));
-logoutBtn.addEventListener('click', () => auth.signOut());
 
+const state = {
+  mode: 'sales',
+  data: { sales: [], bdc: [] },
+  userData: null,
+};
+
+/* ---------- Auth gate (mirror of index.html flow) ---------- */
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    // bounce to login on the main page
+    window.location.href = '/';
+    return;
+  }
+
+  // ensure profile exists & read linkedName/role
+  const userRef = doc(db, 'users', user.uid);
+  let snap = await getDoc(userRef);
+  if (!snap.exists()) {
+    await setDoc(userRef, {
+      email: user.email,
+      role: user.email === SUPERADMIN_EMAIL ? 'superadmin' : 'user',
+      linkedName: '',
+      createdAt: new Date()
+    });
+    snap = await getDoc(userRef);
+  }
+  const data = snap.data() || {};
+  let role = data.role || 'user';
+  if (user.email === SUPERADMIN_EMAIL && role !== 'superadmin') {
+    role = 'superadmin';
+    await setDoc(userRef, { ...data, role }, { merge: true });
+  }
+
+  state.userData = { email: user.email, uid: user.uid, role, linkedName: data.linkedName || '' };
+
+  // Build a session token exactly like index.html
+  const sessionName = state.userData.linkedName || state.userData.email;
+  window.sessionToken = makeSessionToken({ name: sessionName, role });
+
+  // Fetch leaderboards
+  try {
+    await fetchLeaderboards();
+  } catch (e) {
+    notice.textContent = 'Failed to load leaderboards. Please try again.';
+    console.error(e);
+  }
+});
+
+/* ---------- Networking ---------- */
+async function fetchLeaderboards() {
+  const url = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken || '')}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  const raw = await res.text();
+
+  let json;
+  try { json = JSON.parse(raw); } catch {
+    throw new Error(`Non-JSON response from GAS.\nHTTP ${res.status}\n\n${raw}`);
+  }
+
+  const payload = (json && json.ok && json.data) ? json.data : json;
+
+  const sales = Array.isArray(payload?.sales) ? payload.sales : [];
+  let bdc     = Array.isArray(payload?.bdc)   ? payload.bdc   : [];
+
+  // fallback if backend doesn’t yet include calls/texts for BDC
+  bdc = bdc.map(x => ({ calls: 0, texts: 0, ...x }));
+
+  state.data = { sales, bdc };
+  render();
+}
+
+/* ---------- Rendering ---------- */
 function setMode(m) {
   if (state.mode === m) return;
   state.mode = m;
   chipSales.classList.toggle('active', m === 'sales');
-  chipBdc.classList.toggle('active', m === 'bdc');
-  if (m === 'sales') {
-    notice.textContent = 'Viewing Sales leaderboard (sorted by Sales, desc).';
-  } else {
-    notice.textContent = 'Viewing BDC leaderboard (sorted by Appts Shown, desc).';
-  }
+  chipBdc.classList.toggle('active',   m === 'bdc');
+  notice.textContent = m === 'sales'
+    ? 'Viewing Sales leaderboard (sorted by Sales, desc).'
+    : 'Viewing BDC leaderboard (sorted by Appts Shown, desc).';
   render();
 }
 
-function safeNum(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
+function safeNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function shownVal(x){ return x.shown ?? x.shows ?? x.shown_count ?? x.shows_count ?? 0; }
 
 function sortRows(rows, mode) {
-  // Sales: sort by `sales` desc; BDC: sort by `shown` desc
-  if (mode === 'sales') {
-    return [...rows].sort((a,b) => safeNum(b.sales) - safeNum(a.sales));
-  } else {
-    // Support `shown` or `shows` field names
-    return [...rows].sort((a,b) => (safeNum(b.shown ?? b.shows) - safeNum(a.shown ?? a.shows)));
-  }
+  if (mode === 'sales') return [...rows].sort((a,b)=> safeNum(b.sales) - safeNum(a.sales));
+  return [...rows].sort((a,b)=> safeNum(shownVal(b)) - safeNum(shownVal(a)));
 }
 
 function headHTML(mode) {
@@ -141,7 +213,7 @@ function rowHTML(row, i, mode) {
   const calls  = safeNum(row.calls);
   const texts  = safeNum(row.texts);
   const created = safeNum(row.created ?? row.created_count);
-  const shown   = safeNum(row.shown ?? row.shows ?? row.shows_count);
+  const shown   = safeNum(shownVal(row));
   const sales   = safeNum(row.sales);
 
   if (mode === 'sales') {
@@ -156,7 +228,6 @@ function rowHTML(row, i, mode) {
         <td class="num"><strong>${sales}</strong></td>
       </tr>`;
   }
-  // BDC
   return `
     <tr>
       <td class="rank">${i+1}</td>
@@ -171,45 +242,8 @@ function rowHTML(row, i, mode) {
 function render() {
   thead.innerHTML = headHTML(state.mode);
   const rows = sortRows(state.mode === 'sales' ? state.data.sales : state.data.bdc, state.mode);
-  tbody.innerHTML = rows.map((r, i) => rowHTML(r, i, state.mode)).join('');
+  tbody.innerHTML = rows.map((r, i) => rowHTML(r, i, state.mode)).join('') || `<tr><td colspan="7"><div class="empty"></div></td></tr>`;
 }
-
-async function fetchLeaderboards(idToken) {
-  const url = `${SCRIPT_URL}?route=leaderboards`;
-  const res = await fetch(url, {
-    headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
-    cache: 'no-store',
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-
-  // Defensive normalization so the page works with today’s payloads
-  const sales = Array.isArray(data.sales) ? data.sales : [];
-  let bdc    = Array.isArray(data.bdc) ? data.bdc : [];
-
-  // If backend doesn’t yet provide calls/texts for BDC, fill zeros
-  bdc = bdc.map(x => ({ calls:0, texts:0, ...x }));
-
-  state.data = { sales, bdc };
-  render();
-}
-
-// Auth gate
-auth.onAuthStateChanged(async (user) => {
-  if (!user) {
-    // If your app has a login page/flow, redirect there:
-    window.location.href = '/';
-    return;
-  }
-  state.user = user;
-  try {
-    const token = await user.getIdToken(/* forceRefresh */ false);
-    await fetchLeaderboards(token);
-  } catch (err) {
-    console.error(err);
-    notice.textContent = 'Failed to load leaderboards. Please try again.';
-  }
-});
 </script>
 </body>
 </html>
