@@ -5,53 +5,75 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Full Leaderboard • Store Dashboard</title>
 
+<!-- White theme + watermark -->
 <style>
-  :root { --bg:#0b1220; --card:#0f1629; --muted:#94a3b8; --line:#1f2937; --chip:#1f2937; --chipOn:#10b981; }
+  :root {
+    --bg:#ffffff;
+    --card:#ffffff;
+    --text:#111827;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --chip:#f1f5f9;
+    --chipOn:#10b981;
+  }
 
   html,body {
     margin:0;
     height:100%;
-    background:#0b1220;
-    color:#e5e7eb;
+    background:var(--bg);
+    color:var(--text);
     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
   }
 
-  .wrap { max-width:1200px; margin:0 auto; padding:24px; }
+  /* Watermark */
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background-image:url("sa-watermark.png");
+    background-repeat:repeat;
+    background-size:280px auto;
+    opacity:.10;
+    filter:grayscale(100%) contrast(120%);
+    pointer-events:none;
+    z-index:0;
+  }
+  .wrap { position:relative; z-index:1; max-width:1200px; margin:0 auto; padding:24px; }
+
   header { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
   h1 { font-size:22px; margin:0; letter-spacing:.2px; }
   .spacer { flex:1; }
 
   a.btn, button.btn {
-    background:#334155; color:#e5e7eb;
+    background:#334155; color:#fff;
     padding:10px 14px; border-radius:10px;
     text-decoration:none; border:none; cursor:pointer;
   }
   a.btn:hover, button.btn:hover { filter:brightness(1.1); }
 
   .modebar { display:flex; gap:8px; margin:12px 0 18px; }
-  .chip { padding:8px 12px; border-radius:999px; background:var(--chip); cursor:pointer; user-select:none; font-weight:700; }
-  .chip.active { background:var(--chipOn); color:#052e21; }
+  .chip {
+    padding:8px 12px; border-radius:999px; background:var(--chip);
+    cursor:pointer; user-select:none; font-weight:700; color:#111827; border:1px solid #e5e7eb;
+  }
+  .chip.active { background:var(--chipOn); color:#052e21; border-color:transparent; }
 
-  .notice { margin:0 0 14px; color:#cbd5e1; font-size:13px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; }
-  table {
-    width:100%;
-    border-collapse:collapse;
-    table-layout:fixed;
+  .notice { margin:0 0 14px; color:var(--muted); font-size:13px; }
+
+  .card {
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:12px;
+    box-shadow: 0 6px 16px rgba(0,0,0,.06);
   }
 
+  table { width:100%; border-collapse:collapse; table-layout:fixed; }
   th, td {
     padding:10px 8px;
     border-bottom:1px solid var(--line);
-    text-align:left;
+    text-align:center;
     font-size:14px;
   }
-
-  th.num, td.num {
-    text-align:center;                     /* Center all numeric headers and cells */
-    font-variant-numeric:tabular-nums;
-  }
-
   .name { display:flex; gap:8px; align-items:center; justify-content:center; text-align:center; }
   .rank { width:28px; text-align:center; opacity:.65; }
   .muted { color:var(--muted); }
