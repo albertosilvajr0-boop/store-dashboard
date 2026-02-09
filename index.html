@@ -594,6 +594,54 @@ function kpiClass(value, target) {
   return 'kpi-red';
 }
 
+/* ── BDC Column-Relative Gradient ── */
+/* Computes min/max per metric across all BDC rows, then colors each cell
+   on a red → yellow → green scale based on where it falls in that range. */
+function bdcColumnRanges(rows) {
+  const metrics = ['calls','texts','created','due'];
+  const ranges = {};
+  metrics.forEach(m => {
+    let min = Infinity, max = -Infinity;
+    rows.forEach(r => {
+      let v;
+      if (m === 'calls') v = safeNum(r.calls);
+      else if (m === 'texts') v = safeNum(r.texts);
+      else if (m === 'created') v = safeNum(r.created ?? r.created_count ?? 0);
+      else if (m === 'due') v = safeNum(r.due ?? r.due_count ?? 0);
+      else v = 0;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    });
+    ranges[m] = { min, max };
+  });
+  return ranges;
+}
+
+function kpiColumnGradient(value, min, max) {
+  if (max === min) {
+    // Everyone has the same value
+    if (value <= 0) return 'background:#f4f4f5;color:#a1a1aa;font-weight:600;';
+    return 'background:#dcfce7;color:#16a34a;font-weight:700;';
+  }
+  if (value <= 0) return 'background:#f4f4f5;color:#a1a1aa;font-weight:600;';
+
+  const pct = (value - min) / (max - min); // 0 = worst, 1 = best
+
+  let r, g, b, tr, tg, tb;
+  if (pct < 0.5) {
+    const t = pct / 0.5;
+    // red (#fee2e2) → amber (#fef3c7)
+    r = 254; g = Math.round(226 + t * (243 - 226)); b = Math.round(226 - t * (226 - 199));
+    tr = Math.round(220 + t * (180 - 220)); tg = Math.round(38 + t * (83 - 38)); tb = Math.round(38 + t * (9 - 38));
+  } else {
+    const t = (pct - 0.5) / 0.5;
+    // amber (#fef3c7) → green (#dcfce7)
+    r = Math.round(254 - t * (254 - 220)); g = Math.round(243 + t * (252 - 243)); b = Math.round(199 - t * (199 - 231));
+    tr = Math.round(180 - t * (180 - 22)); tg = Math.round(83 + t * (163 - 83)); tb = Math.round(9 + t * (74 - 9));
+  }
+  return `background:rgb(${r},${g},${b});color:rgb(${tr},${tg},${tb});font-weight:700;`;
+}
+
 /* ── Render ── */
 function renderDashboard() {
   const me = window.userData || {};
@@ -602,6 +650,7 @@ function renderDashboard() {
   const bs = bdcStats(bdc);
   const ss = salesStats(sales);
   const now = timeStr();
+  const bdcRanges = bdcColumnRanges(bdc);
 
   function sortArrow(panel, col) {
     const s = panel === 'bdc' ? bdcSort : salesSort;
@@ -633,21 +682,20 @@ function renderDashboard() {
     const click   = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', 'BDC')"` : '';
     const cursor  = allowed ? 'cursor:pointer;' : 'opacity:0.7;';
 
-    // KPI colors for weekly metrics (same targets as Sales)
-    const callsK   = kpiClass(calls, WEEKLY_TARGETS.calls);
-    const textsK   = kpiClass(texts, WEEKLY_TARGETS.texts);
-    const createdK = kpiClass(created, WEEKLY_TARGETS.created);
-    const dueK     = kpiClass(due, WEEKLY_TARGETS.due);
-    const shownK   = kpiClass(shown, WEEKLY_TARGETS.shown);
+    // Column-relative gradient (best in column = green, worst = red)
+    const callsS   = kpiColumnGradient(calls, bdcRanges.calls.min, bdcRanges.calls.max);
+    const textsS   = kpiColumnGradient(texts, bdcRanges.texts.min, bdcRanges.texts.max);
+    const createdS = kpiColumnGradient(created, bdcRanges.created.min, bdcRanges.created.max);
+    const dueS     = kpiColumnGradient(due, bdcRanges.due.min, bdcRanges.due.max);
 
     return `<tr class="${top3}" ${click} style="${cursor}">
       <td class="rank-cell">${trophy(i)}${i < 3 ? '' : (i + 1)}</td>
       <td class="name-cell">${name}</td>
       <td><strong>${shown}</strong></td>
-      <td class="${callsK}">${calls}</td>
-      <td class="${textsK}">${texts}</td>
-      <td class="${createdK}">${created}</td>
-      <td class="${dueK}">${due}</td>
+      <td style="${callsS}">${calls}</td>
+      <td style="${textsS}">${texts}</td>
+      <td style="${createdS}">${created}</td>
+      <td style="${dueS}">${due}</td>
       <td>${pct}</td>
     </tr>`;
   }
@@ -729,11 +777,12 @@ function renderDashboard() {
           <div class="chip active">MTD</div>
         </div>
 
-        <div class="kpi-legend">
-          <span><span class="kpi-dot green"></span> ≥ target</span>
-          <span><span class="kpi-dot yellow"></span> some but &lt; target</span>
-          <span><span class="kpi-dot gray"></span> no activity yet</span>
-          <span><span class="kpi-dot red"></span> sales well below target</span>
+        <div class="kpi-legend" style="align-items:center;">
+          <span style="display:inline-flex;align-items:center;gap:6px;">
+            <span style="display:inline-block;width:120px;height:10px;border-radius:5px;background:linear-gradient(to right,#fee2e2 0%,#fef3c7 50%,#dcfce7 100%);border:1px solid var(--line);"></span>
+            <span>lowest → highest in column</span>
+          </span>
+          <span><span class="kpi-dot gray"></span> no activity</span>
         </div>
 
         <div class="table-card">
