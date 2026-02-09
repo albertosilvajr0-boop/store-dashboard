@@ -625,7 +625,6 @@ function renderDashboard() {
     const shown   = safeNum(shownVal(r));
     const calls   = safeNum(r.calls);
     const texts   = safeNum(r.texts);
-    const salesV  = safeNum(r.sales);
     const created = safeNum(r.created ?? r.created_count ?? 0);
     const due     = safeNum(r.due ?? r.due_count ?? 0);
     const pct     = due > 0 ? ((shown / due) * 100).toFixed(1) + '%' : (created > 0 ? ((shown / created) * 100).toFixed(1) + '%' : '–');
@@ -634,15 +633,21 @@ function renderDashboard() {
     const click   = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', 'BDC')"` : '';
     const cursor  = allowed ? 'cursor:pointer;' : 'opacity:0.7;';
 
+    // KPI colors for weekly metrics (same targets as Sales)
+    const callsK   = kpiClass(calls, WEEKLY_TARGETS.calls);
+    const textsK   = kpiClass(texts, WEEKLY_TARGETS.texts);
+    const createdK = kpiClass(created, WEEKLY_TARGETS.created);
+    const dueK     = kpiClass(due, WEEKLY_TARGETS.due);
+    const shownK   = kpiClass(shown, WEEKLY_TARGETS.shown);
+
     return `<tr class="${top3}" ${click} style="${cursor}">
       <td class="rank-cell">${trophy(i)}${i < 3 ? '' : (i + 1)}</td>
       <td class="name-cell">${name}</td>
       <td><strong>${shown}</strong></td>
-      <td>${calls}</td>
-      <td>${texts}</td>
-      <td>${salesV}</td>
-      <td>${created}</td>
-      <td>${due}</td>
+      <td class="${callsK}">${calls}</td>
+      <td class="${textsK}">${texts}</td>
+      <td class="${createdK}">${created}</td>
+      <td class="${dueK}">${due}</td>
       <td>${pct}</td>
     </tr>`;
   }
@@ -724,6 +729,13 @@ function renderDashboard() {
           <div class="chip active">MTD</div>
         </div>
 
+        <div class="kpi-legend">
+          <span><span class="kpi-dot green"></span> ≥ target</span>
+          <span><span class="kpi-dot yellow"></span> some but &lt; target</span>
+          <span><span class="kpi-dot gray"></span> no activity yet</span>
+          <span><span class="kpi-dot red"></span> sales well below target</span>
+        </div>
+
         <div class="table-card">
           <table>
             <thead>
@@ -733,14 +745,13 @@ function renderDashboard() {
                 <th ${thAttr('bdc','shown')}>Appts Shown ${sortArrow('bdc','shown')}</th>
                 <th ${thAttr('bdc','calls')}>Calls ${sortArrow('bdc','calls')}</th>
                 <th ${thAttr('bdc','texts')}>Texts ${sortArrow('bdc','texts')}</th>
-                <th ${thAttr('bdc','sales')}>Sales ${sortArrow('bdc','sales')}</th>
                 <th ${thAttr('bdc','created')}>Appts Created ${sortArrow('bdc','created')}</th>
                 <th ${thAttr('bdc','due')}>Appts Due ${sortArrow('bdc','due')}</th>
                 <th ${thAttr('bdc','pctShown')}>% Shown ${sortArrow('bdc','pctShown')}</th>
               </tr>
             </thead>
             <tbody>
-              ${bdc.length ? bdc.map((r, i) => bdcRow(r, i)).join('') : '<tr><td colspan="9" style="padding:30px;color:var(--muted);">No BDC data</td></tr>'}
+              ${bdc.length ? bdc.map((r, i) => bdcRow(r, i)).join('') : '<tr><td colspan="8" style="padding:30px;color:var(--muted);">No BDC data</td></tr>'}
             </tbody>
           </table>
         </div>
