@@ -502,6 +502,7 @@ async function showDashboard() {
     dashboardData.bdc = dashboardData.bdc.map(x => ({ calls: 0, texts: 0, ...x }));
     // Total Units from "User Act" sheet (col M, "Total" row) — sent by backend
     dashboardData.salesTotalUnits = payload.salesTotalUnits ?? null;
+    console.log('DEBUG salesTotalUnits from backend:', payload.salesTotalUnits, '| stored:', dashboardData.salesTotalUnits);
 
     renderDashboard();
     prefetchForDashboard(dashboardData);
@@ -531,15 +532,7 @@ function bdcStats(rows) {
 }
 
 function salesStats(rows) {
-  // totalUnits comes from backend (User Act sheet, col M "Total" row)
-  // fallback to summing reps if not provided
-  let totalUnits = dashboardData.salesTotalUnits;
-  if (totalUnits === undefined || totalUnits === null) {
-    totalUnits = 0;
-    rows.forEach(r => { totalUnits += safeNum(r.sales); });
-  } else {
-    totalUnits = safeNum(totalUnits);
-  }
+  let totalUnits = safeNum(dashboardData.salesTotalUnits ?? 0);
   let topName = '–', topVal = 0;
   rows.forEach(r => {
     const s = safeNum(r.sales);
