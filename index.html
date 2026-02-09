@@ -231,6 +231,20 @@ body::before {
 .user-list .user-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
 .delete-btn { background: #ef4444; color: #fff; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; }
 
+/* ── Activity Log ── */
+.activity-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee; }
+.activity-item:last-child { border-bottom: none; }
+.activity-name { font-weight: 600; font-size: 14px; }
+.activity-email { color: var(--muted); font-size: 12px; }
+.activity-time { text-align: right; white-space: nowrap; }
+.activity-time .time-main { font-size: 14px; font-weight: 500; }
+.activity-time .time-sub { color: var(--muted); font-size: 11px; }
+.activity-status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
+.status-recent { background: #22c55e; }
+.status-stale  { background: #f59e0b; }
+.status-old    { background: #ef4444; }
+.status-never  { background: #d1d5db; }
+
 /* ── Person Detail Card ── */
 .detail-card {
   background: var(--card); border-radius: 14px; padding: 24px;
@@ -285,6 +299,19 @@ body::before {
     <div class="user-list" id="userList">
       <h3>Existing Users</h3>
       <div id="userListContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Activity Log Modal -->
+<div class="modal" id="activityModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>🕐 User Activity Log</h2>
+      <button class="modal-close" onclick="closeActivityModal()">&times;</button>
+    </div>
+    <div id="activityContent" style="margin-top:8px;">
+      <p style="color:var(--muted);">Loading...</p>
     </div>
   </div>
 </div>
@@ -474,6 +501,9 @@ onAuthStateChanged(auth, async (user) => {
   window.userData = { email: user.email, uid: user.uid, role, linkedName: data.linkedName || '' };
   const sessionName = window.userData.linkedName || window.userData.email;
   window.sessionToken = makeSessionToken({ name: sessionName, role });
+
+  // Record last login timestamp
+  setDoc(userRef, { lastLogin: new Date() }, { merge: true }).catch(() => {});
 
   showDashboard();
 });
@@ -738,6 +768,7 @@ function renderDashboard() {
         <div class="topbar-sub"><span class="refresh-dot"></span>Live performance · San Antonio CDJR · Updated: ${now} · Auto-refresh every 5 min</div>
       </div>
       <div class="topbar-actions">
+        ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showActivityModal()">🕐 Activity</button>' : ''}
         ${isAdmin() ? '<button class="topbar-btn manage" onclick="showUserModal()">👤 Manage Users</button>' : ''}
         <button class="topbar-btn logout" onclick="logout()">Logout</button>
       </div>
@@ -1082,6 +1113,104 @@ async function deleteUser(uid, email, role) {
 }
 
 /* ══════════════════════════════════════════
+   ACTIVITY LOG
+   ══════════════════════════════════════════ */
+function showActivityModal() {
+  if (!isAdmin() && !isManager()) { alert('Only admins and managers can view activity.'); return; }
+  document.getElementById('activityModal').style.display = 'grid';
+  loadActivity();
+}
+function closeActivityModal() {
+  document.getElementById('activityModal').style.display = 'none';
+}
+
+function timeAgo(date) {
+  if (!date) return { text: 'Never', status: 'never' };
+  const now = new Date();
+  const diff = now - date;
+  const mins = Math.floor(diff / 60000);
+  const hrs  = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  let text;
+  if (mins < 1)       text = 'Just now';
+  else if (mins < 60) text = `${mins}m ago`;
+  else if (hrs < 24)  text = `${hrs}h ago`;
+  else if (days < 7)  text = `${days}d ago`;
+  else                text = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  const status = hrs < 24 ? 'recent' : days < 7 ? 'stale' : 'old';
+  return { text, status };
+}
+
+async function loadActivity() {
+  const el = document.getElementById('activityContent');
+  el.innerHTML = '<p style="color:var(--muted);">Loading...</p>';
+  try {
+    const snap = await getDocs(collection(db, 'users'));
+    const users = [];
+    snap.forEach(d => {
+      const u = d.data();
+      const ll = u.lastLogin?.toDate ? u.lastLogin.toDate() : (u.lastLogin ? new Date(u.lastLogin) : null);
+      users.push({
+        email: u.email || '',
+        role: u.role || 'user',
+        linkedName: u.linkedName || '',
+        lastLogin: ll
+      });
+    });
+
+    // Sort: most recent first, never-logged-in at bottom
+    users.sort((a, b) => {
+      if (!a.lastLogin && !b.lastLogin) return 0;
+      if (!a.lastLogin) return 1;
+      if (!b.lastLogin) return -1;
+      return b.lastLogin - a.lastLogin;
+    });
+
+    if (!users.length) { el.innerHTML = '<p style="color:var(--muted);">No users found.</p>'; return; }
+
+    let html = '';
+    users.forEach(u => {
+      const ago = timeAgo(u.lastLogin);
+      const displayName = u.linkedName || u.email;
+      const fullDate = u.lastLogin
+        ? u.lastLogin.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+        : '—';
+      const roleBadge = u.role === 'superadmin' ? ' 👑' : u.role === 'admin' ? ' ⭐' : u.role === 'manager' ? ' 📋' : '';
+
+      html += `
+        <div class="activity-item">
+          <div style="display:flex;align-items:center;min-width:0;">
+            <span class="activity-status status-${ago.status}"></span>
+            <div style="min-width:0;">
+              <div class="activity-name">${displayName}${roleBadge}</div>
+              <div class="activity-email">${u.linkedName ? u.email + ' · ' : ''}${u.role}</div>
+            </div>
+          </div>
+          <div class="activity-time">
+            <div class="time-main">${ago.text}</div>
+            <div class="time-sub">${fullDate}</div>
+          </div>
+        </div>`;
+    });
+
+    // Legend
+    html += `
+      <div style="margin-top:14px;display:flex;gap:16px;font-size:11px;color:var(--muted);">
+        <span><span class="activity-status status-recent" style="vertical-align:middle;"></span> Last 24h</span>
+        <span><span class="activity-status status-stale" style="vertical-align:middle;"></span> 1–7 days</span>
+        <span><span class="activity-status status-old" style="vertical-align:middle;"></span> 7+ days</span>
+        <span><span class="activity-status status-never" style="vertical-align:middle;"></span> Never</span>
+      </div>`;
+
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<p style="color:#dc2626;">Error: ${e.message}</p>`;
+  }
+}
+
+/* ══════════════════════════════════════════
    GLOBAL BINDINGS
    ══════════════════════════════════════════ */
 window.login = login;
@@ -1091,6 +1220,8 @@ window.showPersonDetails = showPersonDetails;
 window.viewCallSheets = viewCallSheets;
 window.showUserModal = showUserModal;
 window.closeUserModal = closeUserModal;
+window.showActivityModal = showActivityModal;
+window.closeActivityModal = closeActivityModal;
 window.addUser = addUser;
 window.deleteUser = deleteUser;
 window.toggleSort = toggleSort;
