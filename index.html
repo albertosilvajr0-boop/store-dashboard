@@ -534,12 +534,14 @@ function bdcStats(rows) {
 function salesStats(rows) {
   let totalUnits = safeNum(dashboardData.salesTotalUnits ?? 0);
   let topName = '–', topVal = 0;
+  let repSalesSum = 0;
   rows.forEach(r => {
     const s = safeNum(r.sales);
+    repSalesSum += s;
     if (s > topVal) { topVal = s; topName = r.name || '–'; }
   });
   const active = rows.filter(r => safeNum(r.sales) > 0 || safeNum(r.calls) > 0).length || rows.length || 1;
-  const avgUnits = active > 0 ? (totalUnits / active).toFixed(2) : '0';
+  const avgUnits = active > 0 ? (repSalesSum / active).toFixed(2) : '0';
   return { totalUnits, avgUnits, topName, topVal };
 }
 
