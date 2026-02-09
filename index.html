@@ -500,6 +500,8 @@ async function showDashboard() {
     dashboardData.sales = Array.isArray(payload?.sales) ? payload.sales : [];
     dashboardData.bdc   = Array.isArray(payload?.bdc)   ? payload.bdc   : [];
     dashboardData.bdc = dashboardData.bdc.map(x => ({ calls: 0, texts: 0, ...x }));
+    // Total Units from "User Act" sheet (col M, "Total" row) — sent by backend
+    dashboardData.salesTotalUnits = payload.salesTotalUnits ?? null;
 
     renderDashboard();
     prefetchForDashboard(dashboardData);
@@ -529,15 +531,22 @@ function bdcStats(rows) {
 }
 
 function salesStats(rows) {
-  let totalUnits = 0;
+  // totalUnits comes from backend (User Act sheet, col M "Total" row)
+  // fallback to summing reps if not provided
+  let totalUnits = dashboardData.salesTotalUnits;
+  if (totalUnits === undefined || totalUnits === null) {
+    totalUnits = 0;
+    rows.forEach(r => { totalUnits += safeNum(r.sales); });
+  } else {
+    totalUnits = safeNum(totalUnits);
+  }
   let topName = '–', topVal = 0;
   rows.forEach(r => {
     const s = safeNum(r.sales);
-    totalUnits += s;
     if (s > topVal) { topVal = s; topName = r.name || '–'; }
   });
   const active = rows.filter(r => safeNum(r.sales) > 0 || safeNum(r.calls) > 0).length || rows.length || 1;
-  const avgUnits = (totalUnits / active).toFixed(2);
+  const avgUnits = active > 0 ? (totalUnits / active).toFixed(2) : '0';
   return { totalUnits, avgUnits, topName, topVal };
 }
 
@@ -895,9 +904,14 @@ async function viewCallSheets(name) {
     if (!result?.ok) throw new Error(result?.error || 'Failed to load call sheets');
     const rows = result.data?.calls || result.calls || [];
 
-    const trs = rows.map(r => `
+    const trs = rows.map(r => {
+      const custName = r.name || '–';
+      const custCell = r.link
+        ? `<a href="${r.link}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline;font-weight:600;">${custName}</a>`
+        : custName;
+      return `
       <tr>
-        <td style="text-align:left;padding:8px;">${r.name || '–'}</td>
+        <td style="text-align:left;padding:8px;">${custCell}</td>
         <td style="padding:8px;">${r.phone || '–'}</td>
         <td style="padding:8px;">${r.email || '–'}</td>
         <td style="padding:8px;">${r.salesPerson || '–'}</td>
@@ -909,7 +923,8 @@ async function viewCallSheets(name) {
         <td style="padding:8px;">${r.bucket || '–'}</td>
         <td style="padding:8px;">${r.status || '–'}</td>
         <td style="padding:8px;">${r.reason || '–'}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
 
     appEl.innerHTML = `
       <div class="topbar">
