@@ -1341,30 +1341,59 @@ async function loadActivity() {
 
     if (!users.length) { el.innerHTML = '<p style="color:var(--muted);">No users found.</p>'; return; }
 
-    let html = '';
-    users.forEach(u => {
-      const ago = timeAgo(u.lastLogin);
-      const displayName = u.linkedName || u.email;
-      const fullDate = u.lastLogin
-        ? u.lastLogin.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-        : '—';
-      const roleBadge = u.role === 'superadmin' ? ' 👑' : u.role === 'admin' ? ' ⭐' : u.role === 'manager' ? ' 📋' : '';
+    // Group by day
+    const now = new Date();
+    const todayStr = now.toDateString();
+    const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toDateString();
 
-      html += `
-        <div class="activity-item">
-          <div style="display:flex;align-items:center;min-width:0;">
-            <span class="activity-status status-${ago.status}"></span>
-            <div style="min-width:0;">
-              <div class="activity-name">${displayName}${roleBadge}</div>
-              <div class="activity-email">${u.linkedName ? u.email + ' · ' : ''}${u.role}</div>
-            </div>
-          </div>
-          <div class="activity-time">
-            <div class="time-main">${ago.text}</div>
-            <div class="time-sub">${fullDate}</div>
-          </div>
-        </div>`;
+    const groups = new Map(); // label → [users]
+    const neverGroup = [];
+
+    users.forEach(u => {
+      if (!u.lastLogin) { neverGroup.push(u); return; }
+      const dayStr = u.lastLogin.toDateString();
+      let label;
+      if (dayStr === todayStr) label = 'Today';
+      else if (dayStr === yesterdayStr) label = 'Yesterday';
+      else {
+        label = u.lastLogin.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      }
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label).push(u);
     });
+    if (neverGroup.length) groups.set('Never Logged In', neverGroup);
+
+    let html = '';
+    for (const [label, group] of groups) {
+      const isToday = label === 'Today';
+      const countBadge = `<span style="background:${isToday ? '#dcfce7' : '#f4f4f5'};color:${isToday ? '#166534' : '#71717a'};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-left:8px;">${group.length}</span>`;
+      html += `<div style="margin-top:16px;margin-bottom:6px;font-weight:700;font-size:13px;color:${isToday ? '#166534' : 'var(--muted)'};text-transform:uppercase;letter-spacing:.3px;">${label}${countBadge}</div>`;
+
+      group.forEach(u => {
+        const ago = timeAgo(u.lastLogin);
+        const displayName = u.linkedName || u.email;
+        const loginTime = u.lastLogin
+          ? u.lastLogin.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+          : '—';
+        const roleBadge = u.role === 'superadmin' ? ' 👑' : u.role === 'admin' ? ' ⭐' : u.role === 'manager' ? ' 📋' : '';
+
+        html += `
+          <div class="activity-item">
+            <div style="display:flex;align-items:center;min-width:0;">
+              <span class="activity-status status-${ago.status}"></span>
+              <div style="min-width:0;">
+                <div class="activity-name">${displayName}${roleBadge}</div>
+                <div class="activity-email">${u.linkedName ? u.email + ' · ' : ''}${u.role}</div>
+              </div>
+            </div>
+            <div class="activity-time">
+              <div class="time-main">${ago.text}</div>
+              <div class="time-sub">${loginTime}</div>
+            </div>
+          </div>`;
+      });
+    }
 
     // Legend
     html += `
