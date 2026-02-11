@@ -361,7 +361,7 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz6tDT43rDMWaPFV_nKNxd6A4C-IJUjBxlRAxitCnNorIdYIdTqFD9g-DYUK3lLouWi/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwcHZR9ht6Hk7eZXNCGOk0bS6hEfoYOuBCTrT6F9Ha48fH1VrXkTDSxAIjT9e0WVYOH/exec';
 const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
 
 /* ── Crash reporter ── */
@@ -1194,6 +1194,7 @@ function renderReassignments(rows) {
   // Stats
   const total = sorted.length;
   const critical = sorted.filter(r => r.daysSince >= 5).length;
+  const reviewCount = sorted.filter(r => r.status === 'Active - Manager Review').length;
   const bySheet = {};
   sorted.forEach(r => { bySheet[r.sheet] = (bySheet[r.sheet] || 0) + 1; });
   const sheetCount = Object.keys(bySheet).length;
@@ -1222,6 +1223,10 @@ function renderReassignments(rows) {
           <div class="stat-value">${total}</div>
         </div>
         <div class="reassign-stat">
+          <div class="stat-label">Manager Review ⚠️</div>
+          <div class="stat-value" style="color:#991b1b;">${reviewCount}</div>
+        </div>
+        <div class="reassign-stat">
           <div class="stat-label">Critical (5+ days) 🔴</div>
           <div class="stat-value" style="color:#dc2626;">${critical}</div>
         </div>
@@ -1244,33 +1249,58 @@ function reassignTableHTML(rows) {
   const sc = (col) => reassignSort.col === col ? 'sorted' : '';
   const ar = (col) => reassignSort.col === col ? (reassignSort.dir === 'desc' ? '▼' : '▲') : '▽';
 
-  let html = `<table><thead><tr>
+  const headerRow = `<tr>
     <th class="${sc('daysSince')}" onclick="toggleReassignSort('daysSince')">Days Since <span class="sort-arrow">${ar('daysSince')}</span></th>
     <th class="${sc('customer')}" onclick="toggleReassignSort('customer')">Customer <span class="sort-arrow">${ar('customer')}</span></th>
     <th>Phone</th>
     <th class="${sc('salesPerson')}" onclick="toggleReassignSort('salesPerson')">Sales Rep <span class="sort-arrow">${ar('salesPerson')}</span></th>
     <th class="${sc('bdcAgent')}" onclick="toggleReassignSort('bdcAgent')">BDC Agent <span class="sort-arrow">${ar('bdcAgent')}</span></th>
     <th class="${sc('source')}" onclick="toggleReassignSort('source')">Source <span class="sort-arrow">${ar('source')}</span></th>
-    <th class="${sc('bucket')}" onclick="toggleReassignSort('bucket')">Bucket <span class="sort-arrow">${ar('bucket')}</span></th>
+    <th class="${sc('status')}" onclick="toggleReassignSort('status')">Status <span class="sort-arrow">${ar('status')}</span></th>
     <th class="${sc('sheet')}" onclick="toggleReassignSort('sheet')">Assigned To <span class="sort-arrow">${ar('sheet')}</span></th>
-  </tr></thead><tbody>`;
+  </tr>`;
 
-  rows.forEach(r => {
-    const dc = r.daysSince >= 9 ? 'days-9p' : r.daysSince >= 8 ? 'days-8' : r.daysSince >= 7 ? 'days-7' : r.daysSince >= 6 ? 'days-6' : r.daysSince >= 5 ? 'days-5' : r.daysSince >= 4 ? 'days-4' : 'days-3';
-    html += `<tr>
-      <td><span class="days-badge ${dc}">${r.daysSince}</span></td>
-      <td style="text-align:left;"><a class="reassign-link" href="${r.link}" target="_blank">${r.customer || '—'}</a></td>
-      <td style="font-size:12px;">${r.phone || '—'}</td>
-      <td style="font-size:12px;">${r.salesPerson || '—'}</td>
-      <td style="font-size:12px;">${r.bdcAgent || '—'}</td>
-      <td style="font-size:12px;">${r.source || '—'}</td>
-      <td style="font-size:12px;">${r.bucket || '—'}</td>
-      <td><span class="reassign-sheet-badge">${r.sheet}</span></td>
-    </tr>`;
-  });
+  // Split into Manager Review and rest
+  const reviewRows = rows.filter(r => r.status === 'Active - Manager Review');
+  const otherRows = rows.filter(r => r.status !== 'Active - Manager Review');
+
+  let html = '<table><thead>' + headerRow + '</thead><tbody>';
+
+  if (reviewRows.length > 0) {
+    html += `<tr><td colspan="8" style="background:#fef2f2;text-align:left;padding:10px 12px;font-weight:700;font-size:13px;color:#991b1b;border-bottom:2px solid #fecaca;">
+      ⚠️ Manager Review Required (${reviewRows.length})
+    </td></tr>`;
+    reviewRows.forEach(r => { html += reassignRowHTML(r); });
+  }
+
+  if (otherRows.length > 0) {
+    if (reviewRows.length > 0) {
+      html += `<tr><td colspan="8" style="background:#f9fafb;text-align:left;padding:10px 12px;font-weight:700;font-size:13px;color:var(--muted);border-bottom:2px solid var(--line);">
+        Other Flagged Leads (${otherRows.length})
+      </td></tr>`;
+    }
+    otherRows.forEach(r => { html += reassignRowHTML(r); });
+  }
 
   html += '</tbody></table>';
   return html;
+}
+
+function reassignRowHTML(r) {
+  const dc = r.daysSince >= 9 ? 'days-9p' : r.daysSince >= 8 ? 'days-8' : r.daysSince >= 7 ? 'days-7' : r.daysSince >= 6 ? 'days-6' : r.daysSince >= 5 ? 'days-5' : r.daysSince >= 4 ? 'days-4' : 'days-3';
+  const isReview = r.status === 'Active - Manager Review';
+  const rowStyle = isReview ? 'background:#fff5f5;' : '';
+  const statusStyle = isReview ? 'color:#991b1b;font-weight:700;' : 'font-size:12px;';
+  return `<tr style="${rowStyle}">
+    <td><span class="days-badge ${dc}">${r.daysSince}</span></td>
+    <td style="text-align:left;"><a class="reassign-link" href="${r.link}" target="_blank">${r.customer || '—'}</a></td>
+    <td style="font-size:12px;">${r.phone || '—'}</td>
+    <td style="font-size:12px;">${r.salesPerson || '—'}</td>
+    <td style="font-size:12px;">${r.bdcAgent || '—'}</td>
+    <td style="font-size:12px;">${r.source || '—'}</td>
+    <td style="${statusStyle}">${r.status || '—'}</td>
+    <td><span class="reassign-sheet-badge">${r.sheet}</span></td>
+  </tr>`;
 }
 
 function sortReassignRows(rows, sortState) {
@@ -1278,7 +1308,7 @@ function sortReassignRows(rows, sortState) {
   const mult = dir === 'desc' ? -1 : 1;
   return [...rows].sort((a, b) => {
     if (col === 'daysSince') return mult * (a.daysSince - b.daysSince);
-    if (col === 'customer' || col === 'salesPerson' || col === 'bdcAgent' || col === 'source' || col === 'bucket' || col === 'sheet') {
+    if (col === 'customer' || col === 'salesPerson' || col === 'bdcAgent' || col === 'source' || col === 'status' || col === 'sheet') {
       return mult * (a[col] || '').localeCompare(b[col] || '');
     }
     return 0;
