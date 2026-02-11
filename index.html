@@ -402,6 +402,19 @@ function timeStr() {
   return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
+/* ── Motivational Quotes ── */
+const TOPBAR_QUOTES = [
+  "The leaderboard doesn't lie.",
+  "You don't get paid for intention. You get paid for execution.",
+  "Volume creates luck.",
+  "Every call is an opportunity. Every note is a receipt.",
+  "Small daily disciplines become big monthly commissions."
+];
+function setTopbarQuote() {
+  const el = document.getElementById('topbarQuote');
+  if (el) el.textContent = TOPBAR_QUOTES[Math.floor(Math.random() * TOPBAR_QUOTES.length)];
+}
+
 /* ── Cache ── */
 const personCache = new Map();
 const callListCache = new Map();
@@ -552,6 +565,7 @@ async function showDashboard() {
     console.log('DEBUG salesTotalUnits from backend:', payload.salesTotalUnits, '| stored:', dashboardData.salesTotalUnits);
 
     renderDashboard();
+    setTopbarQuote();
     prefetchForDashboard(dashboardData);
   } catch (err) {
     console.error('Dashboard error:', err);
@@ -782,7 +796,7 @@ function renderDashboard() {
       <div class="topbar-logo">SA</div>
       <div class="topbar-info">
         <div class="topbar-title">BDC &amp; Sales Leaderboards</div>
-        <div class="topbar-sub"><span class="refresh-dot"></span>Live performance · San Antonio CDJR · Updates every morning Mon–Sat</div>
+        <div class="topbar-sub"><span class="refresh-dot"></span><span id="topbarQuote"></span></div>
       </div>
       <div class="topbar-actions">
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showReassignments()">🔄 Reassignments</button>' : ''}
