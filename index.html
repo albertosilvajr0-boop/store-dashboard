@@ -417,23 +417,48 @@ function setTopbarQuote() {
 
 /* ── Click Tracking ── */
 function todayDateStr() {
-  return new Date().toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  return new Date().toISOString().slice(0, 10); // "2026-02-12" — stable format
 }
 
-async function trackClick() {
-  if (!window.userData?.uid) return;
+let _clickBuffer = 0;
+let _clickFlushing = false;
+
+async function _flushClicks() {
+  if (!window.userData?.uid || _clickBuffer <= 0 || _clickFlushing) return;
+  _clickFlushing = true;
+  const count = _clickBuffer;
+  _clickBuffer = 0;
   try {
     const userRef = doc(db, 'users', window.userData.uid);
+    const today = todayDateStr();
     const snap = await getDoc(userRef);
     const data = snap.data() || {};
-    const today = todayDateStr();
     if (data.clickDate === today) {
-      await updateDoc(userRef, { clicksToday: increment(1) });
+      await updateDoc(userRef, { clicksToday: increment(count) });
     } else {
-      await setDoc(userRef, { clicksToday: 1, clickDate: today }, { merge: true });
+      await setDoc(userRef, { clicksToday: count, clickDate: today }, { merge: true });
     }
-  } catch (e) { /* silent */ }
+  } catch (e) { _clickBuffer += count; /* retry next flush */ }
+  _clickFlushing = false;
 }
+
+// Track ALL clicks on the page
+document.addEventListener('click', () => {
+  if (!window.userData?.uid) return;
+  _clickBuffer++;
+});
+
+// Flush every 15 seconds
+setInterval(_flushClicks, 15000);
+
+// Flush on page unload (tab close, navigation away, refresh)
+window.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') _flushClicks();
+});
+window.addEventListener('beforeunload', () => { _flushClicks(); });
+
+// Legacy wrapper for explicit trackClick() calls
+function trackClick() { /* now handled by global listener */ }
 
 /* ── Cache ── */
 const personCache = new Map();
@@ -1390,7 +1415,7 @@ async function loadActivity() {
   try {
     const snap = await getDocs(collection(db, 'users'));
     const users = [];
-    const today = todayDateStr();
+    const today = todayDateStr(); // "2026-02-12" format
     snap.forEach(d => {
       const u = d.data();
       const ll = u.lastLogin?.toDate ? u.lastLogin.toDate() : (u.lastLogin ? new Date(u.lastLogin) : null);
