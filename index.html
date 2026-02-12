@@ -253,6 +253,10 @@ body::before {
 
 /* ── News Page ── */
 .news-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; transition: box-shadow .15s; }
+
+/* ── Resources Dropdown ── */
+.res-link { display:block;padding:9px 16px;color:var(--text);text-decoration:none;font-size:13px;font-weight:500;white-space:nowrap;transition:background .12s; }
+.res-link:hover { background:#f4f4f5; }
 .news-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
 .news-title { font-size: 15px; font-weight: 700; line-height: 1.4; }
 .news-title a { color: var(--text); text-decoration: none; }
@@ -854,12 +858,22 @@ function renderDashboard() {
         <div class="topbar-sub"><span class="refresh-dot"></span><span id="topbarQuote"></span></div>
       </div>
       <div class="topbar-actions">
-        <div style="display:flex;flex-direction:column;gap:3px;">
-          <div style="display:flex;gap:3px;">
-            <a href="https://www.eleadcrm.com/evo2/fresh/login.asp?logout=1&CID=0&USERID=0&SESSIONID=" target="_blank" class="topbar-btn manage" style="font-size:10px;padding:3px 6px;text-decoration:none;text-align:center;flex:1;min-width:0;">OG CRM</a>
-            <a href="https://retail.cdk.com/login/login.htm?fromURI=%2Fapp%2Fmodern-retailing_eleadcrm_2%2Fexk3ds515b8OezABo697%2Fsso%2Fsaml%3FSAMLRequest%3DfZHNbsIwEITvSLxD5DtxYpofLEBKywWJqhK0PfSCnHgpFrGdep2C%252BvRNQ1HLhevMfjua3SkKXbOGF63fmzV8tIA%252BOOnaID87M9I6w61AhdwIDch9xTfF44qzMOKNs95Wtib%252FmduIQATnlTUkWC5mRMkqjuNdFCdsIuVdPk5LEGlaTuKclWkpdxkJXsFhB8xIx3cUYgtLg14Y30kRS0YxG7HsORrzKOOMvZFg0dVQRvie2nvfIKfUgReqDit5CCurqWgaqq0EZ0ZnR5n3LdQgZOX0llE4HcYSkzgp8yf4Ku5tOskooqU%252FJUlQXHo8WIOtBrcB96kqeFmv%252FiKPx2N4WdmHdjyZDwdBMO1Pxfsybn5rfkqvRoeDX%252BH6afNv%252BRelayState%253DdFxaLjd1sdMLESVboy1b35lo" target="_blank" class="topbar-btn manage" style="font-size:10px;padding:3px 6px;text-decoration:none;text-align:center;flex:1;min-width:0;">NW CRM</a>
+        <div style="position:relative;display:inline-block;" id="resourcesWrap">
+          <button class="topbar-btn manage" onclick="toggleResourcesMenu()" style="min-width:110px;">📂 Resources ▾</button>
+          <div id="resourcesMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:1000;min-width:220px;padding:6px 0;max-height:70vh;overflow-y:auto;">
+            <a href="https://sanantoniododge.com" target="_blank" class="res-link">🌐 Website</a>
+            <a href="https://www.eleadcrm.com/evo2/fresh/login.asp?logout=1&CID=0&USERID=0&SESSIONID=" target="_blank" class="res-link">🖥️ Old CRM</a>
+            <a href="https://retail.cdk.com/login/login.htm?fromURI=%2Fapp%2Fmodern-retailing_eleadcrm_2%2Fexk3ds515b8OezABo697%2Fsso%2Fsaml%3FSAMLRequest%3DfZHNbsIwEITvSLxD5DtxYpofLEBKywWJqhK0PfSCnHgpFrGdep2C%252BvRNQ1HLhevMfjua3SkKXbOGF63fmzV8tIA%252BOOnaID87M9I6w61AhdwIDch9xTfF44qzMOKNs95Wtib%252FmduIQATnlTUkWC5mRMkqjuNdFCdsIuVdPk5LEGlaTuKclWkpdxkJXsFhB8xIx3cUYgtLg14Y30kRS0YxG7HsORrzKOOMvZFg0dVQRvie2nvfIKfUgReqDit5CCurqWgaqq0EZ0ZnR5n3LdQgZOX0llE4HcYSkzgp8yf4Ku5tOskooqU%252FJUlQXHo8WIOtBrcB96kqeFmv%252FiKPx2N4WdmHdjyZDwdBMO1Pxfsybn5rfkqvRoeDX%252BH6afNv%26RelayState%3DdFxaLjd1sdMLESVboy1b35lo" target="_blank" class="res-link">💻 New CRM</a>
+            <a href="https://auth.automotivemastermind.com/u/login/identifier?state=hKFo2SBqMkxFdnZqYUQzSmI5OFIzVFNXNGtLM2IzcDZrZDVXX6Fur3VuaXZlcnNhbC1sb2dpbqN0aWTZIEhzUjFTRVpIZ2RWeG1HNm1CX0xNM0lnQXJqSXNiVFY0o2NpZNkgQ0pHdUlpQThVZmRiVDRxMU54RTF6dU9NV3d0YTNuOWg" target="_blank" class="res-link">🧠 Dealer Mastermind</a>
+            <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
+            <a href="https://www.ramtrucks.com/vehicle-selector.incentives.html" target="_blank" class="res-link">🐏 Ram Incentives</a>
+            <a href="https://www.jeep.com/vehicle-selector.incentives.html" target="_blank" class="res-link">🏔️ Jeep Incentives</a>
+            <a href="https://www.jeep.com/vehicle-selector.incentives.html" target="_blank" class="res-link">🔵 Chrysler Incentives</a>
+            <a href="https://www.dodge.com/vehicle-selector.incentives.html" target="_blank" class="res-link">🔴 Dodge Incentives</a>
+            <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
+            <a href="https://dealerconnect.chrysler.com/login/login.html?TYPE=33554433&REALMOID=06-d5cf97a8-bccd-103a-bcc8-83e513310cb3&GUID=&SMAUTHREASON=0&METHOD=GET&SMAGENTNAME=-SM-go2wTta208Z%2fzUCz5DbrvlEeym4%2faGv4KExpKsILVlca0WM5Is5FVfWQwWKj8l6iqbgVd8ZTMNXhZNBworA80NiZt2yCKScu&TARGET=-SM-https%3a%2f%2fdealerconnect%2echrysler%2ecom%2fportal%2fController%2fPortal" target="_blank" class="res-link">🔗 DealerConnect</a>
+            <a href="#" onclick="event.preventDefault();closeResourcesMenu();showAutoNews();" class="res-link">📰 News (Last 48 hrs)</a>
           </div>
-          <button class="topbar-btn manage" onclick="showAutoNews()" style="width:100%;">📰 News</button>
         </div>
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showReassignments()">🔄 Reassignments</button>' : ''}
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showActivityModal()">🕐 Activity</button>' : ''}
@@ -1743,6 +1757,21 @@ window.toggleReassignSort = toggleReassignSort;
 window.showAutoNews = showAutoNews;
 window.toggleNewsGroup = toggleNewsGroup;
 window.toggleAllNewsGroups = toggleAllNewsGroups;
+
+function toggleResourcesMenu() {
+  const menu = document.getElementById('resourcesMenu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+function closeResourcesMenu() {
+  document.getElementById('resourcesMenu').style.display = 'none';
+}
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('resourcesWrap');
+  if (wrap && !wrap.contains(e.target)) closeResourcesMenu();
+});
+window.toggleResourcesMenu = toggleResourcesMenu;
+window.closeResourcesMenu = closeResourcesMenu;
 window.addUser = addUser;
 window.deleteUser = deleteUser;
 window.toggleSort = toggleSort;
