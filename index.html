@@ -370,7 +370,7 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBFiTAg-zzSBf06XHi8-NnsZB5Aj5rxirxB1pVrLfTAznRqZcHT89A98U_XV7fpg5g/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybStkW6Ary4CSIKyoBxLRqhqFh6XHXQAfBiASQZU8RNdQ-AsIGkwZFIM6P1ReZ4Duu/exec';
 const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
 
 /* ── Crash reporter ── */
@@ -1401,7 +1401,7 @@ async function showAutoNews() {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
           <h2 style="margin:0;font-size:20px;">📰 Automotive Industry News</h2>
-          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Latest articles from the past 48 hours</p>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Latest articles from the past week</p>
         </div>
         <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
       </div>
@@ -1437,17 +1437,38 @@ function renderAutoNews(articles) {
   if (articles.length === 0) {
     cardsHTML = '<div class="detail-card" style="text-align:center;padding:40px;color:var(--muted);font-size:15px;">No recent articles found. Check back later.</div>';
   } else {
-    articles.forEach(a => {
-      const timeStr = a.date ? timeAgoNews(new Date(a.date)) : '';
-      cardsHTML += `
-        <div class="news-card">
-          <div class="news-title"><a href="${a.link}" target="_blank" rel="noopener">${a.title}</a></div>
-          <div class="news-meta">
-            ${a.source ? `<span class="news-source">${a.source}</span>` : ''}
-            ${timeStr ? `<span>🕐 ${timeStr}</span>` : ''}
-          </div>
-        </div>`;
-    });
+    const cdgArticles = articles.filter(a => a.source === 'Car Dealership Guy');
+    const otherArticles = articles.filter(a => a.source !== 'Car Dealership Guy');
+
+    if (cdgArticles.length > 0) {
+      cardsHTML += `<div style="margin-bottom:6px;font-weight:700;font-size:13px;color:#166534;text-transform:uppercase;letter-spacing:.3px;">⭐ Car Dealership Guy <span style="background:#dcfce7;padding:2px 8px;border-radius:10px;font-size:11px;">${cdgArticles.length}</span></div>`;
+      cdgArticles.forEach(a => {
+        const timeStr = a.date ? timeAgoNews(new Date(a.date)) : '';
+        cardsHTML += `
+          <div class="news-card" style="border-left:3px solid #22c55e;">
+            <div class="news-title"><a href="${a.link}" target="_blank" rel="noopener">${a.title}</a></div>
+            <div class="news-meta">
+              <span class="news-source" style="background:#dcfce7;color:#166534;">${a.source}</span>
+              ${timeStr ? `<span>🕐 ${timeStr}</span>` : ''}
+            </div>
+          </div>`;
+      });
+    }
+
+    if (otherArticles.length > 0) {
+      cardsHTML += `<div style="margin-top:18px;margin-bottom:6px;font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;">Industry News <span style="background:#f4f4f5;padding:2px 8px;border-radius:10px;font-size:11px;">${otherArticles.length}</span></div>`;
+      otherArticles.forEach(a => {
+        const timeStr = a.date ? timeAgoNews(new Date(a.date)) : '';
+        cardsHTML += `
+          <div class="news-card">
+            <div class="news-title"><a href="${a.link}" target="_blank" rel="noopener">${a.title}</a></div>
+            <div class="news-meta">
+              ${a.source ? `<span class="news-source">${a.source}</span>` : ''}
+              ${timeStr ? `<span>🕐 ${timeStr}</span>` : ''}
+            </div>
+          </div>`;
+      });
+    }
   }
 
   app.innerHTML = `
@@ -1455,7 +1476,7 @@ function renderAutoNews(articles) {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
           <h2 style="margin:0;font-size:20px;">📰 Automotive Industry News</h2>
-          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Latest articles from the past 48 hours · ${articles.length} article${articles.length !== 1 ? 's' : ''}</p>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Latest articles from the past week · ${articles.length} article${articles.length !== 1 ? 's' : ''}</p>
         </div>
         <div style="display:flex;gap:8px;">
           <button class="topbar-btn manage" onclick="showAutoNews()">↻ Refresh</button>
