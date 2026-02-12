@@ -854,11 +854,13 @@ function renderDashboard() {
         <div class="topbar-sub"><span class="refresh-dot"></span><span id="topbarQuote"></span></div>
       </div>
       <div class="topbar-actions">
-        <div style="display:flex;gap:4px;">
-          <a href="https://www.eleadcrm.com/evo2/fresh/login.asp?logout=1&CID=0&USERID=0&SESSIONID=" target="_blank" class="topbar-btn manage" style="font-size:11px;padding:4px 8px;text-decoration:none;text-align:center;flex:1;">OG CRM</a>
-          <a href="https://retail.cdk.com/login/login.htm?fromURI=%2Fapp%2Fmodern-retailing_eleadcrm_2%2Fexk3ds515b8OezABo697%2Fsso%2Fsaml%3FSAMLRequest%3DfZHNbsIwEITvSLxD5DtxYpofLEBKywWJqhK0PfSCnHgpFrGdep2C%252BvRNQ1HLhevMfjua3SkKXbOGF63fmzV8tIA%252BOOnaID87M9I6w61AhdwIDch9xTfF44qzMOKNs95Wtib%252FmduIQATnlTUkWC5mRMkqjuNdFCdsIuVdPk5LEGlaTuKclWkpdxkJXsFhB8xIx3cUYgtLg14Y30kRS0YxG7HsORrzKOOMvZFg0dVQRvie2nvfIKfUgReqDit5CCurqWgaqq0EZ0ZnR5n3LdQgZOX0llE4HcYSkzgp8yf4Ku5tOskooqU%252FJUlQXHo8WIOtBrcB96kqeFmv%252FiKPx2N4WdmHdjyZDwdBMO1Pxfsybn5rfkqvRoeDX%252BH6afNv%252BRelayState%253DdFxaLjd1sdMLESVboy1b35lo" target="_blank" class="topbar-btn manage" style="font-size:11px;padding:4px 8px;text-decoration:none;text-align:center;flex:1;">NW CRM</a>
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <div style="display:flex;gap:3px;">
+            <a href="https://www.eleadcrm.com/evo2/fresh/login.asp?logout=1&CID=0&USERID=0&SESSIONID=" target="_blank" class="topbar-btn manage" style="font-size:10px;padding:3px 6px;text-decoration:none;text-align:center;flex:1;min-width:0;">OG CRM</a>
+            <a href="https://retail.cdk.com/login/login.htm?fromURI=%2Fapp%2Fmodern-retailing_eleadcrm_2%2Fexk3ds515b8OezABo697%2Fsso%2Fsaml%3FSAMLRequest%3DfZHNbsIwEITvSLxD5DtxYpofLEBKywWJqhK0PfSCnHgpFrGdep2C%252BvRNQ1HLhevMfjua3SkKXbOGF63fmzV8tIA%252BOOnaID87M9I6w61AhdwIDch9xTfF44qzMOKNs95Wtib%252FmduIQATnlTUkWC5mRMkqjuNdFCdsIuVdPk5LEGlaTuKclWkpdxkJXsFhB8xIx3cUYgtLg14Y30kRS0YxG7HsORrzKOOMvZFg0dVQRvie2nvfIKfUgReqDit5CCurqWgaqq0EZ0ZnR5n3LdQgZOX0llE4HcYSkzgp8yf4Ku5tOskooqU%252FJUlQXHo8WIOtBrcB96kqeFmv%252FiKPx2N4WdmHdjyZDwdBMO1Pxfsybn5rfkqvRoeDX%252BH6afNv%252BRelayState%253DdFxaLjd1sdMLESVboy1b35lo" target="_blank" class="topbar-btn manage" style="font-size:10px;padding:3px 6px;text-decoration:none;text-align:center;flex:1;min-width:0;">NW CRM</a>
+          </div>
+          <button class="topbar-btn manage" onclick="showAutoNews()" style="width:100%;">📰 News</button>
         </div>
-        <button class="topbar-btn manage" onclick="showAutoNews()">📰 News</button>
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showReassignments()">🔄 Reassignments</button>' : ''}
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showActivityModal()">🕐 Activity</button>' : ''}
         ${isAdmin() ? '<button class="topbar-btn manage" onclick="showUserModal()">👤 Manage Users</button>' : ''}
