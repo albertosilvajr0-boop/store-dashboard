@@ -370,7 +370,7 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybStkW6Ary4CSIKyoBxLRqhqFh6XHXQAfBiASQZU8RNdQ-AsIGkwZFIM6P1ReZ4Duu/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby6dg7qFOznuzMOAuQ42aMoGf3AL7VUPcouc7enyKp6YE_AbGUzImDcG0vr2NMYoBxV/exec';
 const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
 
 /* ── Crash reporter ── */
@@ -1437,38 +1437,57 @@ function renderAutoNews(articles) {
   if (articles.length === 0) {
     cardsHTML = '<div class="detail-card" style="text-align:center;padding:40px;color:var(--muted);font-size:15px;">No recent articles found. Check back later.</div>';
   } else {
-    const cdgArticles = articles.filter(a => a.source === 'Car Dealership Guy');
-    const otherArticles = articles.filter(a => a.source !== 'Car Dealership Guy');
+    // Group by source
+    const groups = new Map();
+    articles.forEach(a => {
+      const src = a.source || 'Other';
+      if (!groups.has(src)) groups.set(src, []);
+      groups.get(src).push(a);
+    });
 
-    if (cdgArticles.length > 0) {
-      cardsHTML += `<div style="margin-bottom:6px;font-weight:700;font-size:13px;color:#166534;text-transform:uppercase;letter-spacing:.3px;">⭐ Car Dealership Guy <span style="background:#dcfce7;padding:2px 8px;border-radius:10px;font-size:11px;">${cdgArticles.length}</span></div>`;
-      cdgArticles.forEach(a => {
+    // Sort groups: CDG first, then by article count descending
+    const sortedGroups = [...groups.entries()].sort((a, b) => {
+      if (a[0] === 'Car Dealership Guy') return -1;
+      if (b[0] === 'Car Dealership Guy') return 1;
+      return b[1].length - a[1].length;
+    });
+
+    let groupIdx = 0;
+    sortedGroups.forEach(([source, items]) => {
+      const isCDG = source === 'Car Dealership Guy';
+      const groupId = 'newsGroup' + groupIdx++;
+      const bgColor = isCDG ? '#f0fdf4' : '#f9fafb';
+      const badgeBg = isCDG ? '#dcfce7' : '#f4f4f5';
+      const badgeColor = isCDG ? '#166534' : '#71717a';
+      const icon = isCDG ? '⭐' : '📰';
+
+      cardsHTML += `
+        <div style="margin-bottom:8px;border:1px solid var(--line);border-radius:10px;overflow:hidden;">
+          <div onclick="toggleNewsGroup('${groupId}')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:${bgColor};cursor:pointer;user-select:none;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:14px;">${icon}</span>
+              <span style="font-weight:700;font-size:14px;color:${isCDG ? '#166534' : 'var(--text)'};">${source}</span>
+              <span style="background:${badgeBg};color:${badgeColor};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${items.length}</span>
+            </div>
+            <span id="${groupId}Arrow" style="font-size:12px;color:var(--muted);transition:transform .2s;">▼</span>
+          </div>
+          <div id="${groupId}" style="border-top:1px solid var(--line);">`;
+
+      items.forEach(a => {
         const timeStr = a.date ? timeAgoNews(new Date(a.date)) : '';
         cardsHTML += `
-          <div class="news-card" style="border-left:3px solid #22c55e;">
-            <div class="news-title"><a href="${a.link}" target="_blank" rel="noopener">${a.title}</a></div>
-            <div class="news-meta">
-              <span class="news-source" style="background:#dcfce7;color:#166534;">${a.source}</span>
-              ${timeStr ? `<span>🕐 ${timeStr}</span>` : ''}
-            </div>
-          </div>`;
+            <div style="padding:12px 16px;border-bottom:1px solid var(--line);${isCDG ? 'border-left:3px solid #22c55e;' : ''}">
+              <div class="news-title"><a href="${a.link}" target="_blank" rel="noopener">${a.title}</a></div>
+              <div class="news-meta">
+                ${timeStr ? `<span>🕐 ${timeStr}</span>` : ''}
+              </div>
+            </div>`;
       });
-    }
 
-    if (otherArticles.length > 0) {
-      cardsHTML += `<div style="margin-top:18px;margin-bottom:6px;font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;">Industry News <span style="background:#f4f4f5;padding:2px 8px;border-radius:10px;font-size:11px;">${otherArticles.length}</span></div>`;
-      otherArticles.forEach(a => {
-        const timeStr = a.date ? timeAgoNews(new Date(a.date)) : '';
-        cardsHTML += `
-          <div class="news-card">
-            <div class="news-title"><a href="${a.link}" target="_blank" rel="noopener">${a.title}</a></div>
-            <div class="news-meta">
-              ${a.source ? `<span class="news-source">${a.source}</span>` : ''}
-              ${timeStr ? `<span>🕐 ${timeStr}</span>` : ''}
-            </div>
-          </div>`;
-      });
-    }
+      cardsHTML += `
+          </div>
+        </div>`;
+    });
   }
 
   app.innerHTML = `
@@ -1476,15 +1495,43 @@ function renderAutoNews(articles) {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
           <h2 style="margin:0;font-size:20px;">📰 Automotive Industry News</h2>
-          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Latest articles from the past week · ${articles.length} article${articles.length !== 1 ? 's' : ''}</p>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Latest articles from the past 48 hours · ${articles.length} article${articles.length !== 1 ? 's' : ''}</p>
         </div>
         <div style="display:flex;gap:8px;">
+          <button class="topbar-btn manage" onclick="toggleAllNewsGroups()">Expand / Collapse All</button>
           <button class="topbar-btn manage" onclick="showAutoNews()">↻ Refresh</button>
           <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
         </div>
       </div>
       ${cardsHTML}
     </div>`;
+}
+
+function toggleNewsGroup(id) {
+  const el = document.getElementById(id);
+  const arrow = document.getElementById(id + 'Arrow');
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = '';
+    if (arrow) arrow.style.transform = 'rotate(0deg)';
+  } else {
+    el.style.display = 'none';
+    if (arrow) arrow.style.transform = 'rotate(-90deg)';
+  }
+}
+
+function toggleAllNewsGroups() {
+  const groups = document.querySelectorAll('[id^="newsGroup"]');
+  let hiddenCount = 0;
+  groups.forEach(g => { if (g.id.indexOf('Arrow') === -1 && g.style.display === 'none') hiddenCount++; });
+  const shouldShow = hiddenCount > 0;
+  groups.forEach(g => {
+    if (g.id.indexOf('Arrow') !== -1) {
+      g.style.transform = shouldShow ? 'rotate(0deg)' : 'rotate(-90deg)';
+    } else {
+      g.style.display = shouldShow ? '' : 'none';
+    }
+  });
 }
 
 function timeAgoNews(date) {
@@ -1665,6 +1712,8 @@ window.closeActivityModal = closeActivityModal;
 window.showReassignments = showReassignments;
 window.toggleReassignSort = toggleReassignSort;
 window.showAutoNews = showAutoNews;
+window.toggleNewsGroup = toggleNewsGroup;
+window.toggleAllNewsGroups = toggleAllNewsGroups;
 window.addUser = addUser;
 window.deleteUser = deleteUser;
 window.toggleSort = toggleSort;
