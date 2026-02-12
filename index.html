@@ -257,6 +257,10 @@ body::before {
 /* ── Resources Dropdown ── */
 .res-link { display:block;padding:9px 16px;color:var(--text);text-decoration:none;font-size:13px;font-weight:500;white-space:nowrap;transition:background .12s; }
 .res-link:hover { background:#f4f4f5; }
+.custom-link-wrap { display:flex;align-items:center;gap:0; }
+.custom-link-wrap .res-link { flex:1;overflow:hidden;text-overflow:ellipsis; }
+.custom-link-del { background:none;border:none;color:#dc2626;font-size:14px;cursor:pointer;padding:6px 10px;opacity:0.4;transition:opacity .15s; }
+.custom-link-del:hover { opacity:1; }
 .news-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
 .news-title { font-size: 15px; font-weight: 700; line-height: 1.4; }
 .news-title a { color: var(--text); text-decoration: none; }
@@ -627,6 +631,7 @@ async function showDashboard() {
     setTopbarQuote();
     prefetchForDashboard(dashboardData);
     checkLeadsAtRisk();
+    loadCustomLinks();
   } catch (err) {
     console.error('Dashboard error:', err);
     document.getElementById('app').innerHTML = `
@@ -1030,6 +1035,19 @@ function renderDashboard() {
             <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
             <a href="https://dealerconnect.chrysler.com/login/login.html?TYPE=33554433&REALMOID=06-d5cf97a8-bccd-103a-bcc8-83e513310cb3&GUID=&SMAUTHREASON=0&METHOD=GET&SMAGENTNAME=-SM-go2wTta208Z%2fzUCz5DbrvlEeym4%2faGv4KExpKsILVlca0WM5Is5FVfWQwWKj8l6iqbgVd8ZTMNXhZNBworA80NiZt2yCKScu&TARGET=-SM-https%3a%2f%2fdealerconnect%2echrysler%2ecom%2fportal%2fController%2fPortal" target="_blank" class="res-link">🔗 DealerConnect</a>
             <a href="#" onclick="event.preventDefault();closeResourcesMenu();showAutoNews();" class="res-link">📰 News (Last 48 hrs)</a>
+            <div id="customLinksSection"></div>
+            <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
+            <div id="addLinkForm" style="padding:6px 12px;">
+              <a href="#" onclick="event.preventDefault();event.stopPropagation();showAddLinkForm();" class="res-link" id="addLinkBtn" style="color:var(--accent);font-weight:600;">➕ Add My Link</a>
+              <div id="addLinkFields" style="display:none;padding:4px 0;">
+                <input id="newLinkLabel" type="text" placeholder="Label (e.g. My Tool)" maxlength="40" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px;margin-bottom:4px;box-sizing:border-box;" onclick="event.stopPropagation();" onkeydown="if(event.key==='Enter'){event.stopPropagation();document.getElementById('newLinkUrl').focus();}" />
+                <input id="newLinkUrl" type="url" placeholder="https://..." maxlength="500" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px;margin-bottom:6px;box-sizing:border-box;" onclick="event.stopPropagation();" onkeydown="if(event.key==='Enter'){event.stopPropagation();saveCustomLink();}" />
+                <div style="display:flex;gap:6px;">
+                  <button onclick="event.stopPropagation();saveCustomLink();" style="flex:1;padding:5px 0;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Save</button>
+                  <button onclick="event.stopPropagation();hideAddLinkForm();" style="flex:1;padding:5px 0;background:var(--line);color:var(--text);border:none;border-radius:6px;font-size:12px;cursor:pointer;">Cancel</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showReassignments()">🔄 Reassignments</button>' : ''}
@@ -2084,6 +2102,83 @@ window.showAutoNews = showAutoNews;
 window.toggleNewsGroup = toggleNewsGroup;
 window.toggleAllNewsGroups = toggleAllNewsGroups;
 
+/* ══════════════════════════════════════════
+   CUSTOM USER LINKS (Resources)
+   ══════════════════════════════════════════ */
+window._customLinks = [];
+
+async function loadCustomLinks() {
+  if (!window.userData?.uid) return;
+  try {
+    const snap = await getDoc(doc(db, 'users', window.userData.uid));
+    window._customLinks = snap.exists() ? (snap.data().customLinks || []) : [];
+  } catch { window._customLinks = []; }
+  renderCustomLinks();
+}
+
+function renderCustomLinks() {
+  const container = document.getElementById('customLinksSection');
+  if (!container) return;
+  if (!window._customLinks.length) { container.innerHTML = ''; return; }
+
+  let html = '<div style="border-top:1px solid var(--line);margin:4px 0;"></div>';
+  html += '<div style="padding:2px 14px 0;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">My Links</div>';
+  window._customLinks.forEach((lnk, i) => {
+    const safeLabel = (lnk.label || 'Link').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeUrl = (lnk.url || '#').replace(/"/g, '&quot;');
+    html += `<div class="custom-link-wrap">
+      <a href="${safeUrl}" target="_blank" class="res-link" style="flex:1;">🔖 ${safeLabel}</a>
+      <button class="custom-link-del" onclick="event.stopPropagation();removeCustomLink(${i});" title="Remove">✕</button>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function showAddLinkForm() {
+  document.getElementById('addLinkBtn').style.display = 'none';
+  document.getElementById('addLinkFields').style.display = 'block';
+  document.getElementById('newLinkLabel').focus();
+}
+function hideAddLinkForm() {
+  document.getElementById('addLinkBtn').style.display = 'block';
+  document.getElementById('addLinkFields').style.display = 'none';
+  document.getElementById('newLinkLabel').value = '';
+  document.getElementById('newLinkUrl').value = '';
+}
+
+async function saveCustomLink() {
+  const label = (document.getElementById('newLinkLabel').value || '').trim();
+  let url = (document.getElementById('newLinkUrl').value || '').trim();
+  if (!label || !url) { alert('Please enter both a label and URL.'); return; }
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+  window._customLinks.push({ label, url });
+  try {
+    await setDoc(doc(db, 'users', window.userData.uid), { customLinks: window._customLinks }, { merge: true });
+  } catch (err) {
+    console.error('Save custom link error:', err);
+    window._customLinks.pop();
+    alert('Failed to save link.');
+    return;
+  }
+  hideAddLinkForm();
+  renderCustomLinks();
+}
+
+async function removeCustomLink(idx) {
+  if (idx < 0 || idx >= window._customLinks.length) return;
+  const removed = window._customLinks.splice(idx, 1);
+  try {
+    await setDoc(doc(db, 'users', window.userData.uid), { customLinks: window._customLinks }, { merge: true });
+  } catch (err) {
+    console.error('Remove custom link error:', err);
+    window._customLinks.splice(idx, 0, ...removed);
+    alert('Failed to remove link.');
+    return;
+  }
+  renderCustomLinks();
+}
+
 function toggleResourcesMenu() {
   const menu = document.getElementById('resourcesMenu');
   menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
@@ -2098,6 +2193,10 @@ document.addEventListener('click', function(e) {
 });
 window.toggleResourcesMenu = toggleResourcesMenu;
 window.closeResourcesMenu = closeResourcesMenu;
+window.showAddLinkForm = showAddLinkForm;
+window.hideAddLinkForm = hideAddLinkForm;
+window.saveCustomLink = saveCustomLink;
+window.removeCustomLink = removeCustomLink;
 window.addUser = addUser;
 window.deleteUser = deleteUser;
 window.toggleSort = toggleSort;
