@@ -374,7 +374,7 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby6dg7qFOznuzMOAuQ42aMoGf3AL7VUPcouc7enyKp6YE_AbGUzImDcG0vr2NMYoBxV/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby6rk-SET2XSE8_Kk-aa6Lg-CLm5z1zMIm16ld95sOfx9zquTHD8gOu5ovy1hq_aCpV/exec';
 const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
 
 /* ── Crash reporter ── */
@@ -1033,6 +1033,7 @@ function renderDashboard() {
           </div>
         </div>
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showReassignments()">🔄 Reassignments</button>' : ''}
+        ${isAdmin() ? '<button class="topbar-btn manage" onclick="showSourceLeaderboard()">📊 Sources</button>' : ''}
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showActivityModal()">🕐 Activity</button>' : ''}
         ${isAdmin() ? '<button class="topbar-btn manage" onclick="showUserModal()">👤 Manage Users</button>' : ''}
         <button class="topbar-btn logout" onclick="logout()">Logout</button>
@@ -1745,6 +1746,171 @@ function timeAgoNews(date) {
 }
 
 /* ══════════════════════════════════════════
+   SOURCE LEADERBOARD
+   ══════════════════════════════════════════ */
+let sourceSort = { col: 'total', dir: 'desc' };
+
+async function showSourceLeaderboard() {
+  if (!isAdmin()) { alert('Only admins can view the Source Leaderboard.'); return; }
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="max-width:1200px;margin:0 auto;padding:18px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h2 style="margin:0;font-size:20px;">📊 Source Leaderboard</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Lead source performance across all distribution tabs</p>
+        </div>
+        <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
+      </div>
+      <div class="loading-wrap"><div class="spinner"></div></div>
+    </div>`;
+
+  try {
+    const url = `${SCRIPT_URL}?route=sourcestats&session=${encodeURIComponent(window.sessionToken || '')}`;
+    const resp = await fetch(url);
+    const raw = await resp.text();
+    let result;
+    try { result = JSON.parse(raw); } catch { throw new Error(`Non-JSON response.\nHTTP ${resp.status}\n\n${raw}`); }
+    if (!result.ok) throw new Error(result.error || 'Backend error');
+
+    window._sourceRows = result.sources || [];
+    renderSourceLeaderboard(window._sourceRows);
+  } catch (err) {
+    app.innerHTML = `
+      <div style="max-width:800px;margin:40px auto;padding:20px;">
+        <div class="detail-card" style="color:#dc2626;text-align:center;">
+          <h2>Error Loading Sources</h2>
+          <p>${err.message}</p>
+          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">← Back</button>
+        </div>
+      </div>`;
+  }
+}
+
+function renderSourceLeaderboard(rows) {
+  const sorted = sortSourceRows(rows, sourceSort);
+
+  // Summary stats
+  const totalLeads = sorted.reduce((s, r) => s + r.total, 0);
+  const totalAtRisk = sorted.reduce((s, r) => s + r.atRisk, 0);
+  const totalReview = sorted.reduce((s, r) => s + r.managerReview, 0);
+  const sourceCount = sorted.length;
+
+  // Best & worst follow-up (by atRiskPct, min 5 leads)
+  const qualified = sorted.filter(r => r.total >= 5);
+  let bestSource = '–', worstSource = '–';
+  if (qualified.length) {
+    const byRisk = [...qualified].sort((a, b) => a.atRiskPct - b.atRiskPct);
+    bestSource = byRisk[0].source + ' (' + byRisk[0].atRiskPct + '%)';
+    worstSource = byRisk[byRisk.length - 1].source + ' (' + byRisk[byRisk.length - 1].atRiskPct + '%)';
+  }
+
+  const sc = (col) => sourceSort.col === col ? 'sorted' : '';
+  const ar = (col) => sourceSort.col === col ? (sourceSort.dir === 'desc' ? '▼' : '▲') : '▽';
+
+  let tableHTML = `<table><thead><tr>
+    <th class="${sc('source')}" onclick="toggleSourceSort('source')">Source <span class="sort-arrow">${ar('source')}</span></th>
+    <th class="${sc('total')}" onclick="toggleSourceSort('total')">Total Leads <span class="sort-arrow">${ar('total')}</span></th>
+    <th class="${sc('atRisk')}" onclick="toggleSourceSort('atRisk')">At Risk (3+d) <span class="sort-arrow">${ar('atRisk')}</span></th>
+    <th class="${sc('atRiskPct')}" onclick="toggleSourceSort('atRiskPct')">% At Risk <span class="sort-arrow">${ar('atRiskPct')}</span></th>
+    <th class="${sc('managerReview')}" onclick="toggleSourceSort('managerReview')">Mgr Review <span class="sort-arrow">${ar('managerReview')}</span></th>
+    <th class="${sc('avgDaysSince')}" onclick="toggleSourceSort('avgDaysSince')">Avg Days Since <span class="sort-arrow">${ar('avgDaysSince')}</span></th>
+    <th class="${sc('avgLeadAge')}" onclick="toggleSourceSort('avgLeadAge')">Avg Lead Age <span class="sort-arrow">${ar('avgLeadAge')}</span></th>
+    <th class="${sc('repCount')}" onclick="toggleSourceSort('repCount')">Reps <span class="sort-arrow">${ar('repCount')}</span></th>
+  </tr></thead><tbody>`;
+
+  sorted.forEach((r, i) => {
+    // Color code % at risk
+    const riskColor = r.atRiskPct >= 60 ? '#dc2626' : r.atRiskPct >= 40 ? '#ea580c' : r.atRiskPct >= 20 ? '#ca8a04' : '#16a34a';
+    const riskBg = r.atRiskPct >= 60 ? '#fef2f2' : r.atRiskPct >= 40 ? '#fff7ed' : r.atRiskPct >= 20 ? '#fefce8' : '#f0fdf4';
+    const topRepsStr = r.topReps.map(t => t.name.split(' ')[0] + ' (' + t.count + ')').join(', ');
+
+    tableHTML += `<tr>
+      <td style="text-align:left;font-weight:600;">${r.source}</td>
+      <td><strong>${r.total}</strong></td>
+      <td>${r.atRisk > 0 ? '<span style="color:#dc2626;font-weight:600;">' + r.atRisk + '</span>' : '0'}</td>
+      <td style="background:${riskBg};color:${riskColor};font-weight:700;">${r.atRiskPct}%</td>
+      <td>${r.managerReview > 0 ? '<span style="color:#991b1b;font-weight:600;">' + r.managerReview + '</span>' : '0'}</td>
+      <td>${r.avgDaysSince}</td>
+      <td>${r.avgLeadAge}d</td>
+      <td title="${topRepsStr}">${r.repCount}</td>
+    </tr>`;
+  });
+
+  tableHTML += '</tbody></table>';
+
+  document.getElementById('app').innerHTML = `
+    <div style="max-width:1200px;margin:0 auto;padding:18px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h2 style="margin:0;font-size:20px;">📊 Source Leaderboard</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Lead source performance across all distribution tabs · ${sourceCount} sources · ${totalLeads} total leads</p>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="topbar-btn manage" onclick="showSourceLeaderboard()">↻ Refresh</button>
+          <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
+        </div>
+      </div>
+
+      <div class="reassign-stats">
+        <div class="reassign-stat">
+          <div class="stat-label">Total Leads</div>
+          <div class="stat-value">${totalLeads}</div>
+        </div>
+        <div class="reassign-stat">
+          <div class="stat-label">At Risk (3+ days) 🔴</div>
+          <div class="stat-value" style="color:#dc2626;">${totalAtRisk}</div>
+        </div>
+        <div class="reassign-stat">
+          <div class="stat-label">Manager Review ⚠️</div>
+          <div class="stat-value" style="color:#991b1b;">${totalReview}</div>
+        </div>
+        <div class="reassign-stat">
+          <div class="stat-label">Best Follow-Up ✅</div>
+          <div class="stat-value" style="font-size:13px;color:#16a34a;">${bestSource}</div>
+        </div>
+        <div class="reassign-stat">
+          <div class="stat-label">Worst Follow-Up 🚨</div>
+          <div class="stat-value" style="font-size:13px;color:#dc2626;">${worstSource}</div>
+        </div>
+      </div>
+
+      <div class="table-card" id="sourceTable">${tableHTML}</div>
+
+      <div style="margin-top:12px;padding:12px 16px;background:var(--card);border:1px solid var(--line);border-radius:10px;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;">📈 Quick Insights</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">
+          ${qualified.length >= 2 ? `• <strong style="color:#16a34a;">${[...qualified].sort((a,b)=>a.atRiskPct-b.atRiskPct)[0].source}</strong> has the best follow-up rate — only ${[...qualified].sort((a,b)=>a.atRiskPct-b.atRiskPct)[0].atRiskPct}% at risk<br>` : ''}
+          ${qualified.length >= 2 ? `• <strong style="color:#dc2626;">${[...qualified].sort((a,b)=>b.atRiskPct-a.atRiskPct)[0].source}</strong> needs attention — ${[...qualified].sort((a,b)=>b.atRiskPct-a.atRiskPct)[0].atRiskPct}% of leads at risk<br>` : ''}
+          ${sorted.length > 0 ? `• <strong>${sorted[0].source}</strong> produces the most volume with ${sorted[0].total} total leads<br>` : ''}
+          ${totalReview > 0 ? `• <strong style="color:#991b1b;">${totalReview} leads</strong> across all sources are in Manager Review status` : '• No leads currently in Manager Review — great job!'}
+        </div>
+      </div>
+    </div>`;
+}
+
+function sortSourceRows(rows, sortState) {
+  const { col, dir } = sortState;
+  const mult = dir === 'desc' ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    if (col === 'source') return mult * (a.source || '').localeCompare(b.source || '');
+    return mult * ((a[col] || 0) - (b[col] || 0));
+  });
+}
+
+function toggleSourceSort(col) {
+  if (sourceSort.col === col) {
+    sourceSort.dir = sourceSort.dir === 'desc' ? 'asc' : 'desc';
+  } else {
+    sourceSort.col = col;
+    sourceSort.dir = 'desc';
+  }
+  if (window._sourceRows) {
+    renderSourceLeaderboard(window._sourceRows);
+  }
+}
+
+/* ══════════════════════════════════════════
    ACTIVITY LOG
    ══════════════════════════════════════════ */
 function showActivityModal() {
@@ -1912,6 +2078,8 @@ window.showActivityModal = showActivityModal;
 window.closeActivityModal = closeActivityModal;
 window.showReassignments = showReassignments;
 window.toggleReassignSort = toggleReassignSort;
+window.showSourceLeaderboard = showSourceLeaderboard;
+window.toggleSourceSort = toggleSourceSort;
 window.showAutoNews = showAutoNews;
 window.toggleNewsGroup = toggleNewsGroup;
 window.toggleAllNewsGroups = toggleAllNewsGroups;
