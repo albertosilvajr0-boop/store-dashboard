@@ -626,6 +626,7 @@ async function showDashboard() {
     renderDashboard();
     setTopbarQuote();
     prefetchForDashboard(dashboardData);
+    checkLeadsAtRisk();
   } catch (err) {
     console.error('Dashboard error:', err);
     document.getElementById('app').innerHTML = `
@@ -758,6 +759,162 @@ function kpiColumnGradient(value, min, max) {
 }
 
 /* ── Render ── */
+/* ── Personal Scorecard + Rank + Leads at Risk ── */
+function buildPersonalSection(sales, bdc) {
+  const me = window.userData || {};
+  const myName = (me.linkedName || '').trim();
+  if (!myName) return ''; // not linked, skip
+
+  // Always rank by primary metric (sales desc, shown desc) regardless of current sort
+  const salesByUnits = [...sales].sort((a, b) => safeNum(b.sales) - safeNum(a.sales));
+  const bdcByShown   = [...bdc].sort((a, b) => safeNum(shownVal(b)) - safeNum(shownVal(a)));
+
+  const myNameUpper = myName.toUpperCase();
+  const salesIdx = salesByUnits.findIndex(r => (r.name || '').toUpperCase() === myNameUpper);
+  const bdcIdx   = bdcByShown.findIndex(r => (r.name || '').toUpperCase() === myNameUpper);
+
+  const inSales = salesIdx >= 0;
+  const inBDC   = bdcIdx >= 0;
+  if (!inSales && !inBDC) return ''; // not on either board
+
+  let cards = '';
+
+  if (inSales) {
+    const r = salesByUnits[salesIdx];
+    const rank = salesIdx + 1;
+    const total = salesByUnits.length;
+    const unitsSold = safeNum(r.sales);
+    const calls = safeNum(r.calls);
+    const texts = safeNum(r.texts);
+    const created = safeNum(r.created ?? r.created_count ?? 0);
+    const shown = safeNum(shownVal(r));
+    const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '📊';
+
+    cards = `
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:80px;text-align:center;">
+          <div style="font-size:22px;">${rankEmoji}</div>
+          <div style="font-size:20px;font-weight:800;color:var(--accent);">#${rank}</div>
+          <div style="font-size:10px;color:var(--muted);">of ${total} reps</div>
+        </div>
+        <div style="flex:1;min-width:60px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;">${unitsSold}</div>
+          <div style="font-size:10px;color:var(--muted);">Units</div>
+        </div>
+        <div style="flex:1;min-width:60px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;">${calls}</div>
+          <div style="font-size:10px;color:var(--muted);">Calls</div>
+        </div>
+        <div style="flex:1;min-width:60px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;">${texts}</div>
+          <div style="font-size:10px;color:var(--muted);">Texts</div>
+        </div>
+        <div style="flex:1;min-width:60px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;">${created}</div>
+          <div style="font-size:10px;color:var(--muted);">Appts Created</div>
+        </div>
+        <div style="flex:1;min-width:60px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;">${shown}</div>
+          <div style="font-size:10px;color:var(--muted);">Appts Shown</div>
+        </div>
+      </div>`;
+  }
+
+  if (inBDC) {
+    const r = bdcByShown[bdcIdx];
+    const rank = bdcIdx + 1;
+    const total = bdcByShown.length;
+    const shown = safeNum(shownVal(r));
+    const calls = safeNum(r.calls);
+    const texts = safeNum(r.texts);
+    const created = safeNum(r.created ?? r.created_count ?? 0);
+    const due = safeNum(r.due ?? r.due_count ?? 0);
+    const pct = due > 0 ? ((shown / due) * 100).toFixed(1) + '%' : '–';
+    const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '📊';
+
+    cards = `
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:80px;text-align:center;">
+          <div style="font-size:22px;">${rankEmoji}</div>
+          <div style="font-size:20px;font-weight:800;color:var(--accent);">#${rank}</div>
+          <div style="font-size:10px;color:var(--muted);">of ${total} agents</div>
+        </div>
+        <div style="flex:1;min-width:60px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;">${shown}</div>
+          <div style="font-size:10px;color:var(--muted);">Shown</div>
+        </div>
+        <div style="flex:1;min-width:60px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;">${calls}</div>
+          <div style="font-size:10px;color:var(--muted);">Calls</div>
+        </div>
+        <div style="flex:1;min-width:60px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;">${texts}</div>
+          <div style="font-size:10px;color:var(--muted);">Texts</div>
+        </div>
+        <div style="flex:1;min-width:60px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;">${created}</div>
+          <div style="font-size:10px;color:var(--muted);">Created</div>
+        </div>
+        <div style="flex:1;min-width:60px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;">${pct}</div>
+          <div style="font-size:10px;color:var(--muted);">Show Rate</div>
+        </div>
+      </div>`;
+  }
+
+  const teamLabel = inSales ? 'Sales' : 'BDC';
+  const firstName = myName.split(' ')[0] || myName;
+
+  return `
+    <div style="max-width:1400px;margin:0 auto 12px;padding:0 12px;">
+      <div id="personalCard" style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:14px;padding:16px 20px;color:#fff;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+          <div style="font-size:15px;font-weight:700;">👋 Hey ${firstName} — here's your ${teamLabel} snapshot</div>
+          <div style="font-size:11px;color:#94a3b8;">MTD Performance</div>
+        </div>
+        ${cards}
+        <div id="leadsAtRiskBanner"></div>
+      </div>
+    </div>`;
+}
+
+/* Fetch reassignment data in background and show leads-at-risk banner */
+function checkLeadsAtRisk() {
+  const me = window.userData || {};
+  const myName = (me.linkedName || '').trim();
+  if (!myName) return;
+
+  const url = `${SCRIPT_URL}?route=reassignments&session=${encodeURIComponent(window.sessionToken || '')}`;
+  fetch(url).then(r => r.text()).then(raw => {
+    let result;
+    try { result = JSON.parse(raw); } catch { return; }
+    if (!result.ok) return;
+
+    const rows = result.rows || [];
+    const myNameUpper = myName.toUpperCase();
+    const myLeads = rows.filter(r =>
+      (r.salesPerson || '').toUpperCase().includes(myNameUpper) ||
+      (r.bdcAgent || '').toUpperCase().includes(myNameUpper)
+    );
+
+    const banner = document.getElementById('leadsAtRiskBanner');
+    if (!banner) return;
+
+    if (myLeads.length > 0) {
+      const reviewCount = myLeads.filter(r => r.status === 'Active - Manager Review').length;
+      const reviewNote = reviewCount > 0 ? ` · <span style="color:#fca5a5;">${reviewCount} in Manager Review</span>` : '';
+      banner.innerHTML = `
+        <div onclick="${(isAdmin() || isManager()) ? 'showReassignments()' : ''}" style="margin-top:12px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:10px 14px;${(isAdmin() || isManager()) ? 'cursor:pointer;' : ''}display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+          <div>
+            <span style="font-size:14px;">🚨</span>
+            <strong style="color:#fca5a5;">You have ${myLeads.length} lead${myLeads.length !== 1 ? 's' : ''} with 3+ days no contact</strong>${reviewNote}
+          </div>
+          ${(isAdmin() || isManager()) ? '<span style="font-size:12px;color:#94a3b8;">View Reassignments →</span>' : '<span style="font-size:12px;color:#94a3b8;">Follow up today!</span>'}
+        </div>`;
+    }
+  }).catch(() => {});
+}
+
 function renderDashboard() {
   const me = window.userData || {};
   const bdc   = sortRows(dashboardData.bdc, bdcSort, 'bdc');
@@ -883,6 +1040,7 @@ function renderDashboard() {
     </div>
 
     <!-- Two Panels -->
+    ${buildPersonalSection(sales, bdc)}
     <div class="panels">
 
       <!-- ═══ BDC Panel ═══ -->
