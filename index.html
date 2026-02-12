@@ -904,7 +904,7 @@ function renderDashboard() {
               </tr>
             </thead>
             <tbody>
-              ${bdc.length ? bdc.map((r, i) => bdcRow(r, i)).join('') : '<tr><td colspan="8" style="padding:30px;color:var(--muted);">No BDC data</td></tr>'}
+              ${bdc.length ? bdc.map((r, i) => bdcRow(r, i)).join('') : '<tr><td colspan="9" style="padding:30px;color:var(--muted);">No BDC data</td></tr>'}
             </tbody>
           </table>
         </div>
@@ -1299,6 +1299,7 @@ function reassignTableHTML(rows) {
   const ar = (col) => reassignSort.col === col ? (reassignSort.dir === 'desc' ? '▼' : '▲') : '▽';
 
   const headerRow = `<tr>
+    <th class="${sc('leadAge')}" onclick="toggleReassignSort('leadAge')">Lead Age <span class="sort-arrow">${ar('leadAge')}</span></th>
     <th class="${sc('daysSince')}" onclick="toggleReassignSort('daysSince')">Days Since <span class="sort-arrow">${ar('daysSince')}</span></th>
     <th class="${sc('customer')}" onclick="toggleReassignSort('customer')">Customer <span class="sort-arrow">${ar('customer')}</span></th>
     <th>Phone</th>
@@ -1316,7 +1317,7 @@ function reassignTableHTML(rows) {
   let html = '<table><thead>' + headerRow + '</thead><tbody>';
 
   if (reviewRows.length > 0) {
-    html += `<tr><td colspan="8" style="background:#fef2f2;text-align:left;padding:10px 12px;font-weight:700;font-size:13px;color:#991b1b;border-bottom:2px solid #fecaca;">
+    html += `<tr><td colspan="9" style="background:#fef2f2;text-align:left;padding:10px 12px;font-weight:700;font-size:13px;color:#991b1b;border-bottom:2px solid #fecaca;">
       ⚠️ Manager Review Required (${reviewRows.length})
     </td></tr>`;
     reviewRows.forEach(r => { html += reassignRowHTML(r); });
@@ -1324,7 +1325,7 @@ function reassignTableHTML(rows) {
 
   if (otherRows.length > 0) {
     if (reviewRows.length > 0) {
-      html += `<tr><td colspan="8" style="background:#f9fafb;text-align:left;padding:10px 12px;font-weight:700;font-size:13px;color:var(--muted);border-bottom:2px solid var(--line);">
+      html += `<tr><td colspan="9" style="background:#f9fafb;text-align:left;padding:10px 12px;font-weight:700;font-size:13px;color:var(--muted);border-bottom:2px solid var(--line);">
         Other Flagged Leads (${otherRows.length})
       </td></tr>`;
     }
@@ -1341,6 +1342,7 @@ function reassignRowHTML(r) {
   const rowStyle = isReview ? 'background:#fff5f5;' : '';
   const statusStyle = isReview ? 'color:#991b1b;font-weight:700;' : 'font-size:12px;';
   return `<tr style="${rowStyle}">
+    <td style="font-size:12px;">${r.leadAge || '—'}</td>
     <td><span class="days-badge ${dc}">${r.daysSince}</span></td>
     <td style="text-align:left;"><a class="reassign-link" href="${r.link}" target="_blank">${r.customer || '—'}</a></td>
     <td style="font-size:12px;">${r.phone || '—'}</td>
@@ -1357,6 +1359,7 @@ function sortReassignRows(rows, sortState) {
   const mult = dir === 'desc' ? -1 : 1;
   return [...rows].sort((a, b) => {
     if (col === 'daysSince') return mult * (a.daysSince - b.daysSince);
+    if (col === 'leadAge') return mult * ((a.leadAge || 0) - (b.leadAge || 0));
     if (col === 'customer' || col === 'salesPerson' || col === 'bdcAgent' || col === 'source' || col === 'status' || col === 'sheet') {
       return mult * (a[col] || '').localeCompare(b[col] || '');
     }
@@ -1501,19 +1504,17 @@ async function loadActivity() {
 
         html += `
           <div class="activity-item">
-            <div style="display:flex;align-items:center;min-width:0;">
+            <div style="min-width:48px;text-align:center;">${clickBadge}</div>
+            <div style="display:flex;align-items:center;min-width:0;flex:1;">
               <span class="activity-status status-${ago.status}"></span>
               <div style="min-width:0;">
                 <div class="activity-name">${displayName}${roleBadge}</div>
                 <div class="activity-email">${u.linkedName ? u.email + ' · ' : ''}${u.role}</div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;">
-              <div>${clickBadge}</div>
-              <div class="activity-time">
-                <div class="time-main">${ago.text}</div>
-                <div class="time-sub">${loginTime}</div>
-              </div>
+            <div class="activity-time">
+              <div class="time-main">${ago.text}</div>
+              <div class="time-sub">${loginTime}</div>
             </div>
           </div>`;
       });
