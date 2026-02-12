@@ -1459,7 +1459,30 @@ function renderAutoNews(articles) {
       const bgColor = isCDG ? '#f0fdf4' : '#f9fafb';
       const badgeBg = isCDG ? '#dcfce7' : '#f4f4f5';
       const badgeColor = isCDG ? '#166534' : '#71717a';
-      const icon = isCDG ? '⭐' : '📰';
+
+      // Source-specific icons
+      const srcLower = source.toLowerCase();
+      let icon = '📰';
+      if (isCDG) icon = '🚗';
+      else if (srcLower.includes('automotive news')) icon = '🏭';
+      else if (srcLower.includes('cbt')) icon = '🎙️';
+      else if (srcLower.includes('reuters')) icon = '🌐';
+      else if (srcLower.includes('cnbc')) icon = '📈';
+      else if (srcLower.includes('bloomberg')) icon = '💹';
+      else if (srcLower.includes('fox')) icon = '📺';
+      else if (srcLower.includes('cnn')) icon = '📡';
+      else if (srcLower.includes('yahoo')) icon = '🟣';
+      else if (srcLower.includes('ap news') || srcLower.includes('associated press')) icon = '🔵';
+      else if (srcLower.includes('usa today')) icon = '🇺🇸';
+      else if (srcLower.includes('wall street') || srcLower.includes('wsj')) icon = '📊';
+      else if (srcLower.includes('motor') || srcLower.includes('drive') || srcLower.includes('torque')) icon = '🏎️';
+      else if (srcLower.includes('truck') || srcLower.includes('pickup')) icon = '🛻';
+      else if (srcLower.includes('ev') || srcLower.includes('electric') || srcLower.includes('electrek')) icon = '⚡';
+      else if (srcLower.includes('car') || srcLower.includes('auto')) icon = '🚙';
+      else if (srcLower.includes('dealer')) icon = '🤝';
+      else if (srcLower.includes('forbes')) icon = '💰';
+      else if (srcLower.includes('nbc')) icon = '📺';
+      else if (srcLower.includes('abc')) icon = '📺';
 
       cardsHTML += `
         <div style="margin-bottom:8px;border:1px solid var(--line);border-radius:10px;overflow:hidden;">
@@ -1469,9 +1492,9 @@ function renderAutoNews(articles) {
               <span style="font-weight:700;font-size:14px;color:${isCDG ? '#166534' : 'var(--text)'};">${source}</span>
               <span style="background:${badgeBg};color:${badgeColor};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${items.length}</span>
             </div>
-            <span id="${groupId}Arrow" style="font-size:12px;color:var(--muted);transition:transform .2s;">▼</span>
+            <span id="${groupId}Arrow" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg);">▼</span>
           </div>
-          <div id="${groupId}" style="border-top:1px solid var(--line);">`;
+          <div id="${groupId}" style="border-top:1px solid var(--line);display:none;">`;
 
       items.forEach(a => {
         const timeStr = a.date ? timeAgoNews(new Date(a.date)) : '';
