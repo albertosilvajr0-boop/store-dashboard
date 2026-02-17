@@ -261,6 +261,10 @@ body::before {
 .custom-link-wrap .res-link { flex:1;overflow:hidden;text-overflow:ellipsis; }
 .custom-link-del { background:none;border:none;color:#dc2626;font-size:14px;cursor:pointer;padding:6px 10px;opacity:0.4;transition:opacity .15s; }
 .custom-link-del:hover { opacity:1; }
+th[draggable="true"] { cursor:grab; user-select:none; position:relative; }
+th[draggable="true"]:active { cursor:grabbing; }
+th[draggable="true"]::after { content:'⠿'; position:absolute; top:2px; right:2px; font-size:8px; color:var(--muted); opacity:0.4; }
+th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
 .news-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
 .news-title { font-size: 15px; font-weight: 700; line-height: 1.4; }
 .news-title a { color: var(--text); text-decoration: none; }
@@ -671,6 +675,53 @@ function salesStats(rows) {
   return { totalUnits, avgUnits, topName, topVal };
 }
 
+/* ── Column definitions (draggable order) ── */
+const BDC_COL_DEFS = {
+  shown:    { key: 'shown',    label: 'Appts Shown', primary: true },
+  pctShown: { key: 'pctShown', label: '% Shown' },
+  due:      { key: 'due',      label: 'Appts Due' },
+  created:  { key: 'created',  label: 'Appts Created' },
+  calls:    { key: 'calls',    label: 'Calls' },
+  texts:    { key: 'texts',    label: 'Texts' },
+};
+const SALES_COL_DEFS = {
+  sales:    { key: 'sales',    label: 'Sales', primary: true },
+  pctShown: { key: 'pctShown', label: '% Shown' },
+  shown:    { key: 'shown',    label: 'Appts Shown' },
+  due:      { key: 'due',      label: 'Appts Due' },
+  created:  { key: 'created',  label: 'Appts Created' },
+  calls:    { key: 'calls',    label: 'Calls' },
+  texts:    { key: 'texts',    label: 'Texts' },
+};
+// Mutable order arrays (user can rearrange via drag)
+let bdcColOrder   = ['shown','pctShown','due','created','calls','texts'];
+let salesColOrder = ['sales','pctShown','shown','due','created','calls','texts'];
+
+let _dragPanel = null, _dragColKey = null;
+
+function onColDragStart(e, panel, colKey) {
+  _dragPanel = panel; _dragColKey = colKey;
+  e.dataTransfer.effectAllowed = 'move';
+  e.target.style.opacity = '0.5';
+}
+function onColDragEnd(e) { e.target.style.opacity = '1'; _dragPanel = null; _dragColKey = null; }
+function onColDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function onColDrop(e, panel, targetKey) {
+  e.preventDefault();
+  if (_dragPanel !== panel || !_dragColKey || _dragColKey === targetKey) return;
+  const arr = panel === 'bdc' ? bdcColOrder : salesColOrder;
+  const fromIdx = arr.indexOf(_dragColKey);
+  const toIdx = arr.indexOf(targetKey);
+  if (fromIdx < 0 || toIdx < 0) return;
+  arr.splice(fromIdx, 1);
+  arr.splice(toIdx, 0, _dragColKey);
+  renderDashboard();
+}
+window.onColDragStart = onColDragStart;
+window.onColDragEnd = onColDragEnd;
+window.onColDragOver = onColDragOver;
+window.onColDrop = onColDrop;
+
 /* ── Sort ── */
 function sortRows(rows, sortState, type) {
   const { col, dir } = sortState;
@@ -938,6 +989,9 @@ function renderDashboard() {
   function thAttr(panel, col) {
     return `class="${(panel === 'bdc' ? bdcSort : salesSort).col === col ? 'sorted' : ''}" onclick="toggleSort('${panel}','${col}')"`;
   }
+  function thDrag(panel, col) {
+    return `draggable="true" ondragstart="onColDragStart(event,'${panel}','${col}')" ondragend="onColDragEnd(event)" ondragover="onColDragOver(event)" ondrop="onColDrop(event,'${panel}','${col}')" style="cursor:grab;"`;
+  }
 
   function trophy(i) {
     if (i === 0) return '<span class="trophy">🥇</span>';
@@ -946,39 +1000,44 @@ function renderDashboard() {
     return '';
   }
 
-  function bdcRow(r, i) {
-    const name = r.name || '–';
+  /* ── BDC cell renderer ── */
+  function bdcCellData(r) {
     const shown   = safeNum(shownVal(r));
     const calls   = safeNum(r.calls);
     const texts   = safeNum(r.texts);
     const created = safeNum(r.created ?? r.created_count ?? 0);
     const due     = safeNum(r.due ?? r.due_count ?? 0);
     const pct     = due > 0 ? ((shown / due) * 100).toFixed(1) + '%' : (created > 0 ? ((shown / created) * 100).toFixed(1) + '%' : '–');
-    const top3    = i < 3 ? ' top3' : '';
-    const allowed = canViewName(name);
-    const click   = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', 'BDC')"` : '';
-    const cursor  = allowed ? 'cursor:pointer;' : 'opacity:0.7;';
-
-    // Column-relative gradient (best in column = green, worst = red)
     const callsS   = kpiColumnGradient(calls, bdcRanges.calls.min, bdcRanges.calls.max);
     const textsS   = kpiColumnGradient(texts, bdcRanges.texts.min, bdcRanges.texts.max);
     const createdS = kpiColumnGradient(created, bdcRanges.created.min, bdcRanges.created.max);
     const dueS     = kpiColumnGradient(due, bdcRanges.due.min, bdcRanges.due.max);
+    return {
+      shown:    `<td><strong>${shown}</strong></td>`,
+      pctShown: `<td>${pct}</td>`,
+      due:      `<td style="${dueS}">${due}</td>`,
+      created:  `<td style="${createdS}">${created}</td>`,
+      calls:    `<td style="${callsS}">${calls}</td>`,
+      texts:    `<td style="${textsS}">${texts}</td>`,
+    };
+  }
 
+  function bdcRow(r, i) {
+    const name = r.name || '–';
+    const top3    = i < 3 ? ' top3' : '';
+    const allowed = canViewName(name);
+    const click   = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', 'BDC')"` : '';
+    const cursor  = allowed ? 'cursor:pointer;' : 'opacity:0.7;';
+    const cells = bdcCellData(r);
     return `<tr class="${top3}" ${click} style="${cursor}">
       <td class="rank-cell">${trophy(i)}${i < 3 ? '' : (i + 1)}</td>
       <td class="name-cell">${name}</td>
-      <td><strong>${shown}</strong></td>
-      <td style="${callsS}">${calls}</td>
-      <td style="${textsS}">${texts}</td>
-      <td style="${createdS}">${created}</td>
-      <td style="${dueS}">${due}</td>
-      <td>${pct}</td>
+      ${bdcColOrder.map(k => cells[k]).join('')}
     </tr>`;
   }
 
-  function salesRow(r, i) {
-    const name    = r.name || '–';
+  /* ── Sales cell renderer ── */
+  function salesCellData(r) {
     const salesV  = safeNum(r.sales);
     const calls   = safeNum(r.calls);
     const texts   = safeNum(r.texts);
@@ -986,28 +1045,33 @@ function renderDashboard() {
     const due     = safeNum(r.due ?? r.due_count ?? 0);
     const shown   = safeNum(shownVal(r));
     const pct     = due > 0 ? ((shown / due) * 100).toFixed(1) + '%' : (created > 0 ? ((shown / created) * 100).toFixed(1) + '%' : '–');
-    const top3    = i < 3 ? ' top3' : '';
-    const allowed = canViewName(name);
-    const click   = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', 'Sales')"` : '';
-    const cursor  = allowed ? 'cursor:pointer;' : 'opacity:0.7;';
-
-    // KPI colors for weekly metrics
     const callsK   = kpiClass(calls, WEEKLY_TARGETS.calls);
     const textsK   = kpiClass(texts, WEEKLY_TARGETS.texts);
     const createdK = kpiClass(created, WEEKLY_TARGETS.created);
     const dueK     = kpiClass(due, WEEKLY_TARGETS.due);
     const shownK   = kpiClass(shown, WEEKLY_TARGETS.shown);
+    return {
+      sales:    `<td class="sales-primary">${salesV}</td>`,
+      pctShown: `<td>${pct}</td>`,
+      shown:    `<td class="${shownK}">${shown}</td>`,
+      due:      `<td class="${dueK}">${due}</td>`,
+      created:  `<td class="${createdK}">${created}</td>`,
+      calls:    `<td class="${callsK}">${calls}</td>`,
+      texts:    `<td class="${textsK}">${texts}</td>`,
+    };
+  }
 
+  function salesRow(r, i) {
+    const name    = r.name || '–';
+    const top3    = i < 3 ? ' top3' : '';
+    const allowed = canViewName(name);
+    const click   = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', 'Sales')"` : '';
+    const cursor  = allowed ? 'cursor:pointer;' : 'opacity:0.7;';
+    const cells = salesCellData(r);
     return `<tr class="${top3}" ${click} style="${cursor}">
       <td class="rank-cell">${trophy(i)}${i < 3 ? '' : (i + 1)}</td>
       <td class="name-cell">${name}</td>
-      <td class="sales-primary">${salesV}</td>
-      <td class="${callsK}">${calls}</td>
-      <td class="${textsK}">${texts}</td>
-      <td class="${createdK}">${created}</td>
-      <td class="${dueK}">${due}</td>
-      <td class="${shownK}">${shown}</td>
-      <td>${pct}</td>
+      ${salesColOrder.map(k => cells[k]).join('')}
     </tr>`;
   }
 
@@ -1066,7 +1130,7 @@ function renderDashboard() {
       <div>
         <div class="panel-header">
           <div class="panel-title">📞 BDC – Appointments Shown</div>
-          <div class="panel-subtitle">Top 3 highlighted by appointments shown · click headers to sort</div>
+          <div class="panel-subtitle">Top 3 highlighted by appointments shown · click headers to sort · drag to reorder</div>
         </div>
 
         <div class="stat-row">
@@ -1102,16 +1166,11 @@ function renderDashboard() {
               <tr>
                 <th class="rank-cell" ${thAttr('bdc','rank')}>Rank ${sortArrow('bdc','rank')}</th>
                 <th style="text-align:left;" ${thAttr('bdc','name')}>Name ${sortArrow('bdc','name')}</th>
-                <th ${thAttr('bdc','shown')}>Appts Shown ${sortArrow('bdc','shown')}</th>
-                <th ${thAttr('bdc','calls')}>Calls ${sortArrow('bdc','calls')}</th>
-                <th ${thAttr('bdc','texts')}>Texts ${sortArrow('bdc','texts')}</th>
-                <th ${thAttr('bdc','created')}>Appts Created ${sortArrow('bdc','created')}</th>
-                <th ${thAttr('bdc','due')}>Appts Due ${sortArrow('bdc','due')}</th>
-                <th ${thAttr('bdc','pctShown')}>% Shown ${sortArrow('bdc','pctShown')}</th>
+                ${bdcColOrder.map(k => `<th ${thAttr('bdc', BDC_COL_DEFS[k].key)} ${thDrag('bdc', k)}>${BDC_COL_DEFS[k].label} ${sortArrow('bdc', BDC_COL_DEFS[k].key)}</th>`).join('\n                ')}
               </tr>
             </thead>
             <tbody>
-              ${bdc.length ? bdc.map((r, i) => bdcRow(r, i)).join('') : '<tr><td colspan="9" style="padding:30px;color:var(--muted);">No BDC data</td></tr>'}
+              ${bdc.length ? bdc.map((r, i) => bdcRow(r, i)).join('') : '<tr><td colspan="' + (2 + bdcColOrder.length) + '" style="padding:30px;color:var(--muted);">No BDC data</td></tr>'}
             </tbody>
           </table>
         </div>
@@ -1121,7 +1180,7 @@ function renderDashboard() {
       <div>
         <div class="panel-header">
           <div class="panel-title">🚗 Sales – Units Sold</div>
-          <div class="panel-subtitle">Ranked by units sold · weekly KPI flags · click headers to sort</div>
+          <div class="panel-subtitle">Ranked by units sold · weekly KPI flags · click headers to sort · drag to reorder</div>
         </div>
 
         <div class="stat-row">
@@ -1156,17 +1215,11 @@ function renderDashboard() {
               <tr>
                 <th class="rank-cell" ${thAttr('sales','rank')}>Rank ${sortArrow('sales','rank')}</th>
                 <th style="text-align:left;" ${thAttr('sales','name')}>Name ${sortArrow('sales','name')}</th>
-                <th ${thAttr('sales','sales')}>Sales ${sortArrow('sales','sales')}</th>
-                <th ${thAttr('sales','calls')}>Calls ${sortArrow('sales','calls')}</th>
-                <th ${thAttr('sales','texts')}>Texts ${sortArrow('sales','texts')}</th>
-                <th ${thAttr('sales','created')}>Appts Created ${sortArrow('sales','created')}</th>
-                <th ${thAttr('sales','due')}>Appts Due ${sortArrow('sales','due')}</th>
-                <th ${thAttr('sales','shown')}>Appts Shown ${sortArrow('sales','shown')}</th>
-                <th ${thAttr('sales','pctShown')}>% Shown ${sortArrow('sales','pctShown')}</th>
+                ${salesColOrder.map(k => `<th ${thAttr('sales', SALES_COL_DEFS[k].key)} ${thDrag('sales', k)}>${SALES_COL_DEFS[k].label} ${sortArrow('sales', SALES_COL_DEFS[k].key)}</th>`).join('\n                ')}
               </tr>
             </thead>
             <tbody>
-              ${sales.length ? sales.map((r, i) => salesRow(r, i)).join('') : '<tr><td colspan="9" style="padding:30px;color:var(--muted);">No sales data</td></tr>'}
+              ${sales.length ? sales.map((r, i) => salesRow(r, i)).join('') : '<tr><td colspan="' + (2 + salesColOrder.length) + '" style="padding:30px;color:var(--muted);">No sales data</td></tr>'}
             </tbody>
           </table>
         </div>
