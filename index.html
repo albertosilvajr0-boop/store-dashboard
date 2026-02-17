@@ -382,7 +382,7 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzCJTiVz-fElM8zrMV8MsaJ5aO3449sB9ZLsyHtninJli_DgaQWsg2OKntgDTUAPbaR/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzn4ndxFnh90MojPOYS8oDzW3s6V58Z2klkuk1jhyo-pOpfP5EZXTVH0T2EJ-gBQtc/exec';
 const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
 
 /* ── Crash reporter ── */
@@ -990,7 +990,7 @@ function pearsonR(xs, ys) {
 }
 
 function buildCorrelationBox(rows, targetKey, targetLabel, kpiDefs) {
-  if (!isAdmin() || rows.length < 3) return '';
+  if ((!isAdmin() && !isManager()) || rows.length < 3) return '';
 
   const targetVals = rows.map(r => {
     if (targetKey === 'shown') return safeNum(shownVal(r));
@@ -1062,7 +1062,7 @@ function setCallPatternsFilter(f) {
 window.setCallPatternsFilter = setCallPatternsFilter;
 
 function loadCallPatterns() {
-  if (!isAdmin()) return;
+  if (!isAdmin() && !isManager()) return;
   const container = document.getElementById('callPatternsBox');
   if (!container) return;
 
@@ -1389,8 +1389,7 @@ function renderDashboard() {
           </div>
         </div>
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showReassignments()">🔄 Reassignments</button>' : ''}
-        ${isAdmin() ? '<button class="topbar-btn manage" onclick="showSourceLeaderboard()">📊 Sources</button>' : ''}
-        ${isAdmin() ? '<button class="topbar-btn manage" onclick="showLeadFunnel()">🔬 Lead Funnel</button>' : ''}
+        ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showLeadFunnel()">🔬 Lead Funnel</button>' : ''}
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showActivityModal()">🕐 Activity</button>' : ''}
         ${isAdmin() ? '<button class="topbar-btn manage" onclick="showUserModal()">👤 Manage Users</button>' : ''}
         <button class="topbar-btn logout" onclick="logout()">Logout</button>
@@ -1464,7 +1463,7 @@ function renderDashboard() {
           { key: 'shown', label: 'Appts Shown' },
           { key: 'pctShown', label: '% Show Rate' },
         ])}
-        ${isAdmin() ? '<div id="callPatternsBox" style="margin-top:12px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:10px;"><div style="color:var(--muted);font-size:12px;">Loading call patterns…</div></div>' : ''}
+        ${(isAdmin() || isManager()) ? '<div id="callPatternsBox" style="margin-top:12px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:10px;"><div style="color:var(--muted);font-size:12px;">Loading call patterns…</div></div>' : ''}
       </div>
 
       <!-- ═══ Sales Panel ═══ -->
@@ -2432,14 +2431,14 @@ async function loadActivity() {
 window.login = login;
 window.logout = logout;
 /* ══════════════════════════════════════════
-   LEAD FUNNEL (Admin)
+   LEAD FUNNEL (Admin + Manager)
    ══════════════════════════════════════════ */
-let _funnelView = 'provider'; // 'provider' or 'sourceType'
 let _funnelSort = { col: 'total', dir: 'desc' };
 let _funnelData = null;
+let _funnelExpanded = new Set(); // which source types are open
 
 async function showLeadFunnel() {
-  if (!isAdmin()) return;
+  if (!isAdmin() && !isManager()) return;
   showLoading();
   try {
     const url = `${SCRIPT_URL}?route=sourcefunnel&session=${encodeURIComponent(window.sessionToken || '')}`;
@@ -2448,6 +2447,9 @@ async function showLeadFunnel() {
     if (!data.ok) { alert('Error loading funnel data'); showDashboard(); return; }
     _funnelData = data;
     _funnelSort = { col: 'total', dir: 'desc' };
+    // Start with all expanded
+    const sourceTypes = [...new Set((data.byProvider || []).map(p => p.sourceType || '(Unknown)'))];
+    _funnelExpanded = new Set(sourceTypes);
     renderLeadFunnel();
   } catch (err) {
     console.error('Lead funnel error:', err);
@@ -2455,11 +2457,12 @@ async function showLeadFunnel() {
   }
 }
 
-function toggleFunnelView(view) {
-  _funnelView = view;
-  _funnelSort = { col: 'total', dir: 'desc' };
+function toggleFunnelGroup(st) {
+  if (_funnelExpanded.has(st)) _funnelExpanded.delete(st);
+  else _funnelExpanded.add(st);
   renderLeadFunnel();
 }
+window.toggleFunnelGroup = toggleFunnelGroup;
 
 function toggleFunnelSort(col) {
   if (_funnelSort.col === col) {
@@ -2470,27 +2473,48 @@ function toggleFunnelSort(col) {
   renderLeadFunnel();
 }
 
+function funnelExpandAll() { 
+  const types = [...new Set((_funnelData?.byProvider || []).map(p => p.sourceType || '(Unknown)'))];
+  _funnelExpanded = new Set(types);
+  renderLeadFunnel();
+}
+function funnelCollapseAll() { _funnelExpanded = new Set(); renderLeadFunnel(); }
+window.funnelExpandAll = funnelExpandAll;
+window.funnelCollapseAll = funnelCollapseAll;
+
 function renderLeadFunnel() {
   if (!_funnelData) return;
-  const rows = (_funnelView === 'provider' ? _funnelData.byProvider : _funnelData.bySourceType) || [];
+  const providers = _funnelData.byProvider || [];
+  const sourceTypes = _funnelData.bySourceType || [];
 
-  // Sort
-  const sorted = [...rows].sort((a, b) => {
-    let av = a[_funnelSort.col], bv = b[_funnelSort.col];
-    if (typeof av === 'string') return _funnelSort.dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-    av = av ?? -1; bv = bv ?? -1;
-    return _funnelSort.dir === 'asc' ? av - bv : bv - av;
+  // Group providers by sourceType
+  const groups = {};
+  providers.forEach(p => {
+    const st = p.sourceType || '(Unknown)';
+    if (!groups[st]) groups[st] = [];
+    groups[st].push(p);
   });
 
-  // Summary stats
-  const totLeads = rows.reduce((s, r) => s + r.total, 0);
-  const totSold = rows.reduce((s, r) => s + r.sold, 0);
-  const totAppt = rows.reduce((s, r) => s + r.apptSet, 0);
+  // Sort providers within each group
+  function sortRows(arr) {
+    return [...arr].sort((a, b) => {
+      let av = a[_funnelSort.col], bv = b[_funnelSort.col];
+      if (typeof av === 'string') return _funnelSort.dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      av = av ?? -1; bv = bv ?? -1;
+      return _funnelSort.dir === 'asc' ? av - bv : bv - av;
+    });
+  }
+
+  // Overall stats
+  const allProviders = providers;
+  const totLeads = allProviders.reduce((s, r) => s + r.total, 0);
+  const totSold = allProviders.reduce((s, r) => s + r.sold, 0);
+  const totAppt = allProviders.reduce((s, r) => s + r.apptSet, 0);
   const overallClose = totLeads > 0 ? (totSold / totLeads * 100).toFixed(1) : '0';
   const overallAppt = totLeads > 0 ? (totAppt / totLeads * 100).toFixed(1) : '0';
 
-  // Best/worst close rate (min 5 leads)
-  const qualified = rows.filter(r => r.total >= 5);
+  // Best/worst (min 5 leads) across all providers
+  const qualified = allProviders.filter(r => r.total >= 5);
   const bestClose = qualified.length ? qualified.reduce((a, b) => a.closeRate > b.closeRate ? a : b) : null;
   const worstClose = qualified.length ? qualified.reduce((a, b) => a.closeRate < b.closeRate ? a : b) : null;
   const bestAppt = qualified.length ? qualified.reduce((a, b) => a.apptRate > b.apptRate ? a : b) : null;
@@ -2501,9 +2525,7 @@ function renderLeadFunnel() {
     const active = _funnelSort.col === col;
     return active ? (_funnelSort.dir === 'desc' ? '▼' : '▲') : '↕';
   }
-  function thC(col) {
-    return _funnelSort.col === col ? 'sorted' : '';
-  }
+  function thC(col) { return _funnelSort.col === col ? 'sorted' : ''; }
   function closeColor(rate) {
     if (rate >= 15) return '#16a34a';
     if (rate >= 8) return '#ca8a04';
@@ -2515,44 +2537,113 @@ function renderLeadFunnel() {
     if (rate >= 15) return '#ca8a04';
     return '#94a3b8';
   }
-  function funnelBar(value, max, color) {
-    const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-    return `<div style="display:flex;align-items:center;gap:6px;">
-      <div style="flex:1;height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden;">
-        <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;"></div>
-      </div>
-      <span style="min-width:28px;text-align:right;font-size:11px;font-weight:600;">${value}</span>
-    </div>`;
-  }
 
-  const maxTotal = Math.max(...rows.map(r => r.total), 1);
+  const sourceIcons = {
+    'Internet Up': '🌐',
+    'Phone Up': '📞',
+    'Showroom Up': '🏪',
+    'Campaign': '📣',
+  };
+  const sourceColors = {
+    'Internet Up': '#2563eb',
+    'Phone Up': '#16a34a',
+    'Showroom Up': '#9333ea',
+    'Campaign': '#f97316',
+  };
 
-  const tableRows = sorted.map(r => {
-    const closeClr = closeColor(r.closeRate);
-    const apptClr = apptColor(r.apptRate);
-    const daysClose = r.avgDaysToClose !== null ? r.avgDaysToClose + 'd' : '–';
-    const repsStr = (r.topReps || []).join(', ');
-    return `<tr>
-      <td style="font-weight:600;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;" title="${r.name}">${r.name}</td>
-      <td style="text-align:center;font-weight:700;">${r.total}</td>
-      <td style="text-align:center;">${r.apptSet}</td>
-      <td style="text-align:center;font-weight:700;color:${apptClr};">${r.apptRate}%</td>
-      <td style="text-align:center;font-weight:700;">${r.sold}</td>
-      <td style="text-align:center;font-weight:700;color:${closeClr};">${r.closeRate}%</td>
-      <td style="text-align:center;">${daysClose}</td>
-      <td style="text-align:center;">${r.active}</td>
-      <td style="text-align:center;color:${r.stalePct > 40 ? '#dc2626' : r.stalePct > 20 ? '#ca8a04' : '#16a34a'};">${r.stalePct}%</td>
-      <td style="text-align:center;">${r.badLead}</td>
-      <td style="font-size:10px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${repsStr}">${repsStr || '–'}</td>
-    </tr>`;
-  }).join('');
+  // Sort source types by total leads desc
+  const sortedSourceTypes = [...sourceTypes].sort((a, b) => b.total - a.total);
+
+  // Build accordion HTML
+  let accordionHTML = '';
+  sortedSourceTypes.forEach(st => {
+    const stName = st.name;
+    const icon = sourceIcons[stName] || '📋';
+    const clr = sourceColors[stName] || '#64748b';
+    const expanded = _funnelExpanded.has(stName);
+    const chevron = expanded ? '▾' : '▸';
+    const provs = sortRows(groups[stName] || []);
+
+    // Source type header row
+    accordionHTML += `
+      <div style="margin-bottom:${expanded ? '0' : '8'}px;">
+        <div onclick="toggleFunnelGroup('${stName.replace(/'/g, "\\'")}')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--card);border:1px solid var(--line);border-radius:${expanded ? '10px 10px 0 0' : '10px'};cursor:pointer;user-select:none;transition:all .15s;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:16px;">${icon}</span>
+            <span style="font-size:11px;color:var(--muted);">${chevron}</span>
+            <span style="font-weight:800;font-size:14px;">${stName}</span>
+            <span style="font-size:11px;color:var(--muted);font-weight:500;">${provs.length} provider${provs.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div style="display:flex;gap:16px;align-items:center;font-size:12px;flex-wrap:wrap;">
+            <span><strong>${st.total}</strong> leads</span>
+            <span style="color:${apptColor(st.apptRate)};font-weight:700;">${st.apptRate}% appt</span>
+            <span style="color:${closeColor(st.closeRate)};font-weight:700;">${st.closeRate}% close</span>
+            <span style="font-weight:700;color:#16a34a;">${st.sold} sold</span>
+            <span style="color:${st.stalePct > 40 ? '#dc2626' : st.stalePct > 20 ? '#ca8a04' : '#16a34a'};">${st.stalePct}% stale</span>
+          </div>
+        </div>`;
+
+    if (expanded) {
+      accordionHTML += `
+        <div style="border:1px solid var(--line);border-top:none;border-radius:0 0 10px 10px;overflow:hidden;margin-bottom:8px;">
+          <div style="overflow-x:auto;">
+          <table style="width:100%;font-size:12px;">
+            <thead>
+              <tr style="background:rgba(0,0,0,.02);">
+                <th style="text-align:left;padding:8px 12px;cursor:pointer;font-size:11px;" class="${thC('name')}" onclick="toggleFunnelSort('name')">Lead Provider <span class="sort-arrow">${sa('name')}</span></th>
+                <th style="cursor:pointer;font-size:11px;" class="${thC('total')}" onclick="toggleFunnelSort('total')">Leads <span class="sort-arrow">${sa('total')}</span></th>
+                <th style="cursor:pointer;font-size:11px;" class="${thC('apptSet')}" onclick="toggleFunnelSort('apptSet')">Appt Set <span class="sort-arrow">${sa('apptSet')}</span></th>
+                <th style="cursor:pointer;font-size:11px;" class="${thC('apptRate')}" onclick="toggleFunnelSort('apptRate')">Appt % <span class="sort-arrow">${sa('apptRate')}</span></th>
+                <th style="cursor:pointer;font-size:11px;" class="${thC('sold')}" onclick="toggleFunnelSort('sold')">Sold <span class="sort-arrow">${sa('sold')}</span></th>
+                <th style="cursor:pointer;font-size:11px;" class="${thC('closeRate')}" onclick="toggleFunnelSort('closeRate')">Close % <span class="sort-arrow">${sa('closeRate')}</span></th>
+                <th style="cursor:pointer;font-size:11px;" class="${thC('avgDaysToClose')}" onclick="toggleFunnelSort('avgDaysToClose')">Days to Close <span class="sort-arrow">${sa('avgDaysToClose')}</span></th>
+                <th style="cursor:pointer;font-size:11px;" class="${thC('active')}" onclick="toggleFunnelSort('active')">Active <span class="sort-arrow">${sa('active')}</span></th>
+                <th style="cursor:pointer;font-size:11px;" class="${thC('stalePct')}" onclick="toggleFunnelSort('stalePct')">Stale 3d+ <span class="sort-arrow">${sa('stalePct')}</span></th>
+                <th style="cursor:pointer;font-size:11px;" class="${thC('badLead')}" onclick="toggleFunnelSort('badLead')">Bad <span class="sort-arrow">${sa('badLead')}</span></th>
+                <th style="text-align:left;font-size:11px;">Top Reps</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+      provs.forEach(r => {
+        const daysClose = r.avgDaysToClose !== null ? r.avgDaysToClose + 'd' : '–';
+        const repsStr = (r.topReps || []).join(', ');
+        // Bar width proportional to group max
+        const groupMax = Math.max(...provs.map(p => p.total), 1);
+        const barPct = Math.round((r.total / groupMax) * 100);
+        accordionHTML += `<tr>
+          <td style="padding:6px 12px;font-weight:600;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;" title="${r.name}">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;">${r.name}</div>
+              <div style="width:40px;height:4px;background:#f1f5f9;border-radius:2px;flex-shrink:0;">
+                <div style="width:${barPct}%;height:100%;background:${clr};border-radius:2px;opacity:.5;"></div>
+              </div>
+            </div>
+          </td>
+          <td style="text-align:center;font-weight:700;">${r.total}</td>
+          <td style="text-align:center;">${r.apptSet}</td>
+          <td style="text-align:center;font-weight:700;color:${apptColor(r.apptRate)};">${r.apptRate}%</td>
+          <td style="text-align:center;font-weight:700;">${r.sold}</td>
+          <td style="text-align:center;font-weight:700;color:${closeColor(r.closeRate)};">${r.closeRate}%</td>
+          <td style="text-align:center;">${daysClose}</td>
+          <td style="text-align:center;">${r.active}</td>
+          <td style="text-align:center;color:${r.stalePct > 40 ? '#dc2626' : r.stalePct > 20 ? '#ca8a04' : '#16a34a'};">${r.stalePct}%</td>
+          <td style="text-align:center;">${r.badLead}</td>
+          <td style="font-size:10px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${repsStr}">${repsStr || '–'}</td>
+        </tr>`;
+      });
+
+      accordionHTML += `</tbody></table></div></div>`;
+    }
+    accordionHTML += `</div>`;
+  });
 
   // Insights
   let insights = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">';
-  if (bestClose) insights += `<div style="flex:1;min-width:180px;padding:10px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;font-size:12px;"><div style="font-weight:700;color:#16a34a;">🏆 Best Close Rate</div><div style="font-weight:800;font-size:16px;margin:4px 0;">${bestClose.name}</div><div>${bestClose.closeRate}% (${bestClose.sold}/${bestClose.total})</div></div>`;
-  if (worstClose) insights += `<div style="flex:1;min-width:180px;padding:10px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;font-size:12px;"><div style="font-weight:700;color:#dc2626;">🚨 Worst Close Rate</div><div style="font-weight:800;font-size:16px;margin:4px 0;">${worstClose.name}</div><div>${worstClose.closeRate}% (${worstClose.sold}/${worstClose.total})</div></div>`;
-  if (fastestClose) insights += `<div style="flex:1;min-width:180px;padding:10px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;font-size:12px;"><div style="font-weight:700;color:#2563eb;">⚡ Fastest to Close</div><div style="font-weight:800;font-size:16px;margin:4px 0;">${fastestClose.name}</div><div>Avg ${fastestClose.avgDaysToClose} days</div></div>`;
-  if (bestAppt) insights += `<div style="flex:1;min-width:180px;padding:10px;background:#fefce8;border-radius:8px;border:1px solid #fde68a;font-size:12px;"><div style="font-weight:700;color:#ca8a04;">📅 Best Appt Rate</div><div style="font-weight:800;font-size:16px;margin:4px 0;">${bestAppt.name}</div><div>${bestAppt.apptRate}% (${bestAppt.apptSet}/${bestAppt.total})</div></div>`;
+  if (bestClose) insights += `<div style="flex:1;min-width:160px;padding:10px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;font-size:12px;"><div style="font-weight:700;color:#16a34a;">🏆 Best Close Rate</div><div style="font-weight:800;font-size:15px;margin:4px 0;">${bestClose.name}</div><div>${bestClose.closeRate}% (${bestClose.sold}/${bestClose.total})</div></div>`;
+  if (worstClose) insights += `<div style="flex:1;min-width:160px;padding:10px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;font-size:12px;"><div style="font-weight:700;color:#dc2626;">🚨 Worst Close Rate</div><div style="font-weight:800;font-size:15px;margin:4px 0;">${worstClose.name}</div><div>${worstClose.closeRate}% (${worstClose.sold}/${worstClose.total})</div></div>`;
+  if (fastestClose) insights += `<div style="flex:1;min-width:160px;padding:10px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;font-size:12px;"><div style="font-weight:700;color:#2563eb;">⚡ Fastest to Close</div><div style="font-weight:800;font-size:15px;margin:4px 0;">${fastestClose.name}</div><div>Avg ${fastestClose.avgDaysToClose} days</div></div>`;
+  if (bestAppt) insights += `<div style="flex:1;min-width:160px;padding:10px;background:#fefce8;border-radius:8px;border:1px solid #fde68a;font-size:12px;"><div style="font-weight:700;color:#ca8a04;">📅 Best Appt Rate</div><div style="font-weight:800;font-size:15px;margin:4px 0;">${bestAppt.name}</div><div>${bestAppt.apptRate}% (${bestAppt.apptSet}/${bestAppt.total})</div></div>`;
   insights += '</div>';
 
   document.getElementById('app').innerHTML = `
@@ -2560,11 +2651,11 @@ function renderLeadFunnel() {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
         <div>
           <div style="font-size:20px;font-weight:800;">🔬 Lead Source Funnel</div>
-          <div style="font-size:12px;color:var(--muted);">Lead In → Appointment Set → Sold · by ${_funnelView === 'provider' ? 'Lead Provider' : 'Source Type'}</div>
+          <div style="font-size:12px;color:var(--muted);">Lead In → Appointment Set → Sold · grouped by Source Type</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <button class="topbar-btn ${_funnelView === 'provider' ? 'active' : ''}" onclick="toggleFunnelView('provider')" style="font-size:12px;padding:6px 12px;${_funnelView === 'provider' ? 'background:var(--accent);color:#fff;' : ''}">By Provider</button>
-          <button class="topbar-btn ${_funnelView === 'sourceType' ? 'active' : ''}" onclick="toggleFunnelView('sourceType')" style="font-size:12px;padding:6px 12px;${_funnelView === 'sourceType' ? 'background:var(--accent);color:#fff;' : ''}">By Source Type</button>
+          <button class="topbar-btn" onclick="funnelExpandAll()" style="font-size:11px;padding:5px 10px;">Expand All</button>
+          <button class="topbar-btn" onclick="funnelCollapseAll()" style="font-size:11px;padding:5px 10px;">Collapse All</button>
           <button class="topbar-btn manage" onclick="showLeadFunnel()">↻ Refresh</button>
           <button class="topbar-btn logout" onclick="showDashboard()">← Dashboard</button>
         </div>
@@ -2587,41 +2678,21 @@ function renderLeadFunnel() {
           <div style="font-size:11px;color:var(--muted);">${overallClose}% close rate</div>
         </div>
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:10px;color:var(--muted);font-weight:600;">${_funnelView === 'provider' ? 'Providers' : 'Source Types'}</div>
-          <div style="font-size:22px;font-weight:800;">${rows.length}</div>
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Source Types</div>
+          <div style="font-size:22px;font-weight:800;">${sortedSourceTypes.length}</div>
+          <div style="font-size:11px;color:var(--muted);">${allProviders.length} providers</div>
         </div>
       </div>
 
       ${insights}
 
-      <!-- Table -->
-      <div class="table-card" style="margin-top:16px;">
-        <div style="overflow-x:auto;">
-        <table>
-          <thead>
-            <tr>
-              <th style="text-align:left;cursor:pointer;" class="${thC('name')}" onclick="toggleFunnelSort('name')">${_funnelView === 'provider' ? 'Lead Provider' : 'Source Type'} <span class="sort-arrow">${sa('name')}</span></th>
-              <th style="cursor:pointer;" class="${thC('total')}" onclick="toggleFunnelSort('total')">Leads <span class="sort-arrow">${sa('total')}</span></th>
-              <th style="cursor:pointer;" class="${thC('apptSet')}" onclick="toggleFunnelSort('apptSet')">Appt Set <span class="sort-arrow">${sa('apptSet')}</span></th>
-              <th style="cursor:pointer;" class="${thC('apptRate')}" onclick="toggleFunnelSort('apptRate')">Appt % <span class="sort-arrow">${sa('apptRate')}</span></th>
-              <th style="cursor:pointer;" class="${thC('sold')}" onclick="toggleFunnelSort('sold')">Sold <span class="sort-arrow">${sa('sold')}</span></th>
-              <th style="cursor:pointer;" class="${thC('closeRate')}" onclick="toggleFunnelSort('closeRate')">Close % <span class="sort-arrow">${sa('closeRate')}</span></th>
-              <th style="cursor:pointer;" class="${thC('avgDaysToClose')}" onclick="toggleFunnelSort('avgDaysToClose')">Avg Days to Close <span class="sort-arrow">${sa('avgDaysToClose')}</span></th>
-              <th style="cursor:pointer;" class="${thC('active')}" onclick="toggleFunnelSort('active')">Active <span class="sort-arrow">${sa('active')}</span></th>
-              <th style="cursor:pointer;" class="${thC('stalePct')}" onclick="toggleFunnelSort('stalePct')">Stale 3d+ <span class="sort-arrow">${sa('stalePct')}</span></th>
-              <th style="cursor:pointer;" class="${thC('badLead')}" onclick="toggleFunnelSort('badLead')">Bad <span class="sort-arrow">${sa('badLead')}</span></th>
-              <th style="text-align:left;">Top Reps</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${tableRows || '<tr><td colspan="11" style="padding:30px;color:var(--muted);">No data</td></tr>'}
-          </tbody>
-        </table>
-        </div>
+      <!-- Accordion -->
+      <div style="margin-top:16px;">
+        ${accordionHTML}
       </div>
 
       <div style="margin-top:12px;font-size:10px;color:var(--muted);line-height:1.6;">
-        <strong>How to read:</strong> Appt % = what % of leads from this source get an appointment. Close % = what % convert to a sale. Stale 3d+ = leads not contacted in 3+ days. Sources with <5 leads excluded from insight cards. Close/Appt colors: <span style="color:#16a34a;">■</span> strong <span style="color:#ca8a04;">■</span> moderate <span style="color:#dc2626;">■</span> weak
+        <strong>How to read:</strong> Appt % = what % of leads get an appointment. Close % = what % convert to a sale. Stale 3d+ = leads not contacted in 3+ days. Sources with &lt;5 leads excluded from insight cards. Colors: <span style="color:#16a34a;">■</span> strong <span style="color:#ca8a04;">■</span> moderate <span style="color:#dc2626;">■</span> weak
       </div>
     </div>`;
 }
@@ -2638,7 +2709,6 @@ window.toggleReassignSort = toggleReassignSort;
 window.showSourceLeaderboard = showSourceLeaderboard;
 window.toggleSourceSort = toggleSourceSort;
 window.showLeadFunnel = showLeadFunnel;
-window.toggleFunnelView = toggleFunnelView;
 window.toggleFunnelSort = toggleFunnelSort;
 window.showAutoNews = showAutoNews;
 window.toggleNewsGroup = toggleNewsGroup;
