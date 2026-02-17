@@ -382,7 +382,7 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzAaQUH_NW5S5SVDwjxGPjBi-KZVwFPPwteHbhFos1g1D-tNh5b4lgCmL2pjrMMZII/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzeJWn5EEySVOE8uZm64li7OoEpDT-1kUN7lPaIkomIDLK4neo2sHfkCmTp1mB5Zk4Z/exec';
 const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
 
 /* ── Crash reporter ── */
@@ -1351,6 +1351,7 @@ function renderDashboard() {
         </div>
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showReassignments()">🔄 Reassignments</button>' : ''}
         ${isAdmin() ? '<button class="topbar-btn manage" onclick="showSourceLeaderboard()">📊 Sources</button>' : ''}
+        ${isAdmin() ? '<button class="topbar-btn manage" onclick="showLeadFunnel()">🔬 Lead Funnel</button>' : ''}
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showActivityModal()">🕐 Activity</button>' : ''}
         ${isAdmin() ? '<button class="topbar-btn manage" onclick="showUserModal()">👤 Manage Users</button>' : ''}
         <button class="topbar-btn logout" onclick="logout()">Logout</button>
@@ -2391,6 +2392,201 @@ async function loadActivity() {
    ══════════════════════════════════════════ */
 window.login = login;
 window.logout = logout;
+/* ══════════════════════════════════════════
+   LEAD FUNNEL (Admin)
+   ══════════════════════════════════════════ */
+let _funnelView = 'provider'; // 'provider' or 'sourceType'
+let _funnelSort = { col: 'total', dir: 'desc' };
+let _funnelData = null;
+
+async function showLeadFunnel() {
+  if (!isAdmin()) return;
+  showLoading();
+  try {
+    const url = `${SCRIPT_URL}?route=sourcefunnel&session=${encodeURIComponent(window.sessionToken || '')}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (!data.ok) { alert('Error loading funnel data'); showDashboard(); return; }
+    _funnelData = data;
+    _funnelSort = { col: 'total', dir: 'desc' };
+    renderLeadFunnel();
+  } catch (err) {
+    console.error('Lead funnel error:', err);
+    showDashboard();
+  }
+}
+
+function toggleFunnelView(view) {
+  _funnelView = view;
+  _funnelSort = { col: 'total', dir: 'desc' };
+  renderLeadFunnel();
+}
+
+function toggleFunnelSort(col) {
+  if (_funnelSort.col === col) {
+    _funnelSort.dir = _funnelSort.dir === 'desc' ? 'asc' : 'desc';
+  } else {
+    _funnelSort = { col, dir: 'desc' };
+  }
+  renderLeadFunnel();
+}
+
+function renderLeadFunnel() {
+  if (!_funnelData) return;
+  const rows = (_funnelView === 'provider' ? _funnelData.byProvider : _funnelData.bySourceType) || [];
+
+  // Sort
+  const sorted = [...rows].sort((a, b) => {
+    let av = a[_funnelSort.col], bv = b[_funnelSort.col];
+    if (typeof av === 'string') return _funnelSort.dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    av = av ?? -1; bv = bv ?? -1;
+    return _funnelSort.dir === 'asc' ? av - bv : bv - av;
+  });
+
+  // Summary stats
+  const totLeads = rows.reduce((s, r) => s + r.total, 0);
+  const totSold = rows.reduce((s, r) => s + r.sold, 0);
+  const totAppt = rows.reduce((s, r) => s + r.apptSet, 0);
+  const overallClose = totLeads > 0 ? (totSold / totLeads * 100).toFixed(1) : '0';
+  const overallAppt = totLeads > 0 ? (totAppt / totLeads * 100).toFixed(1) : '0';
+
+  // Best/worst close rate (min 5 leads)
+  const qualified = rows.filter(r => r.total >= 5);
+  const bestClose = qualified.length ? qualified.reduce((a, b) => a.closeRate > b.closeRate ? a : b) : null;
+  const worstClose = qualified.length ? qualified.reduce((a, b) => a.closeRate < b.closeRate ? a : b) : null;
+  const bestAppt = qualified.length ? qualified.reduce((a, b) => a.apptRate > b.apptRate ? a : b) : null;
+  const fastestClose = qualified.filter(r => r.avgDaysToClose !== null).length
+    ? qualified.filter(r => r.avgDaysToClose !== null).reduce((a, b) => (a.avgDaysToClose ?? 999) < (b.avgDaysToClose ?? 999) ? a : b) : null;
+
+  function sa(col) {
+    const active = _funnelSort.col === col;
+    return active ? (_funnelSort.dir === 'desc' ? '▼' : '▲') : '↕';
+  }
+  function thC(col) {
+    return _funnelSort.col === col ? 'sorted' : '';
+  }
+  function closeColor(rate) {
+    if (rate >= 15) return '#16a34a';
+    if (rate >= 8) return '#ca8a04';
+    if (rate >= 3) return '#f97316';
+    return '#dc2626';
+  }
+  function apptColor(rate) {
+    if (rate >= 30) return '#16a34a';
+    if (rate >= 15) return '#ca8a04';
+    return '#94a3b8';
+  }
+  function funnelBar(value, max, color) {
+    const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+    return `<div style="display:flex;align-items:center;gap:6px;">
+      <div style="flex:1;height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden;">
+        <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;"></div>
+      </div>
+      <span style="min-width:28px;text-align:right;font-size:11px;font-weight:600;">${value}</span>
+    </div>`;
+  }
+
+  const maxTotal = Math.max(...rows.map(r => r.total), 1);
+
+  const tableRows = sorted.map(r => {
+    const closeClr = closeColor(r.closeRate);
+    const apptClr = apptColor(r.apptRate);
+    const daysClose = r.avgDaysToClose !== null ? r.avgDaysToClose + 'd' : '–';
+    const repsStr = (r.topReps || []).join(', ');
+    return `<tr>
+      <td style="font-weight:600;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;" title="${r.name}">${r.name}</td>
+      <td style="text-align:center;font-weight:700;">${r.total}</td>
+      <td style="text-align:center;">${r.apptSet}</td>
+      <td style="text-align:center;font-weight:700;color:${apptClr};">${r.apptRate}%</td>
+      <td style="text-align:center;font-weight:700;">${r.sold}</td>
+      <td style="text-align:center;font-weight:700;color:${closeClr};">${r.closeRate}%</td>
+      <td style="text-align:center;">${daysClose}</td>
+      <td style="text-align:center;">${r.active}</td>
+      <td style="text-align:center;color:${r.stalePct > 40 ? '#dc2626' : r.stalePct > 20 ? '#ca8a04' : '#16a34a'};">${r.stalePct}%</td>
+      <td style="text-align:center;">${r.badLead}</td>
+      <td style="font-size:10px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${repsStr}">${repsStr || '–'}</td>
+    </tr>`;
+  }).join('');
+
+  // Insights
+  let insights = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">';
+  if (bestClose) insights += `<div style="flex:1;min-width:180px;padding:10px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;font-size:12px;"><div style="font-weight:700;color:#16a34a;">🏆 Best Close Rate</div><div style="font-weight:800;font-size:16px;margin:4px 0;">${bestClose.name}</div><div>${bestClose.closeRate}% (${bestClose.sold}/${bestClose.total})</div></div>`;
+  if (worstClose) insights += `<div style="flex:1;min-width:180px;padding:10px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;font-size:12px;"><div style="font-weight:700;color:#dc2626;">🚨 Worst Close Rate</div><div style="font-weight:800;font-size:16px;margin:4px 0;">${worstClose.name}</div><div>${worstClose.closeRate}% (${worstClose.sold}/${worstClose.total})</div></div>`;
+  if (fastestClose) insights += `<div style="flex:1;min-width:180px;padding:10px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;font-size:12px;"><div style="font-weight:700;color:#2563eb;">⚡ Fastest to Close</div><div style="font-weight:800;font-size:16px;margin:4px 0;">${fastestClose.name}</div><div>Avg ${fastestClose.avgDaysToClose} days</div></div>`;
+  if (bestAppt) insights += `<div style="flex:1;min-width:180px;padding:10px;background:#fefce8;border-radius:8px;border:1px solid #fde68a;font-size:12px;"><div style="font-weight:700;color:#ca8a04;">📅 Best Appt Rate</div><div style="font-weight:800;font-size:16px;margin:4px 0;">${bestAppt.name}</div><div>${bestAppt.apptRate}% (${bestAppt.apptSet}/${bestAppt.total})</div></div>`;
+  insights += '</div>';
+
+  document.getElementById('app').innerHTML = `
+    <div style="max-width:1200px;margin:0 auto;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div style="font-size:20px;font-weight:800;">🔬 Lead Source Funnel</div>
+          <div style="font-size:12px;color:var(--muted);">Lead In → Appointment Set → Sold · by ${_funnelView === 'provider' ? 'Lead Provider' : 'Source Type'}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="topbar-btn ${_funnelView === 'provider' ? 'active' : ''}" onclick="toggleFunnelView('provider')" style="font-size:12px;padding:6px 12px;${_funnelView === 'provider' ? 'background:var(--accent);color:#fff;' : ''}">By Provider</button>
+          <button class="topbar-btn ${_funnelView === 'sourceType' ? 'active' : ''}" onclick="toggleFunnelView('sourceType')" style="font-size:12px;padding:6px 12px;${_funnelView === 'sourceType' ? 'background:var(--accent);color:#fff;' : ''}">By Source Type</button>
+          <button class="topbar-btn manage" onclick="showLeadFunnel()">↻ Refresh</button>
+          <button class="topbar-btn logout" onclick="showDashboard()">← Dashboard</button>
+        </div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Total Leads</div>
+          <div style="font-size:22px;font-weight:800;">${totLeads}</div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Appts Set 📅</div>
+          <div style="font-size:22px;font-weight:800;">${totAppt}</div>
+          <div style="font-size:11px;color:var(--muted);">${overallAppt}% of leads</div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Sold ✅</div>
+          <div style="font-size:22px;font-weight:800;color:#16a34a;">${totSold}</div>
+          <div style="font-size:11px;color:var(--muted);">${overallClose}% close rate</div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">${_funnelView === 'provider' ? 'Providers' : 'Source Types'}</div>
+          <div style="font-size:22px;font-weight:800;">${rows.length}</div>
+        </div>
+      </div>
+
+      ${insights}
+
+      <!-- Table -->
+      <div class="table-card" style="margin-top:16px;">
+        <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align:left;cursor:pointer;" class="${thC('name')}" onclick="toggleFunnelSort('name')">${_funnelView === 'provider' ? 'Lead Provider' : 'Source Type'} <span class="sort-arrow">${sa('name')}</span></th>
+              <th style="cursor:pointer;" class="${thC('total')}" onclick="toggleFunnelSort('total')">Leads <span class="sort-arrow">${sa('total')}</span></th>
+              <th style="cursor:pointer;" class="${thC('apptSet')}" onclick="toggleFunnelSort('apptSet')">Appt Set <span class="sort-arrow">${sa('apptSet')}</span></th>
+              <th style="cursor:pointer;" class="${thC('apptRate')}" onclick="toggleFunnelSort('apptRate')">Appt % <span class="sort-arrow">${sa('apptRate')}</span></th>
+              <th style="cursor:pointer;" class="${thC('sold')}" onclick="toggleFunnelSort('sold')">Sold <span class="sort-arrow">${sa('sold')}</span></th>
+              <th style="cursor:pointer;" class="${thC('closeRate')}" onclick="toggleFunnelSort('closeRate')">Close % <span class="sort-arrow">${sa('closeRate')}</span></th>
+              <th style="cursor:pointer;" class="${thC('avgDaysToClose')}" onclick="toggleFunnelSort('avgDaysToClose')">Avg Days to Close <span class="sort-arrow">${sa('avgDaysToClose')}</span></th>
+              <th style="cursor:pointer;" class="${thC('active')}" onclick="toggleFunnelSort('active')">Active <span class="sort-arrow">${sa('active')}</span></th>
+              <th style="cursor:pointer;" class="${thC('stalePct')}" onclick="toggleFunnelSort('stalePct')">Stale 3d+ <span class="sort-arrow">${sa('stalePct')}</span></th>
+              <th style="cursor:pointer;" class="${thC('badLead')}" onclick="toggleFunnelSort('badLead')">Bad <span class="sort-arrow">${sa('badLead')}</span></th>
+              <th style="text-align:left;">Top Reps</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows || '<tr><td colspan="11" style="padding:30px;color:var(--muted);">No data</td></tr>'}
+          </tbody>
+        </table>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;font-size:10px;color:var(--muted);line-height:1.6;">
+        <strong>How to read:</strong> Appt % = what % of leads from this source get an appointment. Close % = what % convert to a sale. Stale 3d+ = leads not contacted in 3+ days. Sources with <5 leads excluded from insight cards. Close/Appt colors: <span style="color:#16a34a;">■</span> strong <span style="color:#ca8a04;">■</span> moderate <span style="color:#dc2626;">■</span> weak
+      </div>
+    </div>`;
+}
+
 window.showDashboard = showDashboard;
 window.showPersonDetails = showPersonDetails;
 window.viewCallSheets = viewCallSheets;
@@ -2402,6 +2598,9 @@ window.showReassignments = showReassignments;
 window.toggleReassignSort = toggleReassignSort;
 window.showSourceLeaderboard = showSourceLeaderboard;
 window.toggleSourceSort = toggleSourceSort;
+window.showLeadFunnel = showLeadFunnel;
+window.toggleFunnelView = toggleFunnelView;
+window.toggleFunnelSort = toggleFunnelSort;
 window.showAutoNews = showAutoNews;
 window.toggleNewsGroup = toggleNewsGroup;
 window.toggleAllNewsGroups = toggleAllNewsGroups;
