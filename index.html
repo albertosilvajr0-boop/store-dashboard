@@ -422,20 +422,26 @@ let _pageViewQueue = [];
 let _pvFlushTimer = null;
 
 function logPageView(pageName) {
-  const email = auth.currentUser?.email;
-  if (!email) return;
+  const user = auth.currentUser;
+  if (!user?.email) return;
   const now = Date.now();
   // Calculate time on previous page
   const dwellMs = _lastPageView ? now - _lastPageView.ts : 0;
   _lastPageView = { page: pageName, ts: now };
 
   _pageViewQueue.push({
-    email: email,
+    email: user.email,
     page: pageName,
     ts: Timestamp.fromMillis(now),
     sessionId: _sessionId,
     dwellMs: dwellMs
   });
+
+  // Update daily login lastSeen
+  if (user.uid) {
+    const loginDocId = user.uid + '_' + todayDateStr();
+    setDoc(doc(db, 'dailyLogins', loginDocId), { lastSeen: new Date() }, { merge: true }).catch(() => {});
+  }
 
   // Batch writes — flush every 3 seconds or at 5 queued
   if (_pvFlushTimer) clearTimeout(_pvFlushTimer);
@@ -497,7 +503,8 @@ function setTopbarQuote() {
 
 /* ── Click Tracking ── */
 function todayDateStr() {
-  return new Date().toISOString().slice(0, 10); // "2026-02-12" — stable format
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
 let _clickBuffer = 0;
@@ -660,6 +667,19 @@ onAuthStateChanged(auth, async (user) => {
 
   // Record last login timestamp
   setDoc(userRef, { lastLogin: new Date() }, { merge: true }).catch(() => {});
+
+  // Record daily login for historical accuracy
+  const loginDate = todayDateStr();
+  const loginDocId = user.uid + '_' + loginDate;
+  setDoc(doc(db, 'dailyLogins', loginDocId), {
+    email: user.email,
+    uid: user.uid,
+    linkedName: data.linkedName || '',
+    role: role,
+    date: loginDate,
+    lastSeen: new Date()
+  }, { merge: true }).catch(() => {});
+
   trackClick();
 
   showDashboard();
@@ -2377,60 +2397,96 @@ async function loadActivity() {
   const el = document.getElementById('activityContent');
   el.innerHTML = '<p style="color:var(--muted);">Loading...</p>';
   try {
-    const snap = await getDocs(collection(db, 'users'));
-    const users = [];
-    const today = todayDateStr(); // "2026-02-12" format
-    snap.forEach(d => {
+    // Fetch users for current data + clicks
+    const userSnap = await getDocs(collection(db, 'users'));
+    const userMap = {}; // uid → user data
+    const today = todayDateStr();
+    userSnap.forEach(d => {
       const u = d.data();
       const ll = u.lastLogin?.toDate ? u.lastLogin.toDate() : (u.lastLogin ? new Date(u.lastLogin) : null);
       const clicks = (u.clickDate === today) ? (u.clicksToday || 0) : 0;
-      users.push({
+      userMap[d.id] = {
+        uid: d.id,
         email: u.email || '',
         role: u.role || 'user',
         linkedName: u.linkedName || '',
         lastLogin: ll,
         clicks
+      };
+    });
+
+    // Fetch dailyLogins (last 14 days)
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 14);
+    const cutoffStr = cutoff.getFullYear() + '-' + String(cutoff.getMonth() + 1).padStart(2, '0') + '-' + String(cutoff.getDate()).padStart(2, '0');
+    const loginSnap = await getDocs(query(
+      collection(db, 'dailyLogins'),
+      where('date', '>=', cutoffStr),
+      orderBy('date', 'desc')
+    ));
+
+    // Build day → users map from dailyLogins
+    const dayLogins = new Map(); // date string → [{email, linkedName, role, lastSeen}]
+    loginSnap.forEach(d => {
+      const data = d.data();
+      const dateStr = data.date;
+      if (!dayLogins.has(dateStr)) dayLogins.set(dateStr, []);
+      const lastSeen = data.lastSeen?.toDate ? data.lastSeen.toDate() : (data.lastSeen ? new Date(data.lastSeen) : null);
+      dayLogins.get(dateStr).push({
+        email: data.email || '',
+        linkedName: data.linkedName || '',
+        role: data.role || 'user',
+        uid: data.uid || '',
+        lastSeen: lastSeen,
+        clicks: (dateStr === today && userMap[data.uid]) ? userMap[data.uid].clicks : 0
       });
     });
 
-    // Sort: most recent first, never-logged-in at bottom
-    users.sort((a, b) => {
-      if (!a.lastLogin && !b.lastLogin) return 0;
-      if (!a.lastLogin) return 1;
-      if (!b.lastLogin) return -1;
-      return b.lastLogin - a.lastLogin;
-    });
-
-    if (!users.length) { el.innerHTML = '<p style="color:var(--muted);">No users found.</p>'; return; }
-
-    // Group by day
-    const now = new Date();
-    const todayStr = now.toDateString();
-    const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toDateString();
-
-    const groups = new Map(); // label → [users]
-    const neverGroup = [];
-
-    users.forEach(u => {
-      if (!u.lastLogin) { neverGroup.push(u); return; }
-      const dayStr = u.lastLogin.toDateString();
-      let label;
-      if (dayStr === todayStr) label = 'Today';
-      else if (dayStr === yesterdayStr) label = 'Yesterday';
-      else {
-        label = u.lastLogin.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    // Also include users from users collection for today if no dailyLogins yet (backward compat)
+    const todayLogins = dayLogins.get(today) || [];
+    const todayUids = new Set(todayLogins.map(u => u.uid));
+    Object.values(userMap).forEach(u => {
+      if (u.lastLogin && u.lastLogin.toDateString() === new Date().toDateString() && !todayUids.has(u.uid)) {
+        if (!dayLogins.has(today)) dayLogins.set(today, []);
+        dayLogins.get(today).push({
+          email: u.email,
+          linkedName: u.linkedName,
+          role: u.role,
+          uid: u.uid,
+          lastSeen: u.lastLogin,
+          clicks: u.clicks
+        });
       }
-      if (!groups.has(label)) groups.set(label, []);
-      groups.get(label).push(u);
     });
-    if (neverGroup.length) groups.set('Never Logged In', neverGroup);
 
-    // Summary stats — who logged in today
-    const todayUsers = groups.get('Today') || [];
-    const salesLoggedIn = todayUsers.filter(u => u.role === 'user').length;
-    const mgmtLoggedIn = todayUsers.filter(u => ['admin','superadmin','manager'].includes(u.role)).length;
-    const totalClicks = todayUsers.reduce((sum, u) => sum + (u.clicks || 0), 0);
+    // Also add "never logged in" users
+    const allLoggedUids = new Set();
+    dayLogins.forEach(users => users.forEach(u => allLoggedUids.add(u.uid)));
+    const neverGroup = Object.values(userMap).filter(u => !u.lastLogin && !allLoggedUids.has(u.uid));
+
+    // Format day groups
+    const now = new Date();
+    const todayDateString = now.toDateString();
+    const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayDateString = yesterday.toDateString();
+
+    // Sort dates descending
+    const sortedDates = [...dayLogins.keys()].sort((a, b) => b.localeCompare(a));
+
+    function dateLabel(dateStr) {
+      // dateStr is "2026-02-17"
+      const parts = dateStr.split('-');
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      if (d.toDateString() === todayDateString) return 'Today';
+      if (d.toDateString() === yesterdayDateString) return 'Yesterday';
+      return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    }
+
+    // Summary stats
+    const todayGroup = dayLogins.get(today) || [];
+    const salesLoggedIn = todayGroup.filter(u => u.role === 'user').length;
+    const mgmtLoggedIn = todayGroup.filter(u => ['admin','superadmin','manager'].includes(u.role)).length;
+    const totalClicks = todayGroup.reduce((sum, u) => sum + (u.clicks || 0), 0);
 
     let html = `
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:4px;">
@@ -2447,16 +2503,21 @@ async function loadActivity() {
           <div style="font-size:22px;font-weight:800;color:#7e22ce;">${totalClicks}</div>
         </div>
       </div>`;
-    for (const [label, group] of groups) {
+
+    for (const dateStr of sortedDates) {
+      const group = dayLogins.get(dateStr);
+      // Sort by lastSeen desc within group
+      group.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+      const label = dateLabel(dateStr);
       const isToday = label === 'Today';
       const countBadge = `<span style="background:${isToday ? '#dcfce7' : '#f4f4f5'};color:${isToday ? '#166534' : '#71717a'};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-left:8px;">${group.length}</span>`;
       html += `<div style="margin-top:16px;margin-bottom:6px;font-weight:700;font-size:13px;color:${isToday ? '#166534' : 'var(--muted)'};text-transform:uppercase;letter-spacing:.3px;">${label}${countBadge}</div>`;
 
       group.forEach(u => {
-        const ago = timeAgo(u.lastLogin);
+        const ago = u.lastSeen ? timeAgo(u.lastSeen) : { text: '—', status: 'never' };
         const displayName = u.linkedName || u.email;
-        const loginTime = u.lastLogin
-          ? u.lastLogin.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        const loginTime = u.lastSeen
+          ? u.lastSeen.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
           : '—';
         const roleBadge = u.role === 'superadmin' ? ' 🙏' : u.role === 'admin' ? ' ⭐' : u.role === 'manager' ? ' 📋' : '';
         const clickBadge = u.clicks > 0
@@ -2465,7 +2526,7 @@ async function loadActivity() {
 
         html += `
           <div class="activity-item">
-            <div style="min-width:48px;text-align:center;">${clickBadge}</div>
+            <div style="min-width:48px;text-align:center;">${isToday ? clickBadge : ''}</div>
             <div style="display:flex;align-items:center;min-width:0;flex:1;">
               <span class="activity-status status-${ago.status}"></span>
               <div style="min-width:0;">
@@ -2474,25 +2535,37 @@ async function loadActivity() {
               </div>
             </div>
             <div class="activity-time">
-              <div class="time-main">${ago.text}</div>
-              <div class="time-sub">${loginTime}</div>
+              <div class="time-main">${isToday ? ago.text : loginTime}</div>
+              <div class="time-sub">${isToday ? loginTime : ago.text}</div>
             </div>
           </div>`;
       });
     }
 
-    // Legend
-    html += `
-      <div style="margin-top:14px;display:flex;gap:16px;font-size:11px;color:var(--muted);">
-        <span><span class="activity-status status-recent" style="vertical-align:middle;"></span> Last 24h</span>
-        <span><span class="activity-status status-stale" style="vertical-align:middle;"></span> 1–7 days</span>
-        <span><span class="activity-status status-old" style="vertical-align:middle;"></span> 7+ days</span>
-        <span><span class="activity-status status-never" style="vertical-align:middle;"></span> Never</span>
-      </div>`;
+    if (neverGroup.length) {
+      const countBadge = `<span style="background:#f4f4f5;color:#71717a;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-left:8px;">${neverGroup.length}</span>`;
+      html += `<div style="margin-top:16px;margin-bottom:6px;font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;">Never Logged In${countBadge}</div>`;
+      neverGroup.forEach(u => {
+        const roleBadge = u.role === 'superadmin' ? ' 🙏' : u.role === 'admin' ? ' ⭐' : u.role === 'manager' ? ' 📋' : '';
+        html += `
+          <div class="activity-item">
+            <div style="min-width:48px;"></div>
+            <div style="display:flex;align-items:center;min-width:0;flex:1;">
+              <span class="activity-status status-never"></span>
+              <div style="min-width:0;">
+                <div class="activity-name">${u.linkedName || u.email}${roleBadge}</div>
+                <div class="activity-email">${u.linkedName ? u.email + ' · ' : ''}${u.role}</div>
+              </div>
+            </div>
+            <div class="activity-time"><div class="time-main">Never</div></div>
+          </div>`;
+      });
+    }
 
     el.innerHTML = html;
-  } catch (e) {
-    el.innerHTML = `<p style="color:#dc2626;">Error: ${e.message}</p>`;
+  } catch (err) {
+    console.error('Activity error:', err);
+    el.innerHTML = '<p style="color:#dc2626;">Error loading activity data. Check Firestore rules.</p>';
   }
 }
 
