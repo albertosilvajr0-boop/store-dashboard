@@ -1261,6 +1261,14 @@ function renderDashboard() {
           { key: 'due', alt: 'due_count', label: 'Appts Due' },
           { key: 'pctShown', label: '% Show Rate' },
         ])}
+        ${buildCorrelationBox(sales, 'sales', 'Units Sold', [
+          { key: 'calls', label: 'Calls' },
+          { key: 'texts', label: 'Texts' },
+          { key: 'created', alt: 'created_count', label: 'Appts Created' },
+          { key: 'due', alt: 'due_count', label: 'Appts Due' },
+          { key: 'shown', label: 'Appts Shown' },
+          { key: 'pctShown', label: '% Show Rate' },
+        ])}
       </div>
 
       <!-- ═══ Sales Panel ═══ -->
