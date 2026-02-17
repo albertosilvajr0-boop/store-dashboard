@@ -971,6 +971,85 @@ function checkLeadsAtRisk() {
   }).catch(() => {});
 }
 
+/* ── Pearson Correlation for KPI Analysis (admin only) ── */
+function pearsonR(xs, ys) {
+  const n = xs.length;
+  if (n < 3) return null; // need at least 3 data points
+  const mx = xs.reduce((s, v) => s + v, 0) / n;
+  const my = ys.reduce((s, v) => s + v, 0) / n;
+  let num = 0, dx2 = 0, dy2 = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xs[i] - mx, dy = ys[i] - my;
+    num += dx * dy;
+    dx2 += dx * dx;
+    dy2 += dy * dy;
+  }
+  const denom = Math.sqrt(dx2 * dy2);
+  return denom === 0 ? 0 : num / denom;
+}
+
+function buildCorrelationBox(rows, targetKey, targetLabel, kpiDefs) {
+  if (!isAdmin() || rows.length < 3) return '';
+
+  const targetVals = rows.map(r => {
+    if (targetKey === 'shown') return safeNum(shownVal(r));
+    return safeNum(r[targetKey]);
+  });
+
+  const results = [];
+  kpiDefs.forEach(kpi => {
+    const vals = rows.map(r => {
+      if (kpi.key === 'shown') return safeNum(shownVal(r));
+      if (kpi.key === 'pctShown') {
+        const shown = safeNum(shownVal(r));
+        const due = safeNum(r.due ?? r.due_count ?? 0);
+        const created = safeNum(r.created ?? r.created_count ?? 0);
+        return due > 0 ? shown / due : (created > 0 ? shown / created : 0);
+      }
+      return safeNum(r[kpi.key] ?? r[kpi.alt] ?? 0);
+    });
+    const r = pearsonR(vals, targetVals);
+    if (r !== null) results.push({ label: kpi.label, r });
+  });
+
+  results.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+
+  let rows_html = results.map(item => {
+    const absR = Math.abs(item.r);
+    const sign = item.r >= 0 ? '+' : '−';
+    const color = absR >= 0.7 ? '#16a34a' : absR >= 0.4 ? '#ca8a04' : '#94a3b8';
+    const strength = absR >= 0.7 ? 'Strong' : absR >= 0.4 ? 'Moderate' : 'Weak';
+    const barW = Math.round(absR * 100);
+    const barColor = item.r >= 0
+      ? (absR >= 0.7 ? '#22c55e' : absR >= 0.4 ? '#eab308' : '#d1d5db')
+      : (absR >= 0.7 ? '#ef4444' : absR >= 0.4 ? '#f97316' : '#d1d5db');
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);">
+      <div style="width:110px;font-size:12px;font-weight:600;">${item.label}</div>
+      <div style="flex:1;height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
+        <div style="width:${barW}%;height:100%;background:${barColor};border-radius:4px;transition:width .3s;"></div>
+      </div>
+      <div style="min-width:50px;text-align:right;font-size:12px;font-weight:700;color:${color};">${sign}${absR.toFixed(2)}</div>
+      <div style="min-width:60px;text-align:right;font-size:10px;color:${color};">${strength}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div style="margin-top:12px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-weight:700;font-size:13px;">📐 KPI Correlation to ${targetLabel}</div>
+        <div style="font-size:10px;color:var(--muted);">Pearson r · ${rows.length} reps</div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px;">Which metrics most predict ${targetLabel.toLowerCase()}?</div>
+      ${rows_html}
+      <div style="margin-top:8px;font-size:10px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#22c55e;"></span> Strong (≥0.70)</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#eab308;"></span> Moderate (0.40–0.69)</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#d1d5db;"></span> Weak (&lt;0.40)</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#ef4444;"></span> Negative</span>
+      </div>
+    </div>`;
+}
+
 function renderDashboard() {
   const me = window.userData || {};
   const bdc   = sortRows(dashboardData.bdc, bdcSort, 'bdc');
@@ -1175,6 +1254,13 @@ function renderDashboard() {
             </tbody>
           </table>
         </div>
+        ${buildCorrelationBox(bdc, 'shown', 'Appts Shown', [
+          { key: 'calls', label: 'Calls' },
+          { key: 'texts', label: 'Texts' },
+          { key: 'created', alt: 'created_count', label: 'Appts Created' },
+          { key: 'due', alt: 'due_count', label: 'Appts Due' },
+          { key: 'pctShown', label: '% Show Rate' },
+        ])}
       </div>
 
       <!-- ═══ Sales Panel ═══ -->
@@ -1224,6 +1310,14 @@ function renderDashboard() {
             </tbody>
           </table>
         </div>
+        ${buildCorrelationBox(sales, 'sales', 'Units Sold', [
+          { key: 'calls', label: 'Calls' },
+          { key: 'texts', label: 'Texts' },
+          { key: 'created', alt: 'created_count', label: 'Appts Created' },
+          { key: 'due', alt: 'due_count', label: 'Appts Due' },
+          { key: 'shown', label: 'Appts Shown' },
+          { key: 'pctShown', label: '% Show Rate' },
+        ])}
       </div>
 
     </div><!-- /panels -->
