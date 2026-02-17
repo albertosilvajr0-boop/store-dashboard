@@ -1391,7 +1391,8 @@ function renderDashboard() {
           <div id="reportsMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:1000;min-width:200px;padding:6px 0;">
             <a href="#" onclick="event.preventDefault();closeReportsMenu();showReassignments();" class="res-link">🔄 Reassignments</a>
             <a href="#" onclick="event.preventDefault();closeReportsMenu();showActivityModal();" class="res-link">🕐 Activity Log</a>
-            ${isAdmin() ? '<div style="border-top:1px solid var(--line);margin:4px 0;"></div><a href="#" onclick="event.preventDefault();closeReportsMenu();showLeadFunnel();" class="res-link">🔬 Lead Funnel</a><a href="#" onclick="event.preventDefault();closeReportsMenu();showVehicleDemand();" class="res-link">🚗 Vehicle Demand</a>' : ''}
+            <a href="#" onclick="event.preventDefault();closeReportsMenu();showVehicleDemand();" class="res-link">🚗 Vehicle Demand</a>
+            ${isAdmin() ? '<div style="border-top:1px solid var(--line);margin:4px 0;"></div><a href="#" onclick="event.preventDefault();closeReportsMenu();showLeadFunnel();" class="res-link">🔬 Lead Funnel</a>' : ''}
           </div>
         </div>` : ''}
         ${isAdmin() ? '<button class="topbar-btn manage" onclick="showUserModal()">👤 Manage Users</button>' : ''}
@@ -2724,7 +2725,7 @@ let _vehExpanded = new Set();
 let _vehSort = { col: 'total', dir: 'desc' };
 
 async function showVehicleDemand() {
-  if (!isAdmin()) return;
+  if (!isAdmin() && !isManager()) return;
   showLoading();
   try {
     const url = `${SCRIPT_URL}?route=vehicledemand&session=${encodeURIComponent(window.sessionToken || '')}`;
