@@ -1386,10 +1386,14 @@ function renderDashboard() {
             </div>
           </div>
         </div>
-        ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showReassignments()">🔄 Reassignments</button>' : ''}
-        ${isAdmin() ? '<button class="topbar-btn manage" onclick="showLeadFunnel()">🔬 Lead Funnel</button>' : ''}
-        ${isAdmin() ? '<button class="topbar-btn manage" onclick="showVehicleDemand()">🚗 Vehicle Demand</button>' : ''}
-        ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showActivityModal()">🕐 Activity</button>' : ''}
+        ${(isAdmin() || isManager()) ? `<div style="position:relative;display:inline-block;" id="reportsWrap">
+          <button class="topbar-btn manage" onclick="toggleReportsMenu()" style="min-width:110px;">📊 Reports ▾</button>
+          <div id="reportsMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:1000;min-width:200px;padding:6px 0;">
+            <a href="#" onclick="event.preventDefault();closeReportsMenu();showReassignments();" class="res-link">🔄 Reassignments</a>
+            <a href="#" onclick="event.preventDefault();closeReportsMenu();showActivityModal();" class="res-link">🕐 Activity Log</a>
+            ${isAdmin() ? '<div style="border-top:1px solid var(--line);margin:4px 0;"></div><a href="#" onclick="event.preventDefault();closeReportsMenu();showLeadFunnel();" class="res-link">🔬 Lead Funnel</a><a href="#" onclick="event.preventDefault();closeReportsMenu();showVehicleDemand();" class="res-link">🚗 Vehicle Demand</a>' : ''}
+          </div>
+        </div>` : ''}
         ${isAdmin() ? '<button class="topbar-btn manage" onclick="showUserModal()">👤 Manage Users</button>' : ''}
         <button class="topbar-btn logout" onclick="logout()">Logout</button>
       </div>
@@ -3064,17 +3068,32 @@ async function removeCustomLink(idx) {
 function toggleResourcesMenu() {
   const menu = document.getElementById('resourcesMenu');
   menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  const rMenu = document.getElementById('reportsMenu');
+  if (rMenu) rMenu.style.display = 'none';
 }
 function closeResourcesMenu() {
   document.getElementById('resourcesMenu').style.display = 'none';
 }
-// Close dropdown when clicking outside
+function toggleReportsMenu() {
+  const menu = document.getElementById('reportsMenu');
+  if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('resourcesMenu').style.display = 'none';
+}
+function closeReportsMenu() {
+  const menu = document.getElementById('reportsMenu');
+  if (menu) menu.style.display = 'none';
+}
+// Close dropdowns when clicking outside
 document.addEventListener('click', function(e) {
   const wrap = document.getElementById('resourcesWrap');
   if (wrap && !wrap.contains(e.target)) closeResourcesMenu();
+  const rWrap = document.getElementById('reportsWrap');
+  if (rWrap && !rWrap.contains(e.target)) closeReportsMenu();
 });
 window.toggleResourcesMenu = toggleResourcesMenu;
 window.closeResourcesMenu = closeResourcesMenu;
+window.toggleReportsMenu = toggleReportsMenu;
+window.closeReportsMenu = closeReportsMenu;
 window.showAddLinkForm = showAddLinkForm;
 window.hideAddLinkForm = hideAddLinkForm;
 window.saveCustomLink = saveCustomLink;
