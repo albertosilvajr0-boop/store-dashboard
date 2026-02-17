@@ -382,7 +382,7 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzeJWn5EEySVOE8uZm64li7OoEpDT-1kUN7lPaIkomIDLK4neo2sHfkCmTp1mB5Zk4Z/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzCJTiVz-fElM8zrMV8MsaJ5aO3449sB9ZLsyHtninJli_DgaQWsg2OKntgDTUAPbaR/exec';
 const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
 
 /* ── Crash reporter ── */
@@ -1052,6 +1052,15 @@ function buildCorrelationBox(rows, targetKey, targetLabel, kpiDefs) {
 }
 
 /* ── Day-of-Week & Time-of-Day Performance Patterns (admin only) ── */
+let _callPatternsData = null;
+let _callPatternsFilter = 'total'; // 'total', 'inbound', 'outbound'
+
+function setCallPatternsFilter(f) {
+  _callPatternsFilter = f;
+  renderCallPatternsFromCache();
+}
+window.setCallPatternsFilter = setCallPatternsFilter;
+
 function loadCallPatterns() {
   if (!isAdmin()) return;
   const container = document.getElementById('callPatternsBox');
@@ -1062,147 +1071,177 @@ function loadCallPatterns() {
     let result;
     try { result = JSON.parse(raw); } catch { return; }
     if (!result.ok) return;
-
-    const data = result;
-    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const heatmap = data.heatmap || [];
-    const teamHeatmaps = data.teamHeatmaps || {};
-
-    // Find active hour range (skip dead hours)
-    let minHour = 23, maxHour = 0;
-    heatmap.forEach(c => {
-      if (c.hour < minHour) minHour = c.hour;
-      if (c.hour > maxHour) maxHour = c.hour;
-    });
-    if (minHour > maxHour) { minHour = 7; maxHour = 20; }
-    minHour = Math.max(0, minHour - 1);
-    maxHour = Math.min(23, maxHour + 1);
-
-    // Build lookup: grid[day][hour] = count
-    const grid = {};
-    let maxCount = 1;
-    heatmap.forEach(c => {
-      if (!grid[c.day]) grid[c.day] = {};
-      grid[c.day][c.hour] = c;
-      if (c.count > maxCount) maxCount = c.count;
-    });
-
-    // Avg talk lookup
-    const talkGrid = {};
-    heatmap.forEach(c => {
-      if (!talkGrid[c.day]) talkGrid[c.day] = {};
-      talkGrid[c.day][c.hour] = c.avgTalk;
-    });
-
-    function heatColor(count) {
-      if (!count) return 'var(--card)';
-      const pct = count / maxCount;
-      if (pct >= 0.8) return '#166534';
-      if (pct >= 0.6) return '#22c55e';
-      if (pct >= 0.4) return '#86efac';
-      if (pct >= 0.2) return '#bbf7d0';
-      return '#f0fdf4';
-    }
-    function textColor(count) {
-      if (!count) return 'var(--muted)';
-      const pct = count / maxCount;
-      return pct >= 0.6 ? '#fff' : '#1e293b';
-    }
-
-    // Hour labels
-    function fmtHour(h) {
-      if (h === 0) return '12a';
-      if (h < 12) return h + 'a';
-      if (h === 12) return '12p';
-      return (h - 12) + 'p';
-    }
-
-    // Build heatmap grid HTML
-    let gridHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">';
-    gridHTML += '<thead><tr><th style="padding:4px 6px;text-align:left;font-size:10px;color:var(--muted);">Day</th>';
-    for (let h = minHour; h <= maxHour; h++) {
-      gridHTML += `<th style="padding:4px 2px;text-align:center;font-size:9px;color:var(--muted);min-width:32px;">${fmtHour(h)}</th>`;
-    }
-    gridHTML += '<th style="padding:4px 6px;text-align:right;font-size:10px;color:var(--muted);">Total</th></tr></thead><tbody>';
-
-    const dayOrder = [1,2,3,4,5,6,0]; // Mon-Sun
-    dayOrder.forEach(d => {
-      const dayTotal = (data.dayTotals || [])[d] || 0;
-      const isWeekend = d === 0 || d === 6;
-      gridHTML += `<tr><td style="padding:4px 6px;font-weight:700;font-size:11px;${isWeekend ? 'color:var(--muted);' : ''}">${dayNames[d]}</td>`;
-      for (let h = minHour; h <= maxHour; h++) {
-        const cell = (grid[d] || {})[h];
-        const count = cell ? cell.count : 0;
-        const talk = cell ? cell.avgTalk : 0;
-        const bg = heatColor(count);
-        const fg = textColor(count);
-        const title = count > 0 ? `${dayNames[d]} ${fmtHour(h)}: ${count} calls, avg ${talk.toFixed(1)}min talk` : `${dayNames[d]} ${fmtHour(h)}: no calls`;
-        gridHTML += `<td style="padding:3px 1px;text-align:center;background:${bg};color:${fg};border-radius:3px;font-weight:${count > 0 ? '600' : '400'};" title="${title}">${count || '·'}</td>`;
-      }
-      gridHTML += `<td style="padding:4px 6px;text-align:right;font-weight:700;font-size:11px;">${dayTotal}</td></tr>`;
-    });
-
-    // Hour totals row
-    gridHTML += '<tr><td style="padding:4px 6px;font-size:10px;color:var(--muted);font-weight:600;">Total</td>';
-    for (let h = minHour; h <= maxHour; h++) {
-      const ht = (data.hourTotals || [])[h] || 0;
-      gridHTML += `<td style="padding:3px 1px;text-align:center;font-size:10px;font-weight:600;color:var(--muted);">${ht || '·'}</td>`;
-    }
-    const grandTotal = (data.dayTotals || []).reduce((s, v) => s + v, 0);
-    gridHTML += `<td style="padding:4px 6px;text-align:right;font-weight:800;font-size:12px;">${grandTotal}</td></tr>`;
-    gridHTML += '</tbody></table></div>';
-
-    // Find peak hour and peak day
-    const dayTotals = data.dayTotals || [];
-    const hourTotals = data.hourTotals || [];
-    let peakDay = 0, peakDayVal = 0;
-    dayTotals.forEach((v, i) => { if (v > peakDayVal) { peakDayVal = v; peakDay = i; } });
-    let peakHour = 0, peakHourVal = 0;
-    hourTotals.forEach((v, i) => { if (v > peakHourVal) { peakHourVal = v; peakHour = i; } });
-
-    // Find deadest hour (min non-zero during business hours 8-18)
-    let deadHour = -1, deadHourVal = Infinity;
-    for (let h = 8; h <= 18; h++) {
-      const v = hourTotals[h] || 0;
-      if (v < deadHourVal) { deadHourVal = v; deadHour = h; }
-    }
-
-    // Peak cell (day+hour combo)
-    let peakCell = null, peakCellVal = 0;
-    heatmap.forEach(c => { if (c.count > peakCellVal) { peakCellVal = c.count; peakCell = c; } });
-
-    const insights = `
-      <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.7;">
-        ${peakCell ? `• <strong style="color:#16a34a;">${dayNames[peakCell.day]} ${fmtHour(peakCell.hour)}–${fmtHour(peakCell.hour+1)}</strong> is the golden hour — ${peakCellVal} calls this month<br>` : ''}
-        • <strong>${dayNames[peakDay]}</strong> is the busiest day with ${peakDayVal} total calls<br>
-        ${deadHour >= 0 ? `• <strong style="color:#dc2626;">${fmtHour(deadHour)}–${fmtHour(deadHour+1)}</strong> is the slowest business hour — only ${deadHourVal} calls<br>` : ''}
-        • Peak calling hour overall: <strong>${fmtHour(peakHour)}–${fmtHour(peakHour+1)}</strong> with ${peakHourVal} calls
-      </div>`;
-
-    // Color legend
-    const legend = `<div style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:10px;color:var(--muted);">
-      <span>Low</span>
-      <span style="display:inline-block;width:14px;height:10px;background:#f0fdf4;border:1px solid var(--line);border-radius:2px;"></span>
-      <span style="display:inline-block;width:14px;height:10px;background:#bbf7d0;border-radius:2px;"></span>
-      <span style="display:inline-block;width:14px;height:10px;background:#86efac;border-radius:2px;"></span>
-      <span style="display:inline-block;width:14px;height:10px;background:#22c55e;border-radius:2px;"></span>
-      <span style="display:inline-block;width:14px;height:10px;background:#166534;border-radius:2px;"></span>
-      <span>High</span>
-      <span style="margin-left:8px;">· Hover cells for details</span>
-    </div>`;
-
-    container.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
-        <div style="font-weight:700;font-size:13px;">🕐 Call Activity Heatmap</div>
-        <div style="font-size:10px;color:var(--muted);">${data.month || 'MTD'} · ${grandTotal} calls</div>
-      </div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:8px;">When are calls happening? Darker = more calls in that time slot.</div>
-      ${gridHTML}
-      ${legend}
-      ${insights}`;
+    _callPatternsData = result;
+    _callPatternsFilter = 'total';
+    renderCallPatternsFromCache();
   }).catch(err => {
     console.error('Call patterns load error:', err);
   });
+}
+
+function renderCallPatternsFromCache() {
+  const container = document.getElementById('callPatternsBox');
+  if (!container || !_callPatternsData) return;
+
+  const result = _callPatternsData;
+  // Support both old format (flat) and new format (total/inbound/outbound)
+  const hasNewFormat = result.total && result.total.heatmap;
+  const slice = hasNewFormat
+    ? (result[_callPatternsFilter] || result.total)
+    : { heatmap: result.heatmap || [], dayTotals: result.dayTotals || [], hourTotals: result.hourTotals || [] };
+  const showToggle = hasNewFormat;
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const heatmap = slice.heatmap || [];
+
+  // Filter label
+  const filterLabels = { total: 'All Calls', inbound: 'Inbound', outbound: 'Outbound' };
+  const filterColors = { total: '#166534', inbound: '#2563eb', outbound: '#f97316' };
+  const heatPalettes = {
+    total:    { bg: ['var(--card)','#f0fdf4','#bbf7d0','#86efac','#22c55e','#166534'], fg6: '#fff' },
+    inbound:  { bg: ['var(--card)','#eff6ff','#bfdbfe','#93c5fd','#3b82f6','#1d4ed8'], fg6: '#fff' },
+    outbound: { bg: ['var(--card)','#fff7ed','#fed7aa','#fdba74','#f97316','#c2410c'], fg6: '#fff' },
+  };
+  const palette = heatPalettes[_callPatternsFilter];
+
+  // Hour range
+  let minHour = 23, maxHour = 0;
+  heatmap.forEach(c => {
+    if (c.hour < minHour) minHour = c.hour;
+    if (c.hour > maxHour) maxHour = c.hour;
+  });
+  if (minHour > maxHour) { minHour = 7; maxHour = 20; }
+  minHour = Math.max(0, minHour - 1);
+  maxHour = Math.min(23, maxHour + 1);
+
+  // Build grid
+  const grid = {};
+  let maxCount = 1;
+  heatmap.forEach(c => {
+    if (!grid[c.day]) grid[c.day] = {};
+    grid[c.day][c.hour] = c;
+    if (c.count > maxCount) maxCount = c.count;
+  });
+
+  function heatColor(count) {
+    if (!count) return palette.bg[0];
+    const pct = count / maxCount;
+    if (pct >= 0.8) return palette.bg[5];
+    if (pct >= 0.6) return palette.bg[4];
+    if (pct >= 0.4) return palette.bg[3];
+    if (pct >= 0.2) return palette.bg[2];
+    return palette.bg[1];
+  }
+  function textColor(count) {
+    if (!count) return 'var(--muted)';
+    const pct = count / maxCount;
+    return pct >= 0.6 ? palette.fg6 : '#1e293b';
+  }
+  function fmtHour(h) {
+    if (h === 0) return '12a';
+    if (h < 12) return h + 'a';
+    if (h === 12) return '12p';
+    return (h - 12) + 'p';
+  }
+
+  // Build table
+  let gridHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">';
+  gridHTML += '<thead><tr><th style="padding:4px 6px;text-align:left;font-size:10px;color:var(--muted);">Day</th>';
+  for (let h = minHour; h <= maxHour; h++) {
+    gridHTML += `<th style="padding:4px 2px;text-align:center;font-size:9px;color:var(--muted);min-width:32px;">${fmtHour(h)}</th>`;
+  }
+  gridHTML += '<th style="padding:4px 6px;text-align:right;font-size:10px;color:var(--muted);">Total</th></tr></thead><tbody>';
+
+  const dayOrder = [1,2,3,4,5,6,0];
+  const dayTotals = slice.dayTotals || [];
+  const hourTotals = slice.hourTotals || [];
+
+  dayOrder.forEach(d => {
+    const dayTotal = dayTotals[d] || 0;
+    const isWeekend = d === 0 || d === 6;
+    gridHTML += `<tr><td style="padding:4px 6px;font-weight:700;font-size:11px;${isWeekend ? 'color:var(--muted);' : ''}">${dayNames[d]}</td>`;
+    for (let h = minHour; h <= maxHour; h++) {
+      const cell = (grid[d] || {})[h];
+      const count = cell ? cell.count : 0;
+      const talk = cell ? cell.avgTalk : 0;
+      const bg = heatColor(count);
+      const fg = textColor(count);
+      const title = count > 0 ? `${dayNames[d]} ${fmtHour(h)}: ${count} ${filterLabels[_callPatternsFilter].toLowerCase()}, avg ${talk.toFixed(1)}min` : `${dayNames[d]} ${fmtHour(h)}: no calls`;
+      gridHTML += `<td style="padding:3px 1px;text-align:center;background:${bg};color:${fg};border-radius:3px;font-weight:${count > 0 ? '600' : '400'};" title="${title}">${count || '·'}</td>`;
+    }
+    gridHTML += `<td style="padding:4px 6px;text-align:right;font-weight:700;font-size:11px;">${dayTotal}</td></tr>`;
+  });
+
+  gridHTML += '<tr><td style="padding:4px 6px;font-size:10px;color:var(--muted);font-weight:600;">Total</td>';
+  for (let h = minHour; h <= maxHour; h++) {
+    const ht = hourTotals[h] || 0;
+    gridHTML += `<td style="padding:3px 1px;text-align:center;font-size:10px;font-weight:600;color:var(--muted);">${ht || '·'}</td>`;
+  }
+  const grandTotal = dayTotals.reduce((s, v) => s + v, 0);
+  gridHTML += `<td style="padding:4px 6px;text-align:right;font-weight:800;font-size:12px;">${grandTotal}</td></tr>`;
+  gridHTML += '</tbody></table></div>';
+
+  // Insights
+  let peakDay = 0, peakDayVal = 0;
+  dayTotals.forEach((v, i) => { if (v > peakDayVal) { peakDayVal = v; peakDay = i; } });
+  let peakHour = 0, peakHourVal = 0;
+  hourTotals.forEach((v, i) => { if (v > peakHourVal) { peakHourVal = v; peakHour = i; } });
+  let deadHour = -1, deadHourVal = Infinity;
+  for (let h = 8; h <= 18; h++) {
+    const v = hourTotals[h] || 0;
+    if (v < deadHourVal) { deadHourVal = v; deadHour = h; }
+  }
+  let peakCell = null, peakCellVal = 0;
+  heatmap.forEach(c => { if (c.count > peakCellVal) { peakCellVal = c.count; peakCell = c; } });
+
+  const accentClr = filterColors[_callPatternsFilter];
+  const insights = `
+    <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.7;">
+      ${peakCell ? `• <strong style="color:${accentClr};">${dayNames[peakCell.day]} ${fmtHour(peakCell.hour)}–${fmtHour(peakCell.hour+1)}</strong> is the golden hour — ${peakCellVal} calls this month<br>` : ''}
+      • <strong>${dayNames[peakDay]}</strong> is the busiest day with ${peakDayVal} total calls<br>
+      ${deadHour >= 0 ? `• <strong style="color:#dc2626;">${fmtHour(deadHour)}–${fmtHour(deadHour+1)}</strong> is the slowest business hour — only ${deadHourVal} calls<br>` : ''}
+      • Peak calling hour overall: <strong>${fmtHour(peakHour)}–${fmtHour(peakHour+1)}</strong> with ${peakHourVal} calls
+    </div>`;
+
+  // Legend with palette colors
+  const legend = `<div style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:10px;color:var(--muted);">
+    <span>Low</span>
+    <span style="display:inline-block;width:14px;height:10px;background:${palette.bg[1]};border:1px solid var(--line);border-radius:2px;"></span>
+    <span style="display:inline-block;width:14px;height:10px;background:${palette.bg[2]};border-radius:2px;"></span>
+    <span style="display:inline-block;width:14px;height:10px;background:${palette.bg[3]};border-radius:2px;"></span>
+    <span style="display:inline-block;width:14px;height:10px;background:${palette.bg[4]};border-radius:2px;"></span>
+    <span style="display:inline-block;width:14px;height:10px;background:${palette.bg[5]};border-radius:2px;"></span>
+    <span>High</span>
+    <span style="margin-left:8px;">· Hover cells for details</span>
+  </div>`;
+
+  // Toggle buttons
+  function tbtn(key, label) {
+    const active = _callPatternsFilter === key;
+    const clr = filterColors[key];
+    return `<button onclick="setCallPatternsFilter('${key}')" style="padding:3px 10px;font-size:11px;font-weight:${active ? '700' : '500'};border:1px solid ${active ? clr : 'var(--line)'};background:${active ? clr : 'transparent'};color:${active ? '#fff' : 'var(--text)'};border-radius:6px;cursor:pointer;transition:all .15s;">${label}</button>`;
+  }
+
+  // Totals for each filter for the header
+  const totalAll = (hasNewFormat ? result.total?.dayTotals : slice.dayTotals || []).reduce((s, v) => s + v, 0);
+  const totalIB  = hasNewFormat ? (result.inbound?.dayTotals || []).reduce((s, v) => s + v, 0) : 0;
+  const totalOB  = hasNewFormat ? (result.outbound?.dayTotals || []).reduce((s, v) => s + v, 0) : 0;
+
+  container.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="font-weight:700;font-size:13px;">🕐 Call Activity Heatmap</div>
+        ${showToggle ? `<div style="display:flex;gap:4px;">
+          ${tbtn('total', 'Total')}
+          ${tbtn('inbound', 'IB')}
+          ${tbtn('outbound', 'OB')}
+        </div>` : ''}
+      </div>
+      <div style="font-size:10px;color:var(--muted);">${result.month || 'MTD'} · ${grandTotal} ${filterLabels[_callPatternsFilter].toLowerCase()}${showToggle ? ` · <span style="color:var(--text);">${totalAll} total</span> (<span style="color:#2563eb;">${totalIB} IB</span> / <span style="color:#f97316;">${totalOB} OB</span>)` : ''}</div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:8px;">When are ${_callPatternsFilter === 'total' ? 'calls' : _callPatternsFilter + ' calls'} happening? Darker = more calls in that time slot.</div>
+    ${gridHTML}
+    ${legend}
+    ${insights}`;
 }
 
 function renderDashboard() {
