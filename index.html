@@ -382,7 +382,7 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxetkpCIF0tSy9iiNOvAEWrlRmhl8nXjJinZsYJAyofUo8aAECcZS8ApN6J14O7b1Kn/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyfS04Bm7neT3iJc_dNjg6kvKk_LRaAYWK2RBPYKlSOK4Bf7V8EXn_4kIj4pwafnXwQ/exec';
 const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
 
 /* ── Crash reporter ── */
@@ -1388,6 +1388,7 @@ function renderDashboard() {
         </div>
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showReassignments()">🔄 Reassignments</button>' : ''}
         ${isAdmin() ? '<button class="topbar-btn manage" onclick="showLeadFunnel()">🔬 Lead Funnel</button>' : ''}
+        ${isAdmin() ? '<button class="topbar-btn manage" onclick="showVehicleDemand()">🚗 Vehicle Demand</button>' : ''}
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showActivityModal()">🕐 Activity</button>' : ''}
         ${isAdmin() ? '<button class="topbar-btn manage" onclick="showUserModal()">👤 Manage Users</button>' : ''}
         <button class="topbar-btn logout" onclick="logout()">Logout</button>
@@ -2710,6 +2711,275 @@ window.showSourceLeaderboard = showSourceLeaderboard;
 window.toggleSourceSort = toggleSourceSort;
 window.showLeadFunnel = showLeadFunnel;
 window.toggleFunnelSort = toggleFunnelSort;
+
+/* ══════════════════════════════════════════
+   VEHICLE DEMAND DASHBOARD (Admin)
+   ══════════════════════════════════════════ */
+let _vehData = null;
+let _vehExpanded = new Set();
+let _vehSort = { col: 'total', dir: 'desc' };
+
+async function showVehicleDemand() {
+  if (!isAdmin()) return;
+  showLoading();
+  try {
+    const url = `${SCRIPT_URL}?route=vehicledemand&session=${encodeURIComponent(window.sessionToken || '')}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (!data.ok) { alert('Error loading vehicle data'); showDashboard(); return; }
+    _vehData = data;
+    _vehSort = { col: 'total', dir: 'desc' };
+    _vehExpanded = new Set(data.byMake.slice(0, 5).map(m => m.name));
+    renderVehicleDemand();
+  } catch (err) {
+    console.error('Vehicle demand error:', err);
+    showDashboard();
+  }
+}
+
+function toggleVehGroup(make) {
+  if (_vehExpanded.has(make)) _vehExpanded.delete(make);
+  else _vehExpanded.add(make);
+  renderVehicleDemand();
+}
+
+function toggleVehSort(col) {
+  if (_vehSort.col === col) _vehSort.dir = _vehSort.dir === 'desc' ? 'asc' : 'desc';
+  else _vehSort = { col, dir: 'desc' };
+  renderVehicleDemand();
+}
+
+function vehExpandAll() {
+  _vehExpanded = new Set((_vehData?.byMake || []).map(m => m.name));
+  renderVehicleDemand();
+}
+function vehCollapseAll() { _vehExpanded = new Set(); renderVehicleDemand(); }
+
+function renderVehicleDemand() {
+  if (!_vehData) return;
+  const { byMake, summary, dateRange } = _vehData;
+  const s = summary;
+  const dateStr = dateRange ? `${dateRange.from || '?'} – ${dateRange.to || '?'}` : '';
+
+  // Sort makes
+  const sorted = [...byMake].sort((a, b) => {
+    let av = a[_vehSort.col], bv = b[_vehSort.col];
+    if (typeof av === 'string') return _vehSort.dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    return _vehSort.dir === 'asc' ? (av||0) - (bv||0) : (bv||0) - (av||0);
+  });
+
+  function closeClr(r) { return r >= 20 ? '#16a34a' : r >= 10 ? '#ca8a04' : r >= 3 ? '#f97316' : '#dc2626'; }
+  function nuBar(nw, used, total) {
+    if (!total) return '';
+    const pN = Math.round(nw / total * 100);
+    const pU = Math.round(used / total * 100);
+    return `<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;width:80px;" title="New ${pN}% / Used ${pU}%">
+      <div style="width:${pN}%;background:#3b82f6;"></div>
+      <div style="width:${pU}%;background:#f97316;"></div>
+      <div style="flex:1;background:#e2e8f0;"></div>
+    </div>`;
+  }
+  function statusDots(active, sold, inactive, total) {
+    if (!total) return '';
+    const pA = Math.round(active / total * 100);
+    const pS = Math.round(sold / total * 100);
+    return `<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;width:80px;" title="Active ${pA}% / Sold ${pS}%">
+      <div style="width:${pA}%;background:#3b82f6;"></div>
+      <div style="width:${pS}%;background:#16a34a;"></div>
+      <div style="flex:1;background:#fca5a5;"></div>
+    </div>`;
+  }
+
+  function sa(col) {
+    return _vehSort.col === col ? (_vehSort.dir === 'desc' ? '▼' : '▲') : '↕';
+  }
+
+  // Make brand colors
+  const brandColors = {
+    'JEEP': '#4d6b3a', 'RAM': '#1a1a1a', 'DODGE': '#d32f2f', 'TOYOTA': '#eb0a1e',
+    'FORD': '#003478', 'BMW': '#0066b1', 'CHEVROLET': '#d4a843', 'KIA': '#05141f',
+    'NISSAN': '#c3002f', 'HONDA': '#cc0000', 'CHRYSLER': '#004b87',
+  };
+
+  // Accordion
+  let accHTML = '';
+  sorted.forEach(mk => {
+    const expanded = _vehExpanded.has(mk.name);
+    const chevron = expanded ? '▾' : '▸';
+    const clr = brandColors[mk.name] || '#64748b';
+    const pctNew = mk.total > 0 ? Math.round(mk.new / mk.total * 100) : 0;
+    const pctUsed = mk.total > 0 ? Math.round(mk.used / mk.total * 100) : 0;
+
+    accHTML += `<div style="margin-bottom:${expanded ? '0' : '6'}px;">
+      <div onclick="toggleVehGroup('${mk.name.replace(/'/g, "\\'")}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--card);border:1px solid var(--line);border-radius:${expanded ? '10px 10px 0 0' : '10px'};cursor:pointer;user-select:none;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:11px;color:var(--muted);">${chevron}</span>
+          <span style="display:inline-block;width:4px;height:20px;background:${clr};border-radius:2px;"></span>
+          <span style="font-weight:800;font-size:14px;">${mk.name}</span>
+          <span style="font-size:11px;color:var(--muted);">${mk.models.length} model${mk.models.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div style="display:flex;gap:14px;align-items:center;font-size:12px;flex-wrap:wrap;">
+          <span><strong>${mk.total}</strong> leads</span>
+          ${nuBar(mk.new, mk.used, mk.total)}
+          <span style="color:#3b82f6;font-size:10px;">${pctNew}% new</span>
+          <span style="color:#f97316;font-size:10px;">${pctUsed}% used</span>
+          <span style="color:${closeClr(mk.closeRate)};font-weight:700;">${mk.closeRate}% sold</span>
+          <span style="font-size:10px;color:var(--muted);">${mk.withTrade} trades</span>
+        </div>
+      </div>`;
+
+    if (expanded) {
+      accHTML += `<div style="border:1px solid var(--line);border-top:none;border-radius:0 0 10px 10px;overflow:hidden;margin-bottom:6px;">
+        <div style="overflow-x:auto;">
+        <table style="width:100%;font-size:12px;">
+          <thead><tr style="background:rgba(0,0,0,.02);">
+            <th style="text-align:left;padding:8px 12px;font-size:11px;cursor:pointer;" onclick="toggleVehSort('name')">Model <span class="sort-arrow">${sa('name')}</span></th>
+            <th style="font-size:11px;cursor:pointer;" onclick="toggleVehSort('total')">Leads <span class="sort-arrow">${sa('total')}</span></th>
+            <th style="font-size:11px;">New/Used</th>
+            <th style="font-size:11px;cursor:pointer;" onclick="toggleVehSort('active')">Active <span class="sort-arrow">${sa('active')}</span></th>
+            <th style="font-size:11px;cursor:pointer;" onclick="toggleVehSort('sold')">Sold <span class="sort-arrow">${sa('sold')}</span></th>
+            <th style="font-size:11px;cursor:pointer;" onclick="toggleVehSort('closeRate')">Close % <span class="sort-arrow">${sa('closeRate')}</span></th>
+            <th style="font-size:11px;">Pipeline</th>
+            <th style="font-size:11px;cursor:pointer;" onclick="toggleVehSort('withTrade')">Trades <span class="sort-arrow">${sa('withTrade')}</span></th>
+            <th style="text-align:left;font-size:11px;">Top Trims</th>
+          </tr></thead><tbody>`;
+
+      const sortedModels = [...mk.models].sort((a, b) => {
+        let av = a[_vehSort.col], bv = b[_vehSort.col];
+        if (typeof av === 'string') return _vehSort.dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+        return _vehSort.dir === 'asc' ? (av||0) - (bv||0) : (bv||0) - (av||0);
+      });
+
+      const groupMax = Math.max(...mk.models.map(m => m.total), 1);
+      sortedModels.forEach(md => {
+        const barPct = Math.round((md.total / groupMax) * 100);
+        const trimStr = (md.topTrims || []).join(', ');
+        accHTML += `<tr>
+          <td style="padding:6px 12px;font-weight:600;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${md.name}">${md.name}</div>
+              <div style="width:40px;height:4px;background:#f1f5f9;border-radius:2px;flex-shrink:0;">
+                <div style="width:${barPct}%;height:100%;background:${clr};border-radius:2px;opacity:.4;"></div>
+              </div>
+            </div>
+          </td>
+          <td style="text-align:center;font-weight:700;">${md.total}</td>
+          <td style="text-align:center;">${nuBar(md.new, md.used, md.total)}</td>
+          <td style="text-align:center;">${md.active}</td>
+          <td style="text-align:center;font-weight:700;color:#16a34a;">${md.sold}</td>
+          <td style="text-align:center;font-weight:700;color:${closeClr(md.closeRate)};">${md.closeRate}%</td>
+          <td style="text-align:center;">${statusDots(md.active, md.sold, md.inactive, md.total)}</td>
+          <td style="text-align:center;">${md.withTrade}</td>
+          <td style="font-size:10px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${trimStr}">${trimStr || '–'}</td>
+        </tr>`;
+      });
+
+      accHTML += '</tbody></table></div></div>';
+    }
+    accHTML += '</div>';
+  });
+
+  // Top trades sidebar
+  const tradesHTML = (s.topTrades || []).map((t, i) =>
+    `<div style="display:flex;justify-content:space-between;padding:4px 0;${i > 0 ? 'border-top:1px solid var(--line);' : ''}">
+      <span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;" title="${t.name}">${t.name}</span>
+      <span style="font-size:11px;font-weight:700;flex-shrink:0;margin-left:8px;">${t.count}</span>
+    </div>`
+  ).join('');
+
+  // New vs Used donut (CSS-based)
+  const totalNU = s.new + s.used;
+  const pctNew = totalNU > 0 ? Math.round(s.new / totalNU * 100) : 50;
+
+  document.getElementById('app').innerHTML = `
+    <div style="max-width:1200px;margin:0 auto;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div style="font-size:20px;font-weight:800;">🚗 Vehicle Demand Dashboard</div>
+          <div style="font-size:12px;color:var(--muted);">What customers are shopping for · grouped by Make${dateStr ? ` · <strong style="color:var(--text);">${dateStr}</strong>` : ''}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="topbar-btn" onclick="vehExpandAll()" style="font-size:11px;padding:5px 10px;">Expand All</button>
+          <button class="topbar-btn" onclick="vehCollapseAll()" style="font-size:11px;padding:5px 10px;">Collapse All</button>
+          <button class="topbar-btn manage" onclick="showVehicleDemand()">↻ Refresh</button>
+          <button class="topbar-btn logout" onclick="showDashboard()">← Dashboard</button>
+        </div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Leads w/ Vehicle</div>
+          <div style="font-size:22px;font-weight:800;">${s.withVehicle}</div>
+          <div style="font-size:10px;color:var(--muted);">of ${s.totalLeads} total</div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">New / Used</div>
+          <div style="font-size:18px;font-weight:800;"><span style="color:#3b82f6;">${s.new}</span> <span style="color:var(--muted);font-size:12px;">/</span> <span style="color:#f97316;">${s.used}</span></div>
+          <div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:4px;">
+            <div style="width:${pctNew}%;background:#3b82f6;"></div>
+            <div style="flex:1;background:#f97316;"></div>
+          </div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Active 🟢</div>
+          <div style="font-size:22px;font-weight:800;">${s.active}</div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Sold ✅</div>
+          <div style="font-size:22px;font-weight:800;color:#16a34a;">${s.sold}</div>
+          <div style="font-size:10px;color:var(--muted);">${s.closeRate}% close</div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Makes</div>
+          <div style="font-size:22px;font-weight:800;">${byMake.length}</div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">With Trade-In</div>
+          <div style="font-size:22px;font-weight:800;">${s.withTrade}</div>
+          <div style="font-size:10px;color:var(--muted);">${s.withVehicle > 0 ? Math.round(s.withTrade / s.withVehicle * 100) : 0}% of leads</div>
+        </div>
+      </div>
+
+      <!-- Insights row -->
+      <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+        <!-- Top 5 Models -->
+        <div style="flex:1;min-width:250px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;">
+          <div style="font-weight:700;font-size:12px;margin-bottom:8px;">🔥 Top 5 Most Demanded</div>
+          ${(() => {
+            const allModels = [];
+            byMake.forEach(mk => mk.models.forEach(md => allModels.push({ make: mk.name, ...md })));
+            allModels.sort((a, b) => b.total - a.total);
+            return allModels.slice(0, 5).map((m, i) =>
+              '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;' + (i > 0 ? 'border-top:1px solid var(--line);' : '') + '">' +
+                '<span style="font-size:12px;font-weight:600;">' + (i+1) + '. ' + m.make + ' ' + m.name + '</span>' +
+                '<span style="font-size:11px;color:var(--muted);"><strong style="color:var(--text);">' + m.total + '</strong> leads · <span style="color:' + closeClr(m.closeRate) + ';">' + m.closeRate + '% sold</span></span>' +
+              '</div>'
+            ).join('');
+          })()}
+        </div>
+
+        <!-- Top Trades -->
+        <div style="flex:1;min-width:250px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;">
+          <div style="font-weight:700;font-size:12px;margin-bottom:8px;">🔄 Top Trade-Ins</div>
+          ${tradesHTML || '<div style="color:var(--muted);font-size:12px;">No trade data</div>'}
+        </div>
+      </div>
+
+      <!-- Accordion -->
+      <div>${accHTML}</div>
+
+      <div style="margin-top:12px;font-size:10px;color:var(--muted);line-height:1.6;">
+        <strong>How to read:</strong> New/Used bar = <span style="color:#3b82f6;">■</span> new <span style="color:#f97316;">■</span> used. Pipeline = <span style="color:#3b82f6;">■</span> active <span style="color:#16a34a;">■</span> sold <span style="color:#fca5a5;">■</span> inactive. Close % = sold ÷ total leads for that vehicle.
+      </div>
+    </div>`;
+}
+
+window.showVehicleDemand = showVehicleDemand;
+window.toggleVehGroup = toggleVehGroup;
+window.toggleVehSort = toggleVehSort;
+window.vehExpandAll = vehExpandAll;
+window.vehCollapseAll = vehCollapseAll;
 window.showAutoNews = showAutoNews;
 window.toggleNewsGroup = toggleNewsGroup;
 window.toggleAllNewsGroups = toggleAllNewsGroups;
