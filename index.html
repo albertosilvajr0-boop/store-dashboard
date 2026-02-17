@@ -1190,13 +1190,9 @@ function renderCallPatternsFromCache() {
     const v = hourTotals[h] || 0;
     if (v < deadHourVal) { deadHourVal = v; deadHour = h; }
   }
-  let peakCell = null, peakCellVal = 0;
-  heatmap.forEach(c => { if (c.count > peakCellVal) { peakCellVal = c.count; peakCell = c; } });
-
   const accentClr = filterColors[_callPatternsFilter];
   const insights = `
     <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.7;">
-      ${peakCell ? `• <strong style="color:${accentClr};">${dayNames[peakCell.day]} ${fmtHour(peakCell.hour)}–${fmtHour(peakCell.hour+1)}</strong> is the golden hour — ${peakCellVal} calls this month<br>` : ''}
       • <strong>${dayNames[peakDay]}</strong> is the busiest day with ${peakDayVal} total calls<br>
       ${deadHour >= 0 ? `• <strong style="color:#dc2626;">${fmtHour(deadHour)}–${fmtHour(deadHour+1)}</strong> is the slowest business hour — only ${deadHourVal} calls<br>` : ''}
       • Peak calling hour overall: <strong>${fmtHour(peakHour)}–${fmtHour(peakHour+1)}</strong> with ${peakHourVal} calls
