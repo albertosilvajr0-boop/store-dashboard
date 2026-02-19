@@ -383,7 +383,7 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyfS04Bm7neT3iJc_dNjg6kvKk_LRaAYWK2RBPYKlSOK4Bf7V8EXn_4kIj4pwafnXwQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPOc6viwiuhThXtpEfBtMBxTWHYoaDjTDtroS4-dpHCPQ53WKOwcy3zkNgi8E7LLCT/exec';
 const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
 
 /* ── Crash reporter ── */
@@ -3001,6 +3001,11 @@ function renderVehicleDemand() {
       sortedModels.forEach(md => {
         const barPct = Math.round((md.total / groupMax) * 100);
         const trimStr = (md.topTrims || []).join(', ');
+        const eMake = mk.name.replace(/'/g, "\\'");
+        const eModel = md.name.replace(/'/g, "\\'");
+        const lnk = (val, filter, color) => val > 0
+          ? `<a href="#" onclick="event.preventDefault();showVehLeads('${eMake}','${eModel}','${filter}')" style="color:${color || 'var(--text)'};text-decoration:underline;text-underline-offset:2px;cursor:pointer;font-weight:700;">${val}</a>`
+          : `<span style="color:var(--muted);">${val}</span>`;
         accHTML += `<tr>
           <td style="padding:6px 12px;font-weight:600;">
             <div style="display:flex;align-items:center;gap:8px;">
@@ -3010,13 +3015,13 @@ function renderVehicleDemand() {
               </div>
             </div>
           </td>
-          <td style="text-align:center;font-weight:700;">${md.total}</td>
+          <td style="text-align:center;">${lnk(md.total, 'all', 'var(--text)')}</td>
           <td style="text-align:center;">${nuBar(md.new, md.used, md.total)}</td>
-          <td style="text-align:center;">${md.active}</td>
-          <td style="text-align:center;font-weight:700;color:#16a34a;">${md.sold}</td>
+          <td style="text-align:center;">${lnk(md.active, 'active', '#3b82f6')}</td>
+          <td style="text-align:center;">${lnk(md.sold, 'sold', '#16a34a')}</td>
           <td style="text-align:center;font-weight:700;color:${closeClr(md.closeRate)};">${md.closeRate}%</td>
           <td style="text-align:center;">${statusDots(md.active, md.sold, md.inactive, md.total)}</td>
-          <td style="text-align:center;">${md.withTrade}</td>
+          <td style="text-align:center;">${lnk(md.withTrade, 'trade', '#f97316')}</td>
           <td style="font-size:10px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${trimStr}">${trimStr || '–'}</td>
         </tr>`;
       });
@@ -3127,6 +3132,81 @@ window.toggleVehGroup = toggleVehGroup;
 window.toggleVehSort = toggleVehSort;
 window.vehExpandAll = vehExpandAll;
 window.vehCollapseAll = vehCollapseAll;
+
+function showVehLeads(makeName, modelName, filter) {
+  if (!_vehData) return;
+  logPageView('Vehicle Leads: ' + makeName + ' ' + modelName);
+  const mk = _vehData.byMake.find(m => m.name === makeName);
+  if (!mk) return;
+  const md = mk.models.find(m => m.name === modelName);
+  if (!md || !md.leads) return;
+
+  let leads = md.leads;
+  let filterLabel = 'All';
+  const filterColors = { all: 'var(--text)', active: '#3b82f6', sold: '#16a34a', inactive: '#dc2626', trade: '#f97316' };
+  if (filter === 'active') { leads = leads.filter(l => l.cat === 'active'); filterLabel = 'Active'; }
+  else if (filter === 'sold') { leads = leads.filter(l => l.cat === 'sold'); filterLabel = 'Sold'; }
+  else if (filter === 'inactive') { leads = leads.filter(l => l.cat === 'inactive'); filterLabel = 'Inactive'; }
+  else if (filter === 'trade') { leads = leads.filter(l => l.tv); filterLabel = 'With Trade-In'; }
+
+  const filterBtns = ['all','active','sold','trade'].map(f => {
+    const labels = { all: `All (${md.total})`, active: `Active (${md.active})`, sold: `Sold (${md.sold})`, trade: `Trades (${md.withTrade})` };
+    const isActive = f === filter;
+    return `<button onclick="showVehLeads('${makeName.replace(/'/g, "\\'")}','${modelName.replace(/'/g, "\\'")}','${f}')" style="padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid ${filterColors[f]};background:${isActive ? filterColors[f] : 'transparent'};color:${isActive ? '#fff' : filterColors[f]};cursor:pointer;">${labels[f]}</button>`;
+  }).join('');
+
+  const statusClr = (cat) => cat === 'sold' ? '#16a34a' : cat === 'active' ? '#3b82f6' : '#dc2626';
+
+  document.getElementById('app').innerHTML = `
+    <div style="max-width:1200px;margin:0 auto;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div style="font-size:20px;font-weight:800;">${makeName} ${modelName}</div>
+          <div style="font-size:12px;color:var(--muted);">
+            <span style="color:${filterColors[filter]};font-weight:700;">${filterLabel}</span> · ${leads.length} lead${leads.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          ${filterBtns}
+          <button class="topbar-btn manage" onclick="renderVehicleDemand()" style="margin-left:8px;">← Vehicle Demand</button>
+        </div>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;">
+        <div style="overflow-x:auto;">
+        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+          <thead><tr style="background:rgba(0,0,0,.03);">
+            <th style="text-align:left;padding:10px 12px;font-size:11px;">Customer</th>
+            <th style="text-align:left;font-size:11px;">Phone</th>
+            <th style="text-align:left;font-size:11px;">Email</th>
+            <th style="text-align:left;font-size:11px;">Status</th>
+            <th style="text-align:left;font-size:11px;">Sales Rep</th>
+            <th style="text-align:left;font-size:11px;">Date In</th>
+            <th style="text-align:center;font-size:11px;">New/Used</th>
+            <th style="text-align:left;font-size:11px;">Trim</th>
+            <th style="text-align:left;font-size:11px;">Trade-In</th>
+          </tr></thead>
+          <tbody>
+            ${leads.length === 0 ? '<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--muted);">No leads match this filter.</td></tr>' : ''}
+            ${leads.map(l => `<tr style="border-top:1px solid var(--line);">
+              <td style="padding:8px 12px;font-weight:600;white-space:nowrap;">${l.n || '–'}</td>
+              <td style="white-space:nowrap;">${l.p ? `<a href="tel:${l.p}" style="color:var(--accent);text-decoration:none;">${l.p}</a>` : '–'}</td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.e}">${l.e ? `<a href="mailto:${l.e}" style="color:var(--accent);text-decoration:none;">${l.e}</a>` : '–'}</td>
+              <td style="white-space:nowrap;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusClr(l.cat)};margin-right:4px;"></span>${l.s || '–'}</td>
+              <td style="white-space:nowrap;">${l.r || '–'}</td>
+              <td style="white-space:nowrap;">${l.d || '–'}</td>
+              <td style="text-align:center;"><span style="background:${l.nu === 'New' ? '#dbeafe' : l.nu === 'Used' ? '#ffedd5' : '#f4f4f5'};color:${l.nu === 'New' ? '#1d4ed8' : l.nu === 'Used' ? '#c2410c' : '#71717a'};padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;">${l.nu || '–'}</span></td>
+              <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.t}">${l.t || '–'}</td>
+              <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.tv}">${l.tv || '–'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>`;
+}
+
+window.showVehLeads = showVehLeads;
 
 /* ══════════════════════════════════════════
    ENGAGEMENT REPORT (Admin)
