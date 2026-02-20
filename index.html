@@ -570,16 +570,59 @@ async function fetchCalls(name) {
   if (data?.ok) callListCache.set(key, data);
   return data;
 }
+
+/* ── Prefetch helpers ── */
+const _prefetchingPerson = new Set();
+const _prefetchingCalls = new Set();
+
 function prefetchPerson(name) {
   if (!name) return;
   const key = cacheKey(name);
-  if (!personCache.has(key)) fetchPerson(name).catch(() => {});
+  if (personCache.has(key) || _prefetchingPerson.has(key)) return;
+  _prefetchingPerson.add(key);
+  fetchPerson(name).catch(() => {}).finally(() => _prefetchingPerson.delete(key));
 }
+function prefetchCalls(name) {
+  if (!name) return;
+  const key = cacheKey(name);
+  if (callListCache.has(key) || _prefetchingCalls.has(key)) return;
+  _prefetchingCalls.add(key);
+  fetchCalls(name).catch(() => {}).finally(() => _prefetchingCalls.delete(key));
+}
+
+// Hover prefetch: triggered on mouseenter of leaderboard rows
+function onRowHover(name) {
+  prefetchPerson(name);
+  prefetchCalls(name);
+}
+
+// Staggered prefetch: fetch all names with delays so we don't overwhelm GAS
 function prefetchForDashboard(data) {
+  const allNames = new Set();
+  (data.sales || []).forEach(x => { if (x.name) allNames.add(x.name); });
+  (data.bdc || []).forEach(x => { if (x.name) allNames.add(x.name); });
+  if (window.userData?.linkedName) allNames.add(window.userData.linkedName);
+
+  // Priority: own name + top 3 immediately
   const topSales = (data.sales || []).slice(0, 3).map(x => x.name);
   const topBDC = (data.bdc || []).slice(0, 3).map(x => x.name);
   const mine = window.userData?.linkedName ? [window.userData.linkedName] : [];
-  [...new Set([...topSales, ...topBDC, ...mine])].forEach(prefetchPerson);
+  const priority = [...new Set([...mine, ...topSales, ...topBDC])];
+  priority.forEach(n => { prefetchPerson(n); prefetchCalls(n); });
+
+  // Rest: stagger 500ms apart to avoid overwhelming GAS
+  const rest = [...allNames].filter(n => !priority.includes(n));
+  rest.forEach((n, i) => {
+    setTimeout(() => prefetchPerson(n), (i + 1) * 500);
+    setTimeout(() => prefetchCalls(n), (i + 1) * 500 + 250);
+  });
+}
+
+// Quick-lookup: find a person's row data from dashboard cache
+function getDashboardRow(name) {
+  const key = (name || '').toUpperCase().trim();
+  const all = [...(dashboardData.sales || []), ...(dashboardData.bdc || [])];
+  return all.find(r => (r.name || '').toUpperCase().trim() === key) || null;
 }
 
 /* ══════════════════════════════════════════
@@ -1378,7 +1421,7 @@ function renderDashboard() {
     const name = r.name || '–';
     const top3    = i < 3 ? ' top3' : '';
     const allowed = canViewName(name);
-    const click   = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', 'BDC')"` : '';
+    const click   = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', 'BDC')" onmouseenter="onRowHover('${name.replace(/'/g, "\\'")}')"` : '';
     const cursor  = allowed ? 'cursor:pointer;' : 'opacity:0.7;';
     const cells = bdcCellData(r);
     return `<tr class="${top3}" ${click} style="${cursor}">
@@ -1417,7 +1460,7 @@ function renderDashboard() {
     const name    = r.name || '–';
     const top3    = i < 3 ? ' top3' : '';
     const allowed = canViewName(name);
-    const click   = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', 'Sales')"` : '';
+    const click   = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', 'Sales')" onmouseenter="onRowHover('${name.replace(/'/g, "\\'")}')"` : '';
     const cursor  = allowed ? 'cursor:pointer;' : 'opacity:0.7;';
     const cells = salesCellData(r);
     return `<tr class="${top3}" ${click} style="${cursor}">
@@ -1621,12 +1664,49 @@ async function showPersonDetails(name, type) {
   trackClick();
   logPageView('Person Detail: ' + name);
   const appEl = document.getElementById('app');
-  appEl.innerHTML = `
-    <div class="topbar">
-      <div class="topbar-logo">SA</div>
-      <div class="topbar-info"><div class="topbar-title">Loading ${name}…</div></div>
-    </div>
-    <div class="loading-wrap"><div class="spinner"></div></div>`;
+
+  // Also start fetching calls in background so they're ready when user clicks "View Call Sheets"
+  prefetchCalls(name);
+
+  // Instant preview: use dashboard data we already have while full details load
+  const preview = getDashboardRow(name);
+  const isSalesPreview = type === 'Sales' || (preview && safeNum(preview.sales) > 0);
+
+  if (preview && !personCache.has(cacheKey(name))) {
+    // Show instant preview from leaderboard data
+    appEl.innerHTML = `
+      <div class="topbar">
+        <div class="topbar-logo">SA</div>
+        <div class="topbar-info"><div class="topbar-title">${name}</div><div class="topbar-sub">${type || '–'} · Loading full details…</div></div>
+        <div class="topbar-actions">
+          <button class="topbar-btn manage" onclick="showDashboard()">← Back</button>
+          <button class="topbar-btn logout" onclick="logout()">Logout</button>
+        </div>
+      </div>
+
+      <div class="detail-card" style="margin-top:8px;">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:14px; margin-bottom:18px;">
+          <div class="stat-card"><div class="stat-label">Calls (MTD)</div><div class="stat-value">${safeNum(preview.calls)}</div></div>
+          ${isSalesPreview
+            ? `<div class="stat-card"><div class="stat-label">Sales (MTD)</div><div class="stat-value">${safeNum(preview.sales)}</div></div>
+               <div class="stat-card"><div class="stat-label">Texts (MTD)</div><div class="stat-value">${safeNum(preview.texts)}</div></div>`
+            : `<div class="stat-card"><div class="stat-label">Appts Shown (MTD)</div><div class="stat-value">${safeNum(shownVal(preview))}</div></div>
+               <div class="stat-card"><div class="stat-label">Appts Created (MTD)</div><div class="stat-value">${safeNum(preview.created ?? preview.created_count ?? 0)}</div></div>`
+          }
+        </div>
+        <div style="text-align:center;padding:18px;color:var(--muted);font-size:13px;">
+          <div class="spinner" style="margin:0 auto 10px;width:24px;height:24px;"></div>
+          Loading full details, coaching notes & last work day…
+        </div>
+      </div>`;
+  } else {
+    appEl.innerHTML = `
+      <div class="topbar">
+        <div class="topbar-logo">SA</div>
+        <div class="topbar-info"><div class="topbar-title">Loading ${name}…</div></div>
+      </div>
+      <div class="loading-wrap"><div class="spinner"></div></div>`;
+  }
 
   try {
     const result = await fetchPerson(name);
@@ -2895,6 +2975,7 @@ function renderLeadFunnel() {
 
 window.showDashboard = showDashboard;
 window.showPersonDetails = showPersonDetails;
+window.onRowHover = onRowHover;
 window.viewCallSheets = viewCallSheets;
 window.showUserModal = showUserModal;
 window.closeUserModal = closeUserModal;
