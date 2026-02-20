@@ -6,7 +6,7 @@
 <title>BDC &amp; Sales Leaderboards</title>
 
 <style>
-/* ── Reset & Base ── */
+/* â”€â”€ Reset & Base â”€â”€ */
 :root {
   --bg: #fafaf9;
   --card: #ffffff;
@@ -38,7 +38,7 @@ html, body {
   overflow-x: hidden;
 }
 
-/* ── Scrollbar styling ── */
+/* â”€â”€ Scrollbar styling â”€â”€ */
 .table-card::-webkit-scrollbar { height: 6px; }
 .table-card::-webkit-scrollbar-track { background: var(--line); border-radius: 3px; }
 .table-card::-webkit-scrollbar-thumb { background: #a1a1aa; border-radius: 3px; }
@@ -47,7 +47,7 @@ html, body {
 .detail-card::-webkit-scrollbar-track { background: var(--line); border-radius: 3px; }
 .detail-card::-webkit-scrollbar-thumb { background: #a1a1aa; border-radius: 3px; }
 
-/* ── Watermark ── */
+/* â”€â”€ Watermark â”€â”€ */
 body::before {
   content: "";
   position: fixed; inset: 0;
@@ -59,10 +59,10 @@ body::before {
   filter: grayscale(100%) contrast(120%);
 }
 
-/* ── Layout ── */
+/* â”€â”€ Layout â”€â”€ */
 .wrap { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding: 16px 20px 40px; }
 
-/* ── Top Header Bar ── */
+/* â”€â”€ Top Header Bar â”€â”€ */
 .topbar {
   display: flex; align-items: center; gap: 14px;
   background: var(--header); color: var(--headerText);
@@ -90,7 +90,7 @@ body::before {
 .topbar-btn.manage { background: #3f3f46; color: #fafaf9; }
 .topbar-btn.logout  { background: #ef4444; color: #fff; }
 
-/* ── Two-Panel Grid ── */
+/* â”€â”€ Two-Panel Grid â”€â”€ */
 .panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -122,12 +122,12 @@ body::before {
   .login-container { margin: 8vh 12px; padding: 20px; }
 }
 
-/* ── Panel ── */
+/* â”€â”€ Panel â”€â”€ */
 .panel-header { margin-bottom: 6px; }
 .panel-title { font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
 .panel-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
-/* ── Stat Cards ── */
+/* â”€â”€ Stat Cards â”€â”€ */
 .stat-row {
   display: flex; gap: 10px; margin: 10px 0 8px;
   flex-wrap: wrap;
@@ -142,7 +142,7 @@ body::before {
 .stat-value { font-size: 22px; font-weight: 800; margin-top: 2px; color: var(--text); }
 .stat-value.top-performer { font-size: 15px; font-weight: 700; line-height: 1.3; }
 
-/* ── Time Filter Chips ── */
+/* â”€â”€ Time Filter Chips â”€â”€ */
 .chip-row { display: flex; gap: 6px; margin: 8px 0 6px; align-items: center; }
 .chip {
   padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
@@ -153,7 +153,7 @@ body::before {
 .chip.active { background: var(--chipOn); color: var(--chipOnText); border-color: transparent; }
 .chip:hover:not(.active) { background: #e4e4e7; }
 
-/* ── KPI Legend (Sales) ── */
+/* â”€â”€ KPI Legend (Sales) â”€â”€ */
 .kpi-legend { display: flex; gap: 12px; margin: 4px 0 8px; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
 .kpi-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 3px; vertical-align: middle; }
 .kpi-dot.green  { background: var(--green); }
@@ -161,7 +161,7 @@ body::before {
 .kpi-dot.gray   { background: var(--gray); }
 .kpi-dot.red    { background: var(--red); }
 
-/* ── Table Card ── */
+/* â”€â”€ Table Card â”€â”€ */
 .table-card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -195,17 +195,17 @@ body::before {
 .table-card .name-cell { text-align: left; font-weight: 600; white-space: nowrap; }
 .table-card .trophy { font-size: 14px; margin-right: 4px; }
 
-/* ── KPI Cell Colors ── */
+/* â”€â”€ KPI Cell Colors â”€â”€ */
 .kpi-green  { background: var(--greenBg);  color: var(--green);  font-weight: 700; }
 .kpi-yellow { background: var(--yellowBg); color: var(--yellow); font-weight: 700; }
 .kpi-red    { background: var(--redBg);    color: var(--red);    font-weight: 700; }
 .kpi-gray   { background: var(--grayBg);   color: var(--gray);   font-weight: 600; }
 .kpi-none   { color: var(--muted); }
 
-/* ── Sales primary column highlight ── */
+/* â”€â”€ Sales primary column highlight â”€â”€ */
 .sales-primary { font-weight: 800; font-size: 14px; }
 
-/* ── Login ── */
+/* â”€â”€ Login â”€â”€ */
 .login-container {
   max-width: 400px; margin: 14vh auto; background: var(--card);
   border-radius: 16px; padding: 28px; box-shadow: 0 12px 36px rgba(0,0,0,.12);
@@ -223,7 +223,7 @@ body::before {
 .btn:hover { filter: brightness(1.15); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
-/* ── Modal ── */
+/* â”€â”€ Modal â”€â”€ */
 .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); place-items: center; z-index: 50; }
 .modal-content { width: min(720px, 92vw); max-height: 85vh; overflow-y: auto; background: var(--card); border-radius: 16px; padding: 20px; box-shadow: 0 12px 32px rgba(0,0,0,.25); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -231,10 +231,10 @@ body::before {
 .user-list .user-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
 .delete-btn { background: #ef4444; color: #fff; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; }
 
-/* ── Activity Log ── */
+/* â”€â”€ Activity Log â”€â”€ */
 .activity-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee; }
 
-/* ── Reassignment Page ── */
+/* â”€â”€ Reassignment Page â”€â”€ */
 .reassign-stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .reassign-stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 18px; min-width: 120px; }
 .reassign-stat .stat-label { font-size: 11px; color: var(--muted); font-weight: 500; }
@@ -251,10 +251,10 @@ body::before {
 .reassign-link:hover { text-decoration: underline; }
 .reassign-sheet-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #f0f0f0; color: #555; }
 
-/* ── News Page ── */
+/* â”€â”€ News Page â”€â”€ */
 .news-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; transition: box-shadow .15s; }
 
-/* ── Resources Dropdown ── */
+/* â”€â”€ Resources Dropdown â”€â”€ */
 .res-link { display:block;padding:9px 16px;color:var(--text);text-decoration:none;font-size:13px;font-weight:500;white-space:nowrap;transition:background .12s; }
 .res-link:hover { background:#f4f4f5; }
 .custom-link-wrap { display:flex;align-items:center;gap:0; }
@@ -263,7 +263,7 @@ body::before {
 .custom-link-del:hover { opacity:1; }
 th[draggable="true"] { cursor:grab; user-select:none; position:relative; }
 th[draggable="true"]:active { cursor:grabbing; }
-th[draggable="true"]::after { content:'⠿'; position:absolute; top:2px; right:2px; font-size:8px; color:var(--muted); opacity:0.4; }
+th[draggable="true"]::after { content:'â ¿'; position:absolute; top:2px; right:2px; font-size:8px; color:var(--muted); opacity:0.4; }
 th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
 .news-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
 .news-title { font-size: 15px; font-weight: 700; line-height: 1.4; }
@@ -283,7 +283,7 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
 .status-old    { background: #ef4444; }
 .status-never  { background: #d1d5db; }
 
-/* ── Person Detail Card ── */
+/* â”€â”€ Person Detail Card â”€â”€ */
 .detail-card {
   background: var(--card); border-radius: 14px; padding: 24px;
   border: 1px solid var(--line);
@@ -291,7 +291,7 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
   overflow-x: auto;
 }
 
-/* ── Loading Spinner ── */
+/* â”€â”€ Loading Spinner â”€â”€ */
 .loading-wrap {
   display: flex; align-items: center; justify-content: center;
   min-height: 300px;
@@ -303,7 +303,7 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Auto-refresh countdown ── */
+/* â”€â”€ Auto-refresh countdown â”€â”€ */
 .refresh-dot {
   width: 6px; height: 6px; border-radius: 50%; background: #22c55e;
   display: inline-block; margin-right: 4px; animation: pulse 2s infinite;
@@ -345,7 +345,7 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
 <div class="modal" id="activityModal">
   <div class="modal-content">
     <div class="modal-header">
-      <h2>🕐 User Activity Log</h2>
+      <h2>ðŸ• User Activity Log</h2>
       <button class="modal-close" onclick="closeActivityModal()">&times;</button>
     </div>
     <div id="activityContent" style="margin-top:8px;">
@@ -386,7 +386,7 @@ const secondaryAuth = getAuth(secondaryApp);
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPOc6viwiuhThXtpEfBtMBxTWHYoaDjTDtroS4-dpHCPQ53WKOwcy3zkNgi8E7LLCT/exec';
 const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
 
-/* ── Crash reporter ── */
+/* â”€â”€ Crash reporter â”€â”€ */
 window.addEventListener('error', (e) => {
   const appEl = document.getElementById('app');
   if (!appEl) return;
@@ -398,9 +398,9 @@ window.addEventListener('error', (e) => {
     </div>`;
 });
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    ACCESS HELPERS & SESSION
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function isAdmin()   { return window.userData?.role === 'admin' || window.userData?.role === 'superadmin'; }
 function isManager() { return window.userData?.role === 'manager'; }
 function canViewName(targetName) {
@@ -413,9 +413,9 @@ function makeSessionToken({ name, role }) {
   return btoa(JSON.stringify({ name, role }));
 }
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    PAGE VIEW TRACKING
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const _sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 let _lastPageView = null;
 let _pageViewQueue = [];
@@ -443,7 +443,7 @@ function logPageView(pageName) {
     setDoc(doc(db, 'dailyLogins', loginDocId), { lastSeen: new Date() }, { merge: true }).catch(() => {});
   }
 
-  // Batch writes — flush every 3 seconds or at 5 queued
+  // Batch writes â€” flush every 3 seconds or at 5 queued
   if (_pvFlushTimer) clearTimeout(_pvFlushTimer);
   if (_pageViewQueue.length >= 5) {
     _flushPageViews();
@@ -477,9 +477,9 @@ window.addEventListener('beforeunload', () => {
   _flushPageViews();
 });
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    HELPERS
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function safeNum(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
 function shownVal(x) { return x.shown ?? x.shows ?? x.shown_count ?? x.shows_count ?? 0; }
 function fmt(n, d=0) { return Number(n).toFixed(d); }
@@ -488,7 +488,7 @@ function timeStr() {
   return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-/* ── Motivational Quotes ── */
+/* â”€â”€ Motivational Quotes â”€â”€ */
 const TOPBAR_QUOTES = [
   "The leaderboard doesn't lie.",
   "You don't get paid for intention. You get paid for execution.",
@@ -501,7 +501,7 @@ function setTopbarQuote() {
   if (el) el.textContent = TOPBAR_QUOTES[Math.floor(Math.random() * TOPBAR_QUOTES.length)];
 }
 
-/* ── Click Tracking ── */
+/* â”€â”€ Click Tracking â”€â”€ */
 function todayDateStr() {
   const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }));
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -547,7 +547,7 @@ window.addEventListener('beforeunload', () => { _flushClicks(); });
 // Legacy wrapper for explicit trackClick() calls
 function trackClick() { /* now handled by global listener */ }
 
-/* ── Cache ── */
+/* â”€â”€ Cache â”€â”€ */
 const personCache = new Map();
 const callListCache = new Map();
 function cacheKey(name) { return (name || '').toUpperCase().trim(); }
@@ -582,9 +582,9 @@ function prefetchForDashboard(data) {
   [...new Set([...topSales, ...topBDC, ...mine])].forEach(prefetchPerson);
 }
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    UI HELPERS
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function showLoading(on = true) {
   const appEl = document.getElementById('app');
   if (!appEl || !on) return;
@@ -601,9 +601,9 @@ function closeUserModal() {
   document.getElementById('userModal').style.display = 'none';
 }
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    AUTH
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function showLogin() {
   document.getElementById('app').innerHTML = `
     <div class="login-container">
@@ -685,9 +685,9 @@ onAuthStateChanged(auth, async (user) => {
   showDashboard();
 });
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    DASHBOARD (pic2 layout)
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 let dashboardData = { sales: [], bdc: [] };
 let bdcSort = { col: 'shown', dir: 'desc' };
 let salesSort = { col: 'sales', dir: 'desc' };
@@ -708,7 +708,7 @@ async function showDashboard() {
     dashboardData.sales = Array.isArray(payload?.sales) ? payload.sales : [];
     dashboardData.bdc   = Array.isArray(payload?.bdc)   ? payload.bdc   : [];
     dashboardData.bdc = dashboardData.bdc.map(x => ({ calls: 0, texts: 0, ...x }));
-    // Total Units from "User Act" sheet (col M, "Total" row) — sent by backend
+    // Total Units from "User Act" sheet (col M, "Total" row) â€” sent by backend
     dashboardData.salesTotalUnits = payload.salesTotalUnits ?? null;
     console.log('DEBUG salesTotalUnits from backend:', payload.salesTotalUnits, '| stored:', dashboardData.salesTotalUnits);
 
@@ -731,7 +731,7 @@ async function showDashboard() {
   }
 }
 
-/* ── Compute Stats ── */
+/* â”€â”€ Compute Stats â”€â”€ */
 function bdcStats(rows) {
   let totalShown = 0, totalCreated = 0, totalDue = 0;
   rows.forEach(r => {
@@ -739,25 +739,25 @@ function bdcStats(rows) {
     totalCreated += safeNum(r.created ?? r.created_count ?? 0);
     totalDue     += safeNum(r.due ?? r.due_count ?? 0);
   });
-  const avgShowRate = totalDue > 0 ? ((totalShown / totalDue) * 100).toFixed(1) : (totalCreated > 0 ? ((totalShown / totalCreated) * 100).toFixed(1) : '–');
+  const avgShowRate = totalDue > 0 ? ((totalShown / totalDue) * 100).toFixed(1) : (totalCreated > 0 ? ((totalShown / totalCreated) * 100).toFixed(1) : 'â€“');
   return { totalShown, totalCreated, avgShowRate };
 }
 
 function salesStats(rows) {
   let totalUnits = safeNum(dashboardData.salesTotalUnits ?? 0);
-  let topName = '–', topVal = 0;
+  let topName = 'â€“', topVal = 0;
   let repSalesSum = 0;
   rows.forEach(r => {
     const s = safeNum(r.sales);
     repSalesSum += s;
-    if (s > topVal) { topVal = s; topName = r.name || '–'; }
+    if (s > topVal) { topVal = s; topName = r.name || 'â€“'; }
   });
   const active = rows.filter(r => safeNum(r.sales) > 0 || safeNum(r.calls) > 0).length || rows.length || 1;
   const avgUnits = active > 0 ? (repSalesSum / active).toFixed(2) : '0';
   return { totalUnits, avgUnits, topName, topVal };
 }
 
-/* ── Column definitions (draggable order) ── */
+/* â”€â”€ Column definitions (draggable order) â”€â”€ */
 const BDC_COL_DEFS = {
   shown:    { key: 'shown',    label: 'Appts Shown', primary: true },
   pctShown: { key: 'pctShown', label: '% Shown' },
@@ -804,7 +804,7 @@ window.onColDragEnd = onColDragEnd;
 window.onColDragOver = onColDragOver;
 window.onColDrop = onColDrop;
 
-/* ── Sort ── */
+/* â”€â”€ Sort â”€â”€ */
 function sortRows(rows, sortState, type) {
   const { col, dir } = sortState;
   const mult = dir === 'desc' ? -1 : 1;
@@ -836,7 +836,7 @@ function toggleSort(panel, col) {
   renderDashboard();
 }
 
-/* ── KPI Weekly Targets (Sales) ── */
+/* â”€â”€ KPI Weekly Targets (Sales) â”€â”€ */
 const WEEKLY_TARGETS = { calls: 150, texts: 100, created: 5, due: 5, shown: 3 };
 
 function kpiClass(value, target) {
@@ -848,9 +848,9 @@ function kpiClass(value, target) {
   return 'kpi-red';
 }
 
-/* ── BDC Column-Relative Gradient ── */
+/* â”€â”€ BDC Column-Relative Gradient â”€â”€ */
 /* Computes min/max per metric across all BDC rows, then colors each cell
-   on a red → yellow → green scale based on where it falls in that range. */
+   on a red â†’ yellow â†’ green scale based on where it falls in that range. */
 function bdcColumnRanges(rows) {
   const metrics = ['calls','texts','created','due'];
   const ranges = {};
@@ -884,20 +884,20 @@ function kpiColumnGradient(value, min, max) {
   let r, g, b, tr, tg, tb;
   if (pct < 0.5) {
     const t = pct / 0.5;
-    // red (#fee2e2) → amber (#fef3c7)
+    // red (#fee2e2) â†’ amber (#fef3c7)
     r = 254; g = Math.round(226 + t * (243 - 226)); b = Math.round(226 - t * (226 - 199));
     tr = Math.round(220 + t * (180 - 220)); tg = Math.round(38 + t * (83 - 38)); tb = Math.round(38 + t * (9 - 38));
   } else {
     const t = (pct - 0.5) / 0.5;
-    // amber (#fef3c7) → green (#dcfce7)
+    // amber (#fef3c7) â†’ green (#dcfce7)
     r = Math.round(254 - t * (254 - 220)); g = Math.round(243 + t * (252 - 243)); b = Math.round(199 - t * (199 - 231));
     tr = Math.round(180 - t * (180 - 22)); tg = Math.round(83 + t * (163 - 83)); tb = Math.round(9 + t * (74 - 9));
   }
   return `background:rgb(${r},${g},${b});color:rgb(${tr},${tg},${tb});font-weight:700;`;
 }
 
-/* ── Render ── */
-/* ── Personal Scorecard + Rank + Leads at Risk ── */
+/* â”€â”€ Render â”€â”€ */
+/* â”€â”€ Personal Scorecard + Rank + Leads at Risk â”€â”€ */
 function buildPersonalSection(sales, bdc) {
   const me = window.userData || {};
   const myName = (me.linkedName || '').trim();
@@ -926,7 +926,7 @@ function buildPersonalSection(sales, bdc) {
     const texts = safeNum(r.texts);
     const created = safeNum(r.created ?? r.created_count ?? 0);
     const shown = safeNum(shownVal(r));
-    const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '📊';
+    const rankEmoji = rank === 1 ? 'ðŸ¥‡' : rank === 2 ? 'ðŸ¥ˆ' : rank === 3 ? 'ðŸ¥‰' : 'ðŸ“Š';
 
     cards = `
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -967,8 +967,8 @@ function buildPersonalSection(sales, bdc) {
     const texts = safeNum(r.texts);
     const created = safeNum(r.created ?? r.created_count ?? 0);
     const due = safeNum(r.due ?? r.due_count ?? 0);
-    const pct = due > 0 ? ((shown / due) * 100).toFixed(1) + '%' : '–';
-    const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '📊';
+    const pct = due > 0 ? ((shown / due) * 100).toFixed(1) + '%' : 'â€“';
+    const rankEmoji = rank === 1 ? 'ðŸ¥‡' : rank === 2 ? 'ðŸ¥ˆ' : rank === 3 ? 'ðŸ¥‰' : 'ðŸ“Š';
 
     cards = `
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -1007,7 +1007,7 @@ function buildPersonalSection(sales, bdc) {
     <div style="max-width:1400px;margin:0 auto 12px;padding:0 12px;">
       <div id="personalCard" style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:14px;padding:16px 20px;color:#fff;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
-          <div style="font-size:15px;font-weight:700;">👋 Hey ${firstName} — here's your ${teamLabel} snapshot</div>
+          <div style="font-size:15px;font-weight:700;">ðŸ‘‹ Hey ${firstName} â€” here's your ${teamLabel} snapshot</div>
           <div style="font-size:11px;color:#94a3b8;">MTD Performance</div>
         </div>
         ${cards}
@@ -1040,20 +1040,20 @@ function checkLeadsAtRisk() {
 
     if (myLeads.length > 0) {
       const reviewCount = myLeads.filter(r => r.status === 'Active - Manager Review').length;
-      const reviewNote = reviewCount > 0 ? ` · <span style="color:#fca5a5;">${reviewCount} in Manager Review</span>` : '';
+      const reviewNote = reviewCount > 0 ? ` Â· <span style="color:#fca5a5;">${reviewCount} in Manager Review</span>` : '';
       banner.innerHTML = `
         <div onclick="${(isAdmin() || isManager()) ? 'showReassignments()' : ''}" style="margin-top:12px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:10px 14px;${(isAdmin() || isManager()) ? 'cursor:pointer;' : ''}display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
           <div>
-            <span style="font-size:14px;">🚨</span>
+            <span style="font-size:14px;">ðŸš¨</span>
             <strong style="color:#fca5a5;">You have ${myLeads.length} lead${myLeads.length !== 1 ? 's' : ''} with 3+ days no contact</strong>${reviewNote}
           </div>
-          ${(isAdmin() || isManager()) ? '<span style="font-size:12px;color:#94a3b8;">View Reassignments →</span>' : '<span style="font-size:12px;color:#94a3b8;">Follow up today!</span>'}
+          ${(isAdmin() || isManager()) ? '<span style="font-size:12px;color:#94a3b8;">View Reassignments â†’</span>' : '<span style="font-size:12px;color:#94a3b8;">Follow up today!</span>'}
         </div>`;
     }
   }).catch(() => {});
 }
 
-/* ── Pearson Correlation for KPI Analysis (admin only) ── */
+/* â”€â”€ Pearson Correlation for KPI Analysis (admin only) â”€â”€ */
 function pearsonR(xs, ys) {
   const n = xs.length;
   if (n < 3) return null; // need at least 3 data points
@@ -1098,7 +1098,7 @@ function buildCorrelationBox(rows, targetKey, targetLabel, kpiDefs) {
 
   let rows_html = results.map(item => {
     const absR = Math.abs(item.r);
-    const sign = item.r >= 0 ? '+' : '−';
+    const sign = item.r >= 0 ? '+' : 'âˆ’';
     const color = absR >= 0.7 ? '#16a34a' : absR >= 0.4 ? '#ca8a04' : '#94a3b8';
     const strength = absR >= 0.7 ? 'Strong' : absR >= 0.4 ? 'Moderate' : 'Weak';
     const barW = Math.round(absR * 100);
@@ -1118,21 +1118,21 @@ function buildCorrelationBox(rows, targetKey, targetLabel, kpiDefs) {
   return `
     <div style="margin-top:12px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:10px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <div style="font-weight:700;font-size:13px;">📐 KPI Correlation to ${targetLabel}</div>
-        <div style="font-size:10px;color:var(--muted);">Pearson r · ${rows.length} reps</div>
+        <div style="font-weight:700;font-size:13px;">ðŸ“ KPI Correlation to ${targetLabel}</div>
+        <div style="font-size:10px;color:var(--muted);">Pearson r Â· ${rows.length} reps</div>
       </div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:8px;">Which metrics most predict ${targetLabel.toLowerCase()}?</div>
       ${rows_html}
       <div style="margin-top:8px;font-size:10px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;">
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#22c55e;"></span> Strong (≥0.70)</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#eab308;"></span> Moderate (0.40–0.69)</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#22c55e;"></span> Strong (â‰¥0.70)</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#eab308;"></span> Moderate (0.40â€“0.69)</span>
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#d1d5db;"></span> Weak (&lt;0.40)</span>
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#ef4444;"></span> Negative</span>
       </div>
     </div>`;
 }
 
-/* ── Day-of-Week & Time-of-Day Performance Patterns (admin only) ── */
+/* â”€â”€ Day-of-Week & Time-of-Day Performance Patterns (admin only) â”€â”€ */
 let _callPatternsData = null;
 let _callPatternsFilter = 'total'; // 'total', 'inbound', 'outbound'
 
@@ -1247,7 +1247,7 @@ function renderCallPatternsFromCache() {
       const bg = heatColor(count);
       const fg = textColor(count);
       const title = count > 0 ? `${dayNames[d]} ${fmtHour(h)}: ${count} ${filterLabels[_callPatternsFilter].toLowerCase()}, avg ${talk.toFixed(1)}min` : `${dayNames[d]} ${fmtHour(h)}: no calls`;
-      gridHTML += `<td style="padding:3px 1px;text-align:center;background:${bg};color:${fg};border-radius:3px;font-weight:${count > 0 ? '600' : '400'};" title="${title}">${count || '·'}</td>`;
+      gridHTML += `<td style="padding:3px 1px;text-align:center;background:${bg};color:${fg};border-radius:3px;font-weight:${count > 0 ? '600' : '400'};" title="${title}">${count || 'Â·'}</td>`;
     }
     gridHTML += `<td style="padding:4px 6px;text-align:right;font-weight:700;font-size:11px;">${dayTotal}</td></tr>`;
   });
@@ -1255,7 +1255,7 @@ function renderCallPatternsFromCache() {
   gridHTML += '<tr><td style="padding:4px 6px;font-size:10px;color:var(--muted);font-weight:600;">Total</td>';
   for (let h = minHour; h <= maxHour; h++) {
     const ht = hourTotals[h] || 0;
-    gridHTML += `<td style="padding:3px 1px;text-align:center;font-size:10px;font-weight:600;color:var(--muted);">${ht || '·'}</td>`;
+    gridHTML += `<td style="padding:3px 1px;text-align:center;font-size:10px;font-weight:600;color:var(--muted);">${ht || 'Â·'}</td>`;
   }
   const grandTotal = dayTotals.reduce((s, v) => s + v, 0);
   gridHTML += `<td style="padding:4px 6px;text-align:right;font-weight:800;font-size:12px;">${grandTotal}</td></tr>`;
@@ -1274,9 +1274,9 @@ function renderCallPatternsFromCache() {
   const accentClr = filterColors[_callPatternsFilter];
   const insights = `
     <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.7;">
-      • <strong>${dayNames[peakDay]}</strong> is the busiest day with ${peakDayVal} total calls<br>
-      ${deadHour >= 0 ? `• <strong style="color:#dc2626;">${fmtHour(deadHour)}–${fmtHour(deadHour+1)}</strong> is the slowest business hour — only ${deadHourVal} calls<br>` : ''}
-      • Peak calling hour overall: <strong>${fmtHour(peakHour)}–${fmtHour(peakHour+1)}</strong> with ${peakHourVal} calls
+      â€¢ <strong>${dayNames[peakDay]}</strong> is the busiest day with ${peakDayVal} total calls<br>
+      ${deadHour >= 0 ? `â€¢ <strong style="color:#dc2626;">${fmtHour(deadHour)}â€“${fmtHour(deadHour+1)}</strong> is the slowest business hour â€” only ${deadHourVal} calls<br>` : ''}
+      â€¢ Peak calling hour overall: <strong>${fmtHour(peakHour)}â€“${fmtHour(peakHour+1)}</strong> with ${peakHourVal} calls
     </div>`;
 
   // Legend with palette colors
@@ -1288,7 +1288,7 @@ function renderCallPatternsFromCache() {
     <span style="display:inline-block;width:14px;height:10px;background:${palette.bg[4]};border-radius:2px;"></span>
     <span style="display:inline-block;width:14px;height:10px;background:${palette.bg[5]};border-radius:2px;"></span>
     <span>High</span>
-    <span style="margin-left:8px;">· Hover cells for details</span>
+    <span style="margin-left:8px;">Â· Hover cells for details</span>
   </div>`;
 
   // Toggle buttons
@@ -1303,19 +1303,19 @@ function renderCallPatternsFromCache() {
   const totalIB  = hasNewFormat ? (result.inbound?.dayTotals || []).reduce((s, v) => s + v, 0) : 0;
   const totalOB  = hasNewFormat ? (result.outbound?.dayTotals || []).reduce((s, v) => s + v, 0) : 0;
 
-  const dateRangeStr = result.dateRange ? `${result.dateRange.from || '?'} – ${result.dateRange.to || '?'}` : '';
+  const dateRangeStr = result.dateRange ? `${result.dateRange.from || '?'} â€“ ${result.dateRange.to || '?'}` : '';
 
   container.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-weight:700;font-size:13px;">🕐 Call Activity Heatmap</div>
+        <div style="font-weight:700;font-size:13px;">ðŸ• Call Activity Heatmap</div>
         ${showToggle ? `<div style="display:flex;gap:4px;">
           ${tbtn('total', 'Total')}
           ${tbtn('inbound', 'IB')}
           ${tbtn('outbound', 'OB')}
         </div>` : ''}
       </div>
-      <div style="font-size:10px;color:var(--muted);">${result.month || 'MTD'}${dateRangeStr ? ` · <span style="color:var(--text);">${dateRangeStr}</span>` : ''} · ${grandTotal} ${filterLabels[_callPatternsFilter].toLowerCase()}${showToggle ? ` · <span style="color:var(--text);">${totalAll} total</span> (<span style="color:#2563eb;">${totalIB} IB</span> / <span style="color:#f97316;">${totalOB} OB</span>)` : ''}</div>
+      <div style="font-size:10px;color:var(--muted);">${result.month || 'MTD'}${dateRangeStr ? ` Â· <span style="color:var(--text);">${dateRangeStr}</span>` : ''} Â· ${grandTotal} ${filterLabels[_callPatternsFilter].toLowerCase()}${showToggle ? ` Â· <span style="color:var(--text);">${totalAll} total</span> (<span style="color:#2563eb;">${totalIB} IB</span> / <span style="color:#f97316;">${totalOB} OB</span>)` : ''}</div>
     </div>
     <div style="font-size:10px;color:var(--muted);margin-bottom:8px;">When are ${_callPatternsFilter === 'total' ? 'calls' : _callPatternsFilter + ' calls'} happening? Darker = more calls in that time slot.</div>
     ${gridHTML}
@@ -1335,7 +1335,7 @@ function renderDashboard() {
   function sortArrow(panel, col) {
     const s = panel === 'bdc' ? bdcSort : salesSort;
     const active = s.col === col;
-    const arrow = active ? (s.dir === 'desc' ? '▼' : '▲') : '↕';
+    const arrow = active ? (s.dir === 'desc' ? 'â–¼' : 'â–²') : 'â†•';
     return `<span class="sort-arrow">${arrow}</span>`;
   }
   function thAttr(panel, col) {
@@ -1346,20 +1346,20 @@ function renderDashboard() {
   }
 
   function trophy(i) {
-    if (i === 0) return '<span class="trophy">🥇</span>';
-    if (i === 1) return '<span class="trophy">🥈</span>';
-    if (i === 2) return '<span class="trophy">🥉</span>';
+    if (i === 0) return '<span class="trophy">ðŸ¥‡</span>';
+    if (i === 1) return '<span class="trophy">ðŸ¥ˆ</span>';
+    if (i === 2) return '<span class="trophy">ðŸ¥‰</span>';
     return '';
   }
 
-  /* ── BDC cell renderer ── */
+  /* â”€â”€ BDC cell renderer â”€â”€ */
   function bdcCellData(r) {
     const shown   = safeNum(shownVal(r));
     const calls   = safeNum(r.calls);
     const texts   = safeNum(r.texts);
     const created = safeNum(r.created ?? r.created_count ?? 0);
     const due     = safeNum(r.due ?? r.due_count ?? 0);
-    const pct     = due > 0 ? ((shown / due) * 100).toFixed(1) + '%' : (created > 0 ? ((shown / created) * 100).toFixed(1) + '%' : '–');
+    const pct     = due > 0 ? ((shown / due) * 100).toFixed(1) + '%' : (created > 0 ? ((shown / created) * 100).toFixed(1) + '%' : 'â€“');
     const callsS   = kpiColumnGradient(calls, bdcRanges.calls.min, bdcRanges.calls.max);
     const textsS   = kpiColumnGradient(texts, bdcRanges.texts.min, bdcRanges.texts.max);
     const createdS = kpiColumnGradient(created, bdcRanges.created.min, bdcRanges.created.max);
@@ -1375,7 +1375,7 @@ function renderDashboard() {
   }
 
   function bdcRow(r, i) {
-    const name = r.name || '–';
+    const name = r.name || 'â€“';
     const top3    = i < 3 ? ' top3' : '';
     const allowed = canViewName(name);
     const click   = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', 'BDC')"` : '';
@@ -1388,7 +1388,7 @@ function renderDashboard() {
     </tr>`;
   }
 
-  /* ── Sales cell renderer ── */
+  /* â”€â”€ Sales cell renderer â”€â”€ */
   function salesCellData(r) {
     const salesV  = safeNum(r.sales);
     const calls   = safeNum(r.calls);
@@ -1396,7 +1396,7 @@ function renderDashboard() {
     const created = safeNum(r.created ?? r.created_count ?? 0);
     const due     = safeNum(r.due ?? r.due_count ?? 0);
     const shown   = safeNum(shownVal(r));
-    const pct     = due > 0 ? ((shown / due) * 100).toFixed(1) + '%' : (created > 0 ? ((shown / created) * 100).toFixed(1) + '%' : '–');
+    const pct     = due > 0 ? ((shown / due) * 100).toFixed(1) + '%' : (created > 0 ? ((shown / created) * 100).toFixed(1) + '%' : 'â€“');
     const callsK   = kpiClass(calls, WEEKLY_TARGETS.calls);
     const textsK   = kpiClass(texts, WEEKLY_TARGETS.texts);
     const createdK = kpiClass(created, WEEKLY_TARGETS.created);
@@ -1414,7 +1414,7 @@ function renderDashboard() {
   }
 
   function salesRow(r, i) {
-    const name    = r.name || '–';
+    const name    = r.name || 'â€“';
     const top3    = i < 3 ? ' top3' : '';
     const allowed = canViewName(name);
     const click   = allowed ? `onclick="showPersonDetails('${name.replace(/'/g, "\\'")}', 'Sales')"` : '';
@@ -1437,25 +1437,25 @@ function renderDashboard() {
       </div>
       <div class="topbar-actions">
         <div style="position:relative;display:inline-block;" id="resourcesWrap">
-          <button class="topbar-btn manage" onclick="toggleResourcesMenu()" style="min-width:110px;">📂 Resources ▾</button>
+          <button class="topbar-btn manage" onclick="toggleResourcesMenu()" style="min-width:110px;">ðŸ“‚ Resources â–¾</button>
           <div id="resourcesMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:1000;min-width:220px;padding:6px 0;max-height:70vh;overflow-y:auto;">
-            <a href="https://sanantoniododge.com" target="_blank" class="res-link">🌐 Website</a>
-            <a href="https://www.eleadcrm.com/evo2/fresh/login.asp?logout=1&CID=0&USERID=0&SESSIONID=" target="_blank" class="res-link">🖥️ Old CRM</a>
-            <a href="https://retail.cdk.com/login/login.htm?fromURI=%2Fapp%2Fmodern-retailing_eleadcrm_2%2Fexk3ds515b8OezABo697%2Fsso%2Fsaml%3FSAMLRequest%3DfZHNbsIwEITvSLxD5DtxYpofLEBKywWJqhK0PfSCnHgpFrGdep2C%252BvRNQ1HLhevMfjua3SkKXbOGF63fmzV8tIA%252BOOnaID87M9I6w61AhdwIDch9xTfF44qzMOKNs95Wtib%252FmduIQATnlTUkWC5mRMkqjuNdFCdsIuVdPk5LEGlaTuKclWkpdxkJXsFhB8xIx3cUYgtLg14Y30kRS0YxG7HsORrzKOOMvZFg0dVQRvie2nvfIKfUgReqDit5CCurqWgaqq0EZ0ZnR5n3LdQgZOX0llE4HcYSkzgp8yf4Ku5tOskooqU%252FJUlQXHo8WIOtBrcB96kqeFmv%252FiKPx2N4WdmHdjyZDwdBMO1Pxfsybn5rfkqvRoeDX%252BH6afNv%26RelayState%3DdFxaLjd1sdMLESVboy1b35lo" target="_blank" class="res-link">💻 New CRM</a>
-            <a href="https://auth.automotivemastermind.com/u/login/identifier?state=hKFo2SBqMkxFdnZqYUQzSmI5OFIzVFNXNGtLM2IzcDZrZDVXX6Fur3VuaXZlcnNhbC1sb2dpbqN0aWTZIEhzUjFTRVpIZ2RWeG1HNm1CX0xNM0lnQXJqSXNiVFY0o2NpZNkgQ0pHdUlpQThVZmRiVDRxMU54RTF6dU9NV3d0YTNuOWg" target="_blank" class="res-link">🧠 Dealer Mastermind</a>
+            <a href="https://sanantoniododge.com" target="_blank" class="res-link">ðŸŒ Website</a>
+            <a href="https://www.eleadcrm.com/evo2/fresh/login.asp?logout=1&CID=0&USERID=0&SESSIONID=" target="_blank" class="res-link">ðŸ–¥ï¸ Old CRM</a>
+            <a href="https://retail.cdk.com/login/login.htm?fromURI=%2Fapp%2Fmodern-retailing_eleadcrm_2%2Fexk3ds515b8OezABo697%2Fsso%2Fsaml%3FSAMLRequest%3DfZHNbsIwEITvSLxD5DtxYpofLEBKywWJqhK0PfSCnHgpFrGdep2C%252BvRNQ1HLhevMfjua3SkKXbOGF63fmzV8tIA%252BOOnaID87M9I6w61AhdwIDch9xTfF44qzMOKNs95Wtib%252FmduIQATnlTUkWC5mRMkqjuNdFCdsIuVdPk5LEGlaTuKclWkpdxkJXsFhB8xIx3cUYgtLg14Y30kRS0YxG7HsORrzKOOMvZFg0dVQRvie2nvfIKfUgReqDit5CCurqWgaqq0EZ0ZnR5n3LdQgZOX0llE4HcYSkzgp8yf4Ku5tOskooqU%252FJUlQXHo8WIOtBrcB96kqeFmv%252FiKPx2N4WdmHdjyZDwdBMO1Pxfsybn5rfkqvRoeDX%252BH6afNv%26RelayState%3DdFxaLjd1sdMLESVboy1b35lo" target="_blank" class="res-link">ðŸ’» New CRM</a>
+            <a href="https://auth.automotivemastermind.com/u/login/identifier?state=hKFo2SBqMkxFdnZqYUQzSmI5OFIzVFNXNGtLM2IzcDZrZDVXX6Fur3VuaXZlcnNhbC1sb2dpbqN0aWTZIEhzUjFTRVpIZ2RWeG1HNm1CX0xNM0lnQXJqSXNiVFY0o2NpZNkgQ0pHdUlpQThVZmRiVDRxMU54RTF6dU9NV3d0YTNuOWg" target="_blank" class="res-link">ðŸ§  Dealer Mastermind</a>
             <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
-            <a href="https://www.ramtrucks.com/vehicle-selector.incentives.html" target="_blank" class="res-link">🐏 Ram Incentives</a>
-            <a href="https://www.jeep.com/vehicle-selector.incentives.html" target="_blank" class="res-link">🏔️ Jeep Incentives</a>
-            <a href="https://www.jeep.com/vehicle-selector.incentives.html" target="_blank" class="res-link">🔵 Chrysler Incentives</a>
-            <a href="https://www.dodge.com/vehicle-selector.incentives.html" target="_blank" class="res-link">🔴 Dodge Incentives</a>
+            <a href="https://www.ramtrucks.com/vehicle-selector.incentives.html" target="_blank" class="res-link">ðŸ Ram Incentives</a>
+            <a href="https://www.jeep.com/vehicle-selector.incentives.html" target="_blank" class="res-link">ðŸ”ï¸ Jeep Incentives</a>
+            <a href="https://www.jeep.com/vehicle-selector.incentives.html" target="_blank" class="res-link">ðŸ”µ Chrysler Incentives</a>
+            <a href="https://www.dodge.com/vehicle-selector.incentives.html" target="_blank" class="res-link">ðŸ”´ Dodge Incentives</a>
             <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
-            <a href="https://dealerconnect.chrysler.com/login/login.html?TYPE=33554433&REALMOID=06-d5cf97a8-bccd-103a-bcc8-83e513310cb3&GUID=&SMAUTHREASON=0&METHOD=GET&SMAGENTNAME=-SM-go2wTta208Z%2fzUCz5DbrvlEeym4%2faGv4KExpKsILVlca0WM5Is5FVfWQwWKj8l6iqbgVd8ZTMNXhZNBworA80NiZt2yCKScu&TARGET=-SM-https%3a%2f%2fdealerconnect%2echrysler%2ecom%2fportal%2fController%2fPortal" target="_blank" class="res-link">🔗 DealerConnect</a>
-            <a href="https://gemini.google.com/app" target="_blank" class="res-link">✨ Gemini AI</a>
-            <a href="#" onclick="event.preventDefault();closeResourcesMenu();showAutoNews();" class="res-link">📰 News (Last 48 hrs)</a>
+            <a href="https://dealerconnect.chrysler.com/login/login.html?TYPE=33554433&REALMOID=06-d5cf97a8-bccd-103a-bcc8-83e513310cb3&GUID=&SMAUTHREASON=0&METHOD=GET&SMAGENTNAME=-SM-go2wTta208Z%2fzUCz5DbrvlEeym4%2faGv4KExpKsILVlca0WM5Is5FVfWQwWKj8l6iqbgVd8ZTMNXhZNBworA80NiZt2yCKScu&TARGET=-SM-https%3a%2f%2fdealerconnect%2echrysler%2ecom%2fportal%2fController%2fPortal" target="_blank" class="res-link">ðŸ”— DealerConnect</a>
+            <a href="https://gemini.google.com/app" target="_blank" class="res-link">âœ¨ Gemini AI</a>
+            <a href="#" onclick="event.preventDefault();closeResourcesMenu();showAutoNews();" class="res-link">ðŸ“° News (Last 48 hrs)</a>
             <div id="customLinksSection"></div>
             <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
             <div id="addLinkForm" style="padding:6px 12px;">
-              <a href="#" onclick="event.preventDefault();event.stopPropagation();showAddLinkForm();" class="res-link" id="addLinkBtn" style="color:var(--accent);font-weight:600;">➕ Add My Link</a>
+              <a href="#" onclick="event.preventDefault();event.stopPropagation();showAddLinkForm();" class="res-link" id="addLinkBtn" style="color:var(--accent);font-weight:600;">âž• Add My Link</a>
               <div id="addLinkFields" style="display:none;padding:4px 0;">
                 <input id="newLinkLabel" type="text" placeholder="Label (e.g. My Tool)" maxlength="40" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px;margin-bottom:4px;box-sizing:border-box;" onclick="event.stopPropagation();" onkeydown="if(event.key==='Enter'){event.stopPropagation();document.getElementById('newLinkUrl').focus();}" />
                 <input id="newLinkUrl" type="url" placeholder="https://..." maxlength="500" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:12px;margin-bottom:6px;box-sizing:border-box;" onclick="event.stopPropagation();" onkeydown="if(event.key==='Enter'){event.stopPropagation();saveCustomLink();}" />
@@ -1468,16 +1468,16 @@ function renderDashboard() {
           </div>
         </div>
         ${(isAdmin() || isManager()) ? `<div style="position:relative;display:inline-block;" id="reportsWrap">
-          <button class="topbar-btn manage" onclick="toggleReportsMenu()" style="min-width:110px;">📊 Reports ▾</button>
+          <button class="topbar-btn manage" onclick="toggleReportsMenu()" style="min-width:110px;">ðŸ“Š Reports â–¾</button>
           <div id="reportsMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:1000;min-width:200px;padding:6px 0;">
-            <a href="#" onclick="event.preventDefault();closeReportsMenu();showReassignments();" class="res-link">🔄 Reassignments</a>
-            <a href="#" onclick="event.preventDefault();closeReportsMenu();showActivityModal();" class="res-link">🕐 Activity Log</a>
-            <a href="#" onclick="event.preventDefault();closeReportsMenu();showVehicleDemand();" class="res-link">🚗 Vehicle Demand</a>
-            ${isAdmin() ? '<div style="border-top:1px solid var(--line);margin:4px 0;"></div><a href="#" onclick="event.preventDefault();closeReportsMenu();showLeadFunnel();" class="res-link">🔬 Lead Funnel</a>' : ''}
-            ${isAdmin() ? '<a href="#" onclick="event.preventDefault();closeReportsMenu();showEngagement();" class="res-link">📈 Engagement</a>' : ''}
+            <a href="#" onclick="event.preventDefault();closeReportsMenu();showReassignments();" class="res-link">ðŸ”„ Reassignments</a>
+            <a href="#" onclick="event.preventDefault();closeReportsMenu();showActivityModal();" class="res-link">ðŸ• Activity Log</a>
+            <a href="#" onclick="event.preventDefault();closeReportsMenu();showVehicleDemand();" class="res-link">ðŸš— Vehicle Demand</a>
+            ${isAdmin() ? '<div style="border-top:1px solid var(--line);margin:4px 0;"></div><a href="#" onclick="event.preventDefault();closeReportsMenu();showLeadFunnel();" class="res-link">ðŸ”¬ Lead Funnel</a>' : ''}
+            ${isAdmin() ? '<a href="#" onclick="event.preventDefault();closeReportsMenu();showEngagement();" class="res-link">ðŸ“ˆ Engagement</a>' : ''}
           </div>
         </div>` : ''}
-        ${isAdmin() ? '<button class="topbar-btn manage" onclick="showUserModal()">👤 Manage Users</button>' : ''}
+        ${isAdmin() ? '<button class="topbar-btn manage" onclick="showUserModal()">ðŸ‘¤ Manage Users</button>' : ''}
         <button class="topbar-btn logout" onclick="logout()">Logout</button>
       </div>
     </div>
@@ -1486,24 +1486,24 @@ function renderDashboard() {
     ${buildPersonalSection(sales, bdc)}
     <div class="panels">
 
-      <!-- ═══ BDC Panel ═══ -->
+      <!-- â•â•â• BDC Panel â•â•â• -->
       <div>
         <div class="panel-header">
-          <div class="panel-title">📞 BDC – Appointments Shown</div>
-          <div class="panel-subtitle">Top 3 highlighted by appointments shown · click headers to sort · drag to reorder</div>
+          <div class="panel-title">ðŸ“ž BDC â€“ Appointments Shown</div>
+          <div class="panel-subtitle">Top 3 highlighted by appointments shown Â· click headers to sort Â· drag to reorder</div>
         </div>
 
         <div class="stat-row">
           <div class="stat-card">
-            <div class="stat-label">Total Appts Shown 👣</div>
+            <div class="stat-label">Total Appts Shown ðŸ‘£</div>
             <div class="stat-value">${bs.totalShown}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Total Appts Created 📋</div>
+            <div class="stat-label">Total Appts Created ðŸ“‹</div>
             <div class="stat-value">${bs.totalCreated}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Avg Show Rate 🎯</div>
+            <div class="stat-label">Avg Show Rate ðŸŽ¯</div>
             <div class="stat-value">${bs.avgShowRate}%</div>
           </div>
         </div>
@@ -1515,7 +1515,7 @@ function renderDashboard() {
         <div class="kpi-legend" style="align-items:center;">
           <span style="display:inline-flex;align-items:center;gap:6px;">
             <span style="display:inline-block;width:120px;height:10px;border-radius:5px;background:linear-gradient(to right,#fee2e2 0%,#fef3c7 50%,#dcfce7 100%);border:1px solid var(--line);"></span>
-            <span>lowest → highest in column</span>
+            <span>lowest â†’ highest in column</span>
           </span>
           <span><span class="kpi-dot gray"></span> no activity</span>
         </div>
@@ -1549,27 +1549,27 @@ function renderDashboard() {
           { key: 'shown', label: 'Appts Shown' },
           { key: 'pctShown', label: '% Show Rate' },
         ])}
-        ${(isAdmin() || isManager()) ? '<div id="callPatternsBox" style="margin-top:12px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:10px;"><div style="color:var(--muted);font-size:12px;">Loading call patterns…</div></div>' : ''}
+        ${(isAdmin() || isManager()) ? '<div id="callPatternsBox" style="margin-top:12px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:10px;"><div style="color:var(--muted);font-size:12px;">Loading call patternsâ€¦</div></div>' : ''}
       </div>
 
-      <!-- ═══ Sales Panel ═══ -->
+      <!-- â•â•â• Sales Panel â•â•â• -->
       <div>
         <div class="panel-header">
-          <div class="panel-title">🚗 Sales – Units Sold</div>
-          <div class="panel-subtitle">Ranked by units sold · weekly KPI flags · click headers to sort · drag to reorder</div>
+          <div class="panel-title">ðŸš— Sales â€“ Units Sold</div>
+          <div class="panel-subtitle">Ranked by units sold Â· weekly KPI flags Â· click headers to sort Â· drag to reorder</div>
         </div>
 
         <div class="stat-row">
           <div class="stat-card">
-            <div class="stat-label">Total Units 🚗</div>
+            <div class="stat-label">Total Units ðŸš—</div>
             <div class="stat-value">${ss.totalUnits}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Avg Units / Rep 📊</div>
+            <div class="stat-label">Avg Units / Rep ðŸ“Š</div>
             <div class="stat-value">${ss.avgUnits}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Top Performer ⭐</div>
+            <div class="stat-label">Top Performer â­</div>
             <div class="stat-value top-performer">${ss.topName} (${ss.topVal})</div>
           </div>
         </div>
@@ -1579,7 +1579,7 @@ function renderDashboard() {
         </div>
 
         <div class="kpi-legend">
-          <span><span class="kpi-dot green"></span> ≥ target</span>
+          <span><span class="kpi-dot green"></span> â‰¥ target</span>
           <span><span class="kpi-dot yellow"></span> some but &lt; target</span>
           <span><span class="kpi-dot gray"></span> no activity yet</span>
           <span><span class="kpi-dot red"></span> sales well below target</span>
@@ -1605,18 +1605,18 @@ function renderDashboard() {
   `;
 }
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    AUTO-REFRESH (5 min)
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 setInterval(() => {
   if (window.userData && document.querySelector('.panels')) {
     showDashboard();
   }
 }, 5 * 60 * 1000);
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    PERSON DETAILS (1-on-1 view)
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 async function showPersonDetails(name, type) {
   trackClick();
   logPageView('Person Detail: ' + name);
@@ -1624,7 +1624,7 @@ async function showPersonDetails(name, type) {
   appEl.innerHTML = `
     <div class="topbar">
       <div class="topbar-logo">SA</div>
-      <div class="topbar-info"><div class="topbar-title">Loading ${name}…</div></div>
+      <div class="topbar-info"><div class="topbar-title">Loading ${name}â€¦</div></div>
     </div>
     <div class="loading-wrap"><div class="spinner"></div></div>`;
 
@@ -1641,9 +1641,9 @@ async function showPersonDetails(name, type) {
     appEl.innerHTML = `
       <div class="topbar">
         <div class="topbar-logo">SA</div>
-        <div class="topbar-info"><div class="topbar-title">${b.name || name}</div><div class="topbar-sub">${b.type || type || '–'} · ${b.workingDays || 0} working days (MTD)</div></div>
+        <div class="topbar-info"><div class="topbar-title">${b.name || name}</div><div class="topbar-sub">${b.type || type || 'â€“'} Â· ${b.workingDays || 0} working days (MTD)</div></div>
         <div class="topbar-actions">
-          <button class="topbar-btn manage" onclick="showDashboard()">← Back</button>
+          <button class="topbar-btn manage" onclick="showDashboard()">â† Back</button>
           <button class="topbar-btn logout" onclick="logout()">Logout</button>
         </div>
       </div>
@@ -1664,7 +1664,7 @@ async function showPersonDetails(name, type) {
         <div style="background:#fafaf9;border-radius:10px;padding:14px;margin-bottom:14px;">
           <div style="font-weight:700;margin-bottom:6px;">Last Work Day</div>
           <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:14px;">
-            <div><span style="color:var(--muted);">Date:</span> ${day.dateKey || '–'}</div>
+            <div><span style="color:var(--muted);">Date:</span> ${day.dateKey || 'â€“'}</div>
             <div><span style="color:var(--muted);">Calls:</span> ${day.calls || 0}</div>
             <div><span style="color:var(--muted);">Avg Talk:</span> ${day.avgTalkMSS || '0:00'}</div>
             ${isSales ? `<div><span style="color:var(--muted);">Texts:</span> ${day.texts || 0}</div>` : ''}
@@ -1683,15 +1683,15 @@ async function showPersonDetails(name, type) {
         <div class="detail-card" style="max-width:500px;margin:auto;color:#dc2626;">
           <h2>Error Loading Details</h2>
           <p>${e.message}</p>
-          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">← Back</button>
+          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">â† Back</button>
         </div>
       </div>`;
   }
 }
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    CALL SHEETS VIEW
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 async function viewCallSheets(name) {
   trackClick();
   logPageView('Call Sheets: ' + name);
@@ -1699,7 +1699,7 @@ async function viewCallSheets(name) {
   appEl.innerHTML = `
     <div class="topbar">
       <div class="topbar-logo">SA</div>
-      <div class="topbar-info"><div class="topbar-title">Call Sheets – ${name}</div></div>
+      <div class="topbar-info"><div class="topbar-title">Call Sheets â€“ ${name}</div></div>
     </div>
     <div class="loading-wrap"><div class="spinner"></div></div>`;
 
@@ -1709,34 +1709,34 @@ async function viewCallSheets(name) {
     const rows = result.data?.calls || result.calls || [];
 
     const trs = rows.map(r => {
-      const custName = r.name || '–';
+      const custName = r.name || 'â€“';
       const custCell = r.link
         ? `<a href="${r.link}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline;font-weight:600;">${custName}</a>`
         : custName;
       return `
       <tr>
         <td style="text-align:left;padding:8px;">${custCell}</td>
-        <td style="padding:8px;">${r.phone || '–'}</td>
-        <td style="padding:8px;">${r.email || '–'}</td>
-        <td style="padding:8px;">${r.salesPerson || '–'}</td>
-        <td style="padding:8px;">${r.bdcAgent || '–'}</td>
-        <td style="padding:8px;">${r.source || '–'}</td>
-        <td style="padding:8px;">${r.dateIn || '–'}</td>
-        <td style="padding:8px;">${r.leadAge ?? '–'}</td>
-        <td style="padding:8px;">${r.daysSince ?? '–'}</td>
-        <td style="padding:8px;">${r.bucket || '–'}</td>
-        <td style="padding:8px;">${r.status || '–'}</td>
-        <td style="padding:8px;">${r.reason || '–'}</td>
+        <td style="padding:8px;">${r.phone || 'â€“'}</td>
+        <td style="padding:8px;">${r.email || 'â€“'}</td>
+        <td style="padding:8px;">${r.salesPerson || 'â€“'}</td>
+        <td style="padding:8px;">${r.bdcAgent || 'â€“'}</td>
+        <td style="padding:8px;">${r.source || 'â€“'}</td>
+        <td style="padding:8px;">${r.dateIn || 'â€“'}</td>
+        <td style="padding:8px;">${r.leadAge ?? 'â€“'}</td>
+        <td style="padding:8px;">${r.daysSince ?? 'â€“'}</td>
+        <td style="padding:8px;">${r.bucket || 'â€“'}</td>
+        <td style="padding:8px;">${r.status || 'â€“'}</td>
+        <td style="padding:8px;">${r.reason || 'â€“'}</td>
       </tr>`;
     }).join('');
 
     appEl.innerHTML = `
       <div class="topbar">
         <div class="topbar-logo">SA</div>
-        <div class="topbar-info"><div class="topbar-title">Call Sheets – ${name}</div><div class="topbar-sub">${rows.length} records</div></div>
+        <div class="topbar-info"><div class="topbar-title">Call Sheets â€“ ${name}</div><div class="topbar-sub">${rows.length} records</div></div>
         <div class="topbar-actions">
-          <button class="topbar-btn manage" onclick="showPersonDetails('${name.replace(/'/g, "\\'")}')">← Back to ${name}</button>
-          <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
+          <button class="topbar-btn manage" onclick="showPersonDetails('${name.replace(/'/g, "\\'")}')">â† Back to ${name}</button>
+          <button class="topbar-btn manage" onclick="showDashboard()">â† Dashboard</button>
         </div>
       </div>
 
@@ -1760,15 +1760,15 @@ async function viewCallSheets(name) {
         <div class="detail-card" style="max-width:500px;margin:auto;color:#dc2626;">
           <h2>Error Loading Call Sheets</h2>
           <p>${e.message}</p>
-          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">← Back</button>
+          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">â† Back</button>
         </div>
       </div>`;
   }
 }
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    USER MANAGEMENT
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 async function loadUsers() {
   try {
     const usersSnapshot = await getDocs(collection(db, 'users'));
@@ -1784,7 +1784,7 @@ async function loadUsers() {
         <div class="user-item">
           <div>
             <div>${email}</div>
-            <small>Role: <strong>${role}</strong>${role === 'superadmin' ? ' 👑' : ''} ${linked ? `• Linked: ${linked}` : ''}</small>
+            <small>Role: <strong>${role}</strong>${role === 'superadmin' ? ' ðŸ‘‘' : ''} ${linked ? `â€¢ Linked: ${linked}` : ''}</small>
           </div>
           ${canDelete ? `<button class="delete-btn" onclick="deleteUser('${docu.id}','${email}','${role}')">Delete</button>` : ''}
         </div>`;
@@ -1830,9 +1830,9 @@ async function deleteUser(uid, email, role) {
   } catch (e) { alert('Error: ' + e.message); }
 }
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    POTENTIAL REASSIGNMENTS PAGE
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 let reassignSort = { col: 'daysSince', dir: 'desc' };
 
 async function showReassignments() {
@@ -1844,10 +1844,10 @@ async function showReassignments() {
     <div style="max-width:1200px;margin:0 auto;padding:18px 12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
-          <h2 style="margin:0;font-size:20px;">🔄 Potential Reassignments</h2>
+          <h2 style="margin:0;font-size:20px;">ðŸ”„ Potential Reassignments</h2>
           <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Leads with a CRM link and 3+ days since last contact</p>
         </div>
-        <button class="topbar-btn manage" onclick="showDashboard()">← Back to Dashboard</button>
+        <button class="topbar-btn manage" onclick="showDashboard()">â† Back to Dashboard</button>
       </div>
       <div class="loading-wrap"><div class="spinner"></div></div>
     </div>`;
@@ -1868,7 +1868,7 @@ async function showReassignments() {
         <div class="detail-card" style="color:#dc2626;text-align:center;">
           <h2>Error Loading Reassignments</h2>
           <p>${err.message}</p>
-          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">← Back</button>
+          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">â† Back</button>
         </div>
       </div>`;
   }
@@ -1888,7 +1888,7 @@ function renderReassignments(rows) {
   const sheetCount = Object.keys(bySheet).length;
 
   // Find who has the most
-  let worstSheet = '–', worstCount = 0;
+  let worstSheet = 'â€“', worstCount = 0;
   Object.entries(bySheet).forEach(([k, v]) => { if (v > worstCount) { worstCount = v; worstSheet = k; } });
 
   const app = document.getElementById('app');
@@ -1896,12 +1896,12 @@ function renderReassignments(rows) {
     <div style="max-width:1200px;margin:0 auto;padding:18px 12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
-          <h2 style="margin:0;font-size:20px;">🔄 Potential Reassignments</h2>
+          <h2 style="margin:0;font-size:20px;">ðŸ”„ Potential Reassignments</h2>
           <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Leads with a CRM link and 3+ days since last contact</p>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="topbar-btn manage" onclick="showReassignments()">↻ Refresh</button>
-          <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
+          <button class="topbar-btn manage" onclick="showReassignments()">â†» Refresh</button>
+          <button class="topbar-btn manage" onclick="showDashboard()">â† Dashboard</button>
         </div>
       </div>
 
@@ -1911,11 +1911,11 @@ function renderReassignments(rows) {
           <div class="stat-value">${total}</div>
         </div>
         <div class="reassign-stat">
-          <div class="stat-label">Manager Review ⚠️</div>
+          <div class="stat-label">Manager Review âš ï¸</div>
           <div class="stat-value" style="color:#991b1b;">${reviewCount}</div>
         </div>
         <div class="reassign-stat">
-          <div class="stat-label">Critical (5+ days) 🔴</div>
+          <div class="stat-label">Critical (5+ days) ðŸ”´</div>
           <div class="stat-value" style="color:#dc2626;">${critical}</div>
         </div>
         <div class="reassign-stat">
@@ -1928,14 +1928,14 @@ function renderReassignments(rows) {
         </div>
       </div>
 
-      ${total === 0 ? '<div class="detail-card" style="text-align:center;padding:40px;color:var(--muted);font-size:15px;">No leads flagged — everyone is within 5 days 🎉</div>' : ''}
+      ${total === 0 ? '<div class="detail-card" style="text-align:center;padding:40px;color:var(--muted);font-size:15px;">No leads flagged â€” everyone is within 5 days ðŸŽ‰</div>' : ''}
       ${total > 0 ? `<div class="table-card" id="reassignTable">${reassignTableHTML(sorted)}</div>` : ''}
     </div>`;
 }
 
 function reassignTableHTML(rows) {
   const sc = (col) => reassignSort.col === col ? 'sorted' : '';
-  const ar = (col) => reassignSort.col === col ? (reassignSort.dir === 'desc' ? '▼' : '▲') : '▽';
+  const ar = (col) => reassignSort.col === col ? (reassignSort.dir === 'desc' ? 'â–¼' : 'â–²') : 'â–½';
 
   const headerRow = `<tr>
     <th class="${sc('leadAge')}" onclick="toggleReassignSort('leadAge')">Lead Age <span class="sort-arrow">${ar('leadAge')}</span></th>
@@ -1957,7 +1957,7 @@ function reassignTableHTML(rows) {
 
   if (reviewRows.length > 0) {
     html += `<tr><td colspan="9" style="background:#fef2f2;text-align:left;padding:10px 12px;font-weight:700;font-size:13px;color:#991b1b;border-bottom:2px solid #fecaca;">
-      ⚠️ Manager Review Required (${reviewRows.length})
+      âš ï¸ Manager Review Required (${reviewRows.length})
     </td></tr>`;
     reviewRows.forEach(r => { html += reassignRowHTML(r); });
   }
@@ -1981,14 +1981,14 @@ function reassignRowHTML(r) {
   const rowStyle = isReview ? 'background:#fff5f5;' : '';
   const statusStyle = isReview ? 'color:#991b1b;font-weight:700;' : 'font-size:12px;';
   return `<tr style="${rowStyle}">
-    <td style="font-size:12px;">${r.leadAge || '—'}</td>
+    <td style="font-size:12px;">${r.leadAge || 'â€”'}</td>
     <td><span class="days-badge ${dc}">${r.daysSince}</span></td>
-    <td style="text-align:left;"><a class="reassign-link" href="${r.link}" target="_blank">${r.customer || '—'}</a></td>
-    <td style="font-size:12px;">${r.phone || '—'}</td>
-    <td style="font-size:12px;">${r.salesPerson || '—'}</td>
-    <td style="font-size:12px;">${r.bdcAgent || '—'}</td>
-    <td style="font-size:12px;">${r.source || '—'}</td>
-    <td style="${statusStyle}">${r.status || '—'}</td>
+    <td style="text-align:left;"><a class="reassign-link" href="${r.link}" target="_blank">${r.customer || 'â€”'}</a></td>
+    <td style="font-size:12px;">${r.phone || 'â€”'}</td>
+    <td style="font-size:12px;">${r.salesPerson || 'â€”'}</td>
+    <td style="font-size:12px;">${r.bdcAgent || 'â€”'}</td>
+    <td style="font-size:12px;">${r.source || 'â€”'}</td>
+    <td style="${statusStyle}">${r.status || 'â€”'}</td>
     <td><span class="reassign-sheet-badge">${r.sheet}</span></td>
   </tr>`;
 }
@@ -2013,16 +2013,16 @@ function toggleReassignSort(col) {
     reassignSort.col = col;
     reassignSort.dir = 'desc';
   }
-  // Re-render with current data — refetch not needed
+  // Re-render with current data â€” refetch not needed
   const table = document.getElementById('reassignTable');
   if (table && window._reassignRows) {
     table.innerHTML = reassignTableHTML(sortReassignRows(window._reassignRows, reassignSort));
   }
 }
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    AUTOMOTIVE NEWS PAGE
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 async function showAutoNews() {
   logPageView('Auto News');
   const app = document.getElementById('app');
@@ -2030,10 +2030,10 @@ async function showAutoNews() {
     <div style="max-width:800px;margin:0 auto;padding:18px 12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
-          <h2 style="margin:0;font-size:20px;">📰 Automotive Industry News</h2>
+          <h2 style="margin:0;font-size:20px;">ðŸ“° Automotive Industry News</h2>
           <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Latest articles from the past week</p>
         </div>
-        <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
+        <button class="topbar-btn manage" onclick="showDashboard()">â† Dashboard</button>
       </div>
       <div class="loading-wrap"><div class="spinner"></div></div>
     </div>`;
@@ -2054,7 +2054,7 @@ async function showAutoNews() {
         <div class="detail-card" style="color:#dc2626;text-align:center;">
           <h2>Error Loading News</h2>
           <p>${err.message}</p>
-          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">← Back</button>
+          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">â† Back</button>
         </div>
       </div>`;
   }
@@ -2092,27 +2092,27 @@ function renderAutoNews(articles) {
 
       // Source-specific icons
       const srcLower = source.toLowerCase();
-      let icon = '📰';
-      if (isCDG) icon = '🚗';
-      else if (srcLower.includes('automotive news')) icon = '🏭';
-      else if (srcLower.includes('cbt')) icon = '🎙️';
-      else if (srcLower.includes('reuters')) icon = '🌐';
-      else if (srcLower.includes('cnbc')) icon = '📈';
-      else if (srcLower.includes('bloomberg')) icon = '💹';
-      else if (srcLower.includes('fox')) icon = '📺';
-      else if (srcLower.includes('cnn')) icon = '📡';
-      else if (srcLower.includes('yahoo')) icon = '🟣';
-      else if (srcLower.includes('ap news') || srcLower.includes('associated press')) icon = '🔵';
-      else if (srcLower.includes('usa today')) icon = '🇺🇸';
-      else if (srcLower.includes('wall street') || srcLower.includes('wsj')) icon = '📊';
-      else if (srcLower.includes('motor') || srcLower.includes('drive') || srcLower.includes('torque')) icon = '🏎️';
-      else if (srcLower.includes('truck') || srcLower.includes('pickup')) icon = '🛻';
-      else if (srcLower.includes('ev') || srcLower.includes('electric') || srcLower.includes('electrek')) icon = '⚡';
-      else if (srcLower.includes('car') || srcLower.includes('auto')) icon = '🚙';
-      else if (srcLower.includes('dealer')) icon = '🤝';
-      else if (srcLower.includes('forbes')) icon = '💰';
-      else if (srcLower.includes('nbc')) icon = '📺';
-      else if (srcLower.includes('abc')) icon = '📺';
+      let icon = 'ðŸ“°';
+      if (isCDG) icon = 'ðŸš—';
+      else if (srcLower.includes('automotive news')) icon = 'ðŸ­';
+      else if (srcLower.includes('cbt')) icon = 'ðŸŽ™ï¸';
+      else if (srcLower.includes('reuters')) icon = 'ðŸŒ';
+      else if (srcLower.includes('cnbc')) icon = 'ðŸ“ˆ';
+      else if (srcLower.includes('bloomberg')) icon = 'ðŸ’¹';
+      else if (srcLower.includes('fox')) icon = 'ðŸ“º';
+      else if (srcLower.includes('cnn')) icon = 'ðŸ“¡';
+      else if (srcLower.includes('yahoo')) icon = 'ðŸŸ£';
+      else if (srcLower.includes('ap news') || srcLower.includes('associated press')) icon = 'ðŸ”µ';
+      else if (srcLower.includes('usa today')) icon = 'ðŸ‡ºðŸ‡¸';
+      else if (srcLower.includes('wall street') || srcLower.includes('wsj')) icon = 'ðŸ“Š';
+      else if (srcLower.includes('motor') || srcLower.includes('drive') || srcLower.includes('torque')) icon = 'ðŸŽï¸';
+      else if (srcLower.includes('truck') || srcLower.includes('pickup')) icon = 'ðŸ›»';
+      else if (srcLower.includes('ev') || srcLower.includes('electric') || srcLower.includes('electrek')) icon = 'âš¡';
+      else if (srcLower.includes('car') || srcLower.includes('auto')) icon = 'ðŸš™';
+      else if (srcLower.includes('dealer')) icon = 'ðŸ¤';
+      else if (srcLower.includes('forbes')) icon = 'ðŸ’°';
+      else if (srcLower.includes('nbc')) icon = 'ðŸ“º';
+      else if (srcLower.includes('abc')) icon = 'ðŸ“º';
 
       cardsHTML += `
         <div style="margin-bottom:8px;border:1px solid var(--line);border-radius:10px;overflow:hidden;">
@@ -2122,7 +2122,7 @@ function renderAutoNews(articles) {
               <span style="font-weight:700;font-size:14px;color:${isCDG ? '#166534' : 'var(--text)'};">${source}</span>
               <span style="background:${badgeBg};color:${badgeColor};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${items.length}</span>
             </div>
-            <span id="${groupId}Arrow" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg);">▼</span>
+            <span id="${groupId}Arrow" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg);">â–¼</span>
           </div>
           <div id="${groupId}" style="border-top:1px solid var(--line);display:none;">`;
 
@@ -2132,7 +2132,7 @@ function renderAutoNews(articles) {
             <div style="padding:12px 16px;border-bottom:1px solid var(--line);${isCDG ? 'border-left:3px solid #22c55e;' : ''}">
               <div class="news-title"><a href="${a.link}" target="_blank" rel="noopener">${a.title}</a></div>
               <div class="news-meta">
-                ${timeStr ? `<span>🕐 ${timeStr}</span>` : ''}
+                ${timeStr ? `<span>ðŸ• ${timeStr}</span>` : ''}
               </div>
             </div>`;
       });
@@ -2147,13 +2147,13 @@ function renderAutoNews(articles) {
     <div style="max-width:800px;margin:0 auto;padding:18px 12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
-          <h2 style="margin:0;font-size:20px;">📰 Automotive Industry News</h2>
-          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Latest articles from the past 48 hours · ${articles.length} article${articles.length !== 1 ? 's' : ''}</p>
+          <h2 style="margin:0;font-size:20px;">ðŸ“° Automotive Industry News</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Latest articles from the past 48 hours Â· ${articles.length} article${articles.length !== 1 ? 's' : ''}</p>
         </div>
         <div style="display:flex;gap:8px;">
           <button class="topbar-btn manage" onclick="toggleAllNewsGroups()">Expand / Collapse All</button>
-          <button class="topbar-btn manage" onclick="showAutoNews()">↻ Refresh</button>
-          <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
+          <button class="topbar-btn manage" onclick="showAutoNews()">â†» Refresh</button>
+          <button class="topbar-btn manage" onclick="showDashboard()">â† Dashboard</button>
         </div>
       </div>
       ${cardsHTML}
@@ -2196,9 +2196,9 @@ function timeAgoNews(date) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    SOURCE LEADERBOARD
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 let sourceSort = { col: 'total', dir: 'desc' };
 
 async function showSourceLeaderboard() {
@@ -2208,10 +2208,10 @@ async function showSourceLeaderboard() {
     <div style="max-width:1200px;margin:0 auto;padding:18px 12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
-          <h2 style="margin:0;font-size:20px;">📊 Source Leaderboard</h2>
+          <h2 style="margin:0;font-size:20px;">ðŸ“Š Source Leaderboard</h2>
           <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Lead source performance across all distribution tabs</p>
         </div>
-        <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
+        <button class="topbar-btn manage" onclick="showDashboard()">â† Dashboard</button>
       </div>
       <div class="loading-wrap"><div class="spinner"></div></div>
     </div>`;
@@ -2232,7 +2232,7 @@ async function showSourceLeaderboard() {
         <div class="detail-card" style="color:#dc2626;text-align:center;">
           <h2>Error Loading Sources</h2>
           <p>${err.message}</p>
-          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">← Back</button>
+          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">â† Back</button>
         </div>
       </div>`;
   }
@@ -2249,7 +2249,7 @@ function renderSourceLeaderboard(rows) {
 
   // Best & worst follow-up (by atRiskPct, min 5 leads)
   const qualified = sorted.filter(r => r.total >= 5);
-  let bestSource = '–', worstSource = '–';
+  let bestSource = 'â€“', worstSource = 'â€“';
   if (qualified.length) {
     const byRisk = [...qualified].sort((a, b) => a.atRiskPct - b.atRiskPct);
     bestSource = byRisk[0].source + ' (' + byRisk[0].atRiskPct + '%)';
@@ -2257,7 +2257,7 @@ function renderSourceLeaderboard(rows) {
   }
 
   const sc = (col) => sourceSort.col === col ? 'sorted' : '';
-  const ar = (col) => sourceSort.col === col ? (sourceSort.dir === 'desc' ? '▼' : '▲') : '▽';
+  const ar = (col) => sourceSort.col === col ? (sourceSort.dir === 'desc' ? 'â–¼' : 'â–²') : 'â–½';
 
   let tableHTML = `<table><thead><tr>
     <th class="${sc('source')}" onclick="toggleSourceSort('source')">Source <span class="sort-arrow">${ar('source')}</span></th>
@@ -2294,12 +2294,12 @@ function renderSourceLeaderboard(rows) {
     <div style="max-width:1200px;margin:0 auto;padding:18px 12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
-          <h2 style="margin:0;font-size:20px;">📊 Source Leaderboard</h2>
-          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Lead source performance across all distribution tabs · ${sourceCount} sources · ${totalLeads} total leads</p>
+          <h2 style="margin:0;font-size:20px;">ðŸ“Š Source Leaderboard</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Lead source performance across all distribution tabs Â· ${sourceCount} sources Â· ${totalLeads} total leads</p>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="topbar-btn manage" onclick="showSourceLeaderboard()">↻ Refresh</button>
-          <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
+          <button class="topbar-btn manage" onclick="showSourceLeaderboard()">â†» Refresh</button>
+          <button class="topbar-btn manage" onclick="showDashboard()">â† Dashboard</button>
         </div>
       </div>
 
@@ -2309,19 +2309,19 @@ function renderSourceLeaderboard(rows) {
           <div class="stat-value">${totalLeads}</div>
         </div>
         <div class="reassign-stat">
-          <div class="stat-label">At Risk (3+ days) 🔴</div>
+          <div class="stat-label">At Risk (3+ days) ðŸ”´</div>
           <div class="stat-value" style="color:#dc2626;">${totalAtRisk}</div>
         </div>
         <div class="reassign-stat">
-          <div class="stat-label">Manager Review ⚠️</div>
+          <div class="stat-label">Manager Review âš ï¸</div>
           <div class="stat-value" style="color:#991b1b;">${totalReview}</div>
         </div>
         <div class="reassign-stat">
-          <div class="stat-label">Best Follow-Up ✅</div>
+          <div class="stat-label">Best Follow-Up âœ…</div>
           <div class="stat-value" style="font-size:13px;color:#16a34a;">${bestSource}</div>
         </div>
         <div class="reassign-stat">
-          <div class="stat-label">Worst Follow-Up 🚨</div>
+          <div class="stat-label">Worst Follow-Up ðŸš¨</div>
           <div class="stat-value" style="font-size:13px;color:#dc2626;">${worstSource}</div>
         </div>
       </div>
@@ -2329,12 +2329,12 @@ function renderSourceLeaderboard(rows) {
       <div class="table-card" id="sourceTable">${tableHTML}</div>
 
       <div style="margin-top:12px;padding:12px 16px;background:var(--card);border:1px solid var(--line);border-radius:10px;">
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px;">📈 Quick Insights</div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;">ðŸ“ˆ Quick Insights</div>
         <div style="font-size:12px;color:var(--muted);line-height:1.6;">
-          ${qualified.length >= 2 ? `• <strong style="color:#16a34a;">${[...qualified].sort((a,b)=>a.atRiskPct-b.atRiskPct)[0].source}</strong> has the best follow-up rate — only ${[...qualified].sort((a,b)=>a.atRiskPct-b.atRiskPct)[0].atRiskPct}% at risk<br>` : ''}
-          ${qualified.length >= 2 ? `• <strong style="color:#dc2626;">${[...qualified].sort((a,b)=>b.atRiskPct-a.atRiskPct)[0].source}</strong> needs attention — ${[...qualified].sort((a,b)=>b.atRiskPct-a.atRiskPct)[0].atRiskPct}% of leads at risk<br>` : ''}
-          ${sorted.length > 0 ? `• <strong>${sorted[0].source}</strong> produces the most volume with ${sorted[0].total} total leads<br>` : ''}
-          ${totalReview > 0 ? `• <strong style="color:#991b1b;">${totalReview} leads</strong> across all sources are in Manager Review status` : '• No leads currently in Manager Review — great job!'}
+          ${qualified.length >= 2 ? `â€¢ <strong style="color:#16a34a;">${[...qualified].sort((a,b)=>a.atRiskPct-b.atRiskPct)[0].source}</strong> has the best follow-up rate â€” only ${[...qualified].sort((a,b)=>a.atRiskPct-b.atRiskPct)[0].atRiskPct}% at risk<br>` : ''}
+          ${qualified.length >= 2 ? `â€¢ <strong style="color:#dc2626;">${[...qualified].sort((a,b)=>b.atRiskPct-a.atRiskPct)[0].source}</strong> needs attention â€” ${[...qualified].sort((a,b)=>b.atRiskPct-a.atRiskPct)[0].atRiskPct}% of leads at risk<br>` : ''}
+          ${sorted.length > 0 ? `â€¢ <strong>${sorted[0].source}</strong> produces the most volume with ${sorted[0].total} total leads<br>` : ''}
+          ${totalReview > 0 ? `â€¢ <strong style="color:#991b1b;">${totalReview} leads</strong> across all sources are in Manager Review status` : 'â€¢ No leads currently in Manager Review â€” great job!'}
         </div>
       </div>
     </div>`;
@@ -2361,9 +2361,9 @@ function toggleSourceSort(col) {
   }
 }
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    ACTIVITY LOG
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function showActivityModal() {
   if (!isAdmin() && !isManager()) { alert('Only admins and managers can view activity.'); return; }
   logPageView('Activity Log');
@@ -2399,7 +2399,7 @@ async function loadActivity() {
   try {
     // Fetch users for current data + clicks
     const userSnap = await getDocs(collection(db, 'users'));
-    const userMap = {}; // uid → user data
+    const userMap = {}; // uid â†’ user data
     const today = todayDateStr();
     userSnap.forEach(d => {
       const u = d.data();
@@ -2425,8 +2425,8 @@ async function loadActivity() {
       orderBy('date', 'desc')
     ));
 
-    // Build day → users map from dailyLogins
-    const dayLogins = new Map(); // date string → [{email, linkedName, role, lastSeen}]
+    // Build day â†’ users map from dailyLogins
+    const dayLogins = new Map(); // date string â†’ [{email, linkedName, role, lastSeen}]
     loginSnap.forEach(d => {
       const data = d.data();
       const dateStr = data.date;
@@ -2484,6 +2484,12 @@ async function loadActivity() {
 
     // Summary stats
     const todayGroup = dayLogins.get(today) || [];
+    const todayEmails = new Set(todayGroup.map(u => u.email));
+    const notSignedIn = Object.values(userMap).filter(u => !todayEmails.has(u.email));
+    const notSignedInSales = notSignedIn.filter(u => u.role === 'user');
+    const notSignedInMgmt = notSignedIn.filter(u => ['admin','superadmin','manager'].includes(u.role));
+    notSignedIn.sort((a, b) => (a.linkedName || a.email).localeCompare(b.linkedName || b.email));
+
     const salesLoggedIn = todayGroup.filter(u => u.role === 'user').length;
     const mgmtLoggedIn = todayGroup.filter(u => ['admin','superadmin','manager'].includes(u.role)).length;
     const totalClicks = todayGroup.reduce((sum, u) => sum + (u.clicks || 0), 0);
@@ -2502,7 +2508,27 @@ async function loadActivity() {
           <div style="font-size:11px;color:#7e22ce;font-weight:500;">Total Clicks Today</div>
           <div style="font-size:22px;font-weight:800;color:#7e22ce;">${totalClicks}</div>
         </div>
-      </div>`;
+        <div style="flex:1;min-width:120px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px 16px;">
+          <div style="font-size:11px;color:#991b1b;font-weight:500;">Not Signed In Today</div>
+          <div style="font-size:22px;font-weight:800;color:#991b1b;">${notSignedIn.length}</div>
+        </div>
+      </div>
+      ${notSignedIn.length > 0 ? `
+      <details style="margin-top:8px;margin-bottom:4px;">
+        <summary style="cursor:pointer;font-weight:700;font-size:12px;color:#991b1b;padding:6px 0;user-select:none;">
+          ðŸš« Not Signed In Today <span style="background:#fecaca;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-left:6px;">${notSignedIn.length}</span>
+        </summary>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0;">
+          ${notSignedIn.map(u => {
+            const name = u.linkedName || u.email;
+            const roleBadge = u.role === 'superadmin' ? ' ðŸ™' : u.role === 'admin' ? ' â­' : u.role === 'manager' ? ' ðŸ“‹' : '';
+            const lastStr = u.lastLogin ? timeAgo(u.lastLogin).text : 'Never';
+            return `<div style="background:#fff;border:1px solid #fecaca;border-radius:8px;padding:5px 10px;font-size:11px;" title="Last seen: ${lastStr}">
+              <span style="font-weight:600;">${name}</span>${roleBadge} <span style="color:var(--muted);margin-left:4px;">${lastStr}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </details>` : ''}`;
 
     for (const dateStr of sortedDates) {
       const group = dayLogins.get(dateStr);
@@ -2514,12 +2540,12 @@ async function loadActivity() {
       html += `<div style="margin-top:16px;margin-bottom:6px;font-weight:700;font-size:13px;color:${isToday ? '#166534' : 'var(--muted)'};text-transform:uppercase;letter-spacing:.3px;">${label}${countBadge}</div>`;
 
       group.forEach(u => {
-        const ago = u.lastSeen ? timeAgo(u.lastSeen) : { text: '—', status: 'never' };
+        const ago = u.lastSeen ? timeAgo(u.lastSeen) : { text: 'â€”', status: 'never' };
         const displayName = u.linkedName || u.email;
         const loginTime = u.lastSeen
           ? u.lastSeen.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-          : '—';
-        const roleBadge = u.role === 'superadmin' ? ' 🙏' : u.role === 'admin' ? ' ⭐' : u.role === 'manager' ? ' 📋' : '';
+          : 'â€”';
+        const roleBadge = u.role === 'superadmin' ? ' ðŸ™' : u.role === 'admin' ? ' â­' : u.role === 'manager' ? ' ðŸ“‹' : '';
         const clickBadge = u.clicks > 0
           ? `<span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600;">${u.clicks} click${u.clicks !== 1 ? 's' : ''}</span>`
           : '<span style="color:#d1d5db;font-size:11px;">0 clicks</span>';
@@ -2531,7 +2557,7 @@ async function loadActivity() {
               <span class="activity-status status-${ago.status}"></span>
               <div style="min-width:0;">
                 <div class="activity-name">${displayName}${roleBadge}</div>
-                <div class="activity-email">${u.linkedName ? u.email + ' · ' : ''}${u.role}</div>
+                <div class="activity-email">${u.linkedName ? u.email + ' Â· ' : ''}${u.role}</div>
               </div>
             </div>
             <div class="activity-time">
@@ -2546,7 +2572,7 @@ async function loadActivity() {
       const countBadge = `<span style="background:#f4f4f5;color:#71717a;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-left:8px;">${neverGroup.length}</span>`;
       html += `<div style="margin-top:16px;margin-bottom:6px;font-weight:700;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;">Never Logged In${countBadge}</div>`;
       neverGroup.forEach(u => {
-        const roleBadge = u.role === 'superadmin' ? ' 🙏' : u.role === 'admin' ? ' ⭐' : u.role === 'manager' ? ' 📋' : '';
+        const roleBadge = u.role === 'superadmin' ? ' ðŸ™' : u.role === 'admin' ? ' â­' : u.role === 'manager' ? ' ðŸ“‹' : '';
         html += `
           <div class="activity-item">
             <div style="min-width:48px;"></div>
@@ -2554,7 +2580,7 @@ async function loadActivity() {
               <span class="activity-status status-never"></span>
               <div style="min-width:0;">
                 <div class="activity-name">${u.linkedName || u.email}${roleBadge}</div>
-                <div class="activity-email">${u.linkedName ? u.email + ' · ' : ''}${u.role}</div>
+                <div class="activity-email">${u.linkedName ? u.email + ' Â· ' : ''}${u.role}</div>
               </div>
             </div>
             <div class="activity-time"><div class="time-main">Never</div></div>
@@ -2569,14 +2595,14 @@ async function loadActivity() {
   }
 }
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    GLOBAL BINDINGS
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 window.login = login;
 window.logout = logout;
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    LEAD FUNNEL (Admin + Manager)
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 let _funnelSort = { col: 'total', dir: 'desc' };
 let _funnelData = null;
 let _funnelExpanded = new Set(); // which source types are open
@@ -2668,7 +2694,7 @@ function renderLeadFunnel() {
 
   function sa(col) {
     const active = _funnelSort.col === col;
-    return active ? (_funnelSort.dir === 'desc' ? '▼' : '▲') : '↕';
+    return active ? (_funnelSort.dir === 'desc' ? 'â–¼' : 'â–²') : 'â†•';
   }
   function thC(col) { return _funnelSort.col === col ? 'sorted' : ''; }
   function closeColor(rate) {
@@ -2684,10 +2710,10 @@ function renderLeadFunnel() {
   }
 
   const sourceIcons = {
-    'Internet Up': '🌐',
-    'Phone Up': '📞',
-    'Showroom Up': '🏪',
-    'Campaign': '📣',
+    'Internet Up': 'ðŸŒ',
+    'Phone Up': 'ðŸ“ž',
+    'Showroom Up': 'ðŸª',
+    'Campaign': 'ðŸ“£',
   };
   const sourceColors = {
     'Internet Up': '#2563eb',
@@ -2703,10 +2729,10 @@ function renderLeadFunnel() {
   let accordionHTML = '';
   sortedSourceTypes.forEach(st => {
     const stName = st.name;
-    const icon = sourceIcons[stName] || '📋';
+    const icon = sourceIcons[stName] || 'ðŸ“‹';
     const clr = sourceColors[stName] || '#64748b';
     const expanded = _funnelExpanded.has(stName);
-    const chevron = expanded ? '▾' : '▸';
+    const chevron = expanded ? 'â–¾' : 'â–¸';
     const provs = sortRows(groups[stName] || []);
 
     // Source type header row
@@ -2751,7 +2777,7 @@ function renderLeadFunnel() {
             <tbody>`;
 
       provs.forEach(r => {
-        const daysClose = r.avgDaysToClose !== null ? r.avgDaysToClose + 'd' : '–';
+        const daysClose = r.avgDaysToClose !== null ? r.avgDaysToClose + 'd' : 'â€“';
         const repsStr = (r.topReps || []).join(', ');
         // Bar width proportional to group max
         const groupMax = Math.max(...provs.map(p => p.total), 1);
@@ -2774,7 +2800,7 @@ function renderLeadFunnel() {
           <td style="text-align:center;">${r.active}</td>
           <td style="text-align:center;color:${r.stalePct > 40 ? '#dc2626' : r.stalePct > 20 ? '#ca8a04' : '#16a34a'};">${r.stalePct}%</td>
           <td style="text-align:center;">${r.badLead}</td>
-          <td style="font-size:10px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${repsStr}">${repsStr || '–'}</td>
+          <td style="font-size:10px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${repsStr}">${repsStr || 'â€“'}</td>
         </tr>`;
       });
 
@@ -2785,26 +2811,26 @@ function renderLeadFunnel() {
 
   // Insights
   let insights = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">';
-  if (bestClose) insights += `<div style="flex:1;min-width:160px;padding:10px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;font-size:12px;"><div style="font-weight:700;color:#16a34a;">🏆 Best Close Rate</div><div style="font-weight:800;font-size:15px;margin:4px 0;">${bestClose.name}</div><div>${bestClose.closeRate}% (${bestClose.sold}/${bestClose.total})</div></div>`;
-  if (worstClose) insights += `<div style="flex:1;min-width:160px;padding:10px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;font-size:12px;"><div style="font-weight:700;color:#dc2626;">🚨 Worst Close Rate</div><div style="font-weight:800;font-size:15px;margin:4px 0;">${worstClose.name}</div><div>${worstClose.closeRate}% (${worstClose.sold}/${worstClose.total})</div></div>`;
-  if (fastestClose) insights += `<div style="flex:1;min-width:160px;padding:10px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;font-size:12px;"><div style="font-weight:700;color:#2563eb;">⚡ Fastest to Close</div><div style="font-weight:800;font-size:15px;margin:4px 0;">${fastestClose.name}</div><div>Avg ${fastestClose.avgDaysToClose} days</div></div>`;
-  if (bestAppt) insights += `<div style="flex:1;min-width:160px;padding:10px;background:#fefce8;border-radius:8px;border:1px solid #fde68a;font-size:12px;"><div style="font-weight:700;color:#ca8a04;">📅 Best Appt Rate</div><div style="font-weight:800;font-size:15px;margin:4px 0;">${bestAppt.name}</div><div>${bestAppt.apptRate}% (${bestAppt.apptSet}/${bestAppt.total})</div></div>`;
+  if (bestClose) insights += `<div style="flex:1;min-width:160px;padding:10px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;font-size:12px;"><div style="font-weight:700;color:#16a34a;">ðŸ† Best Close Rate</div><div style="font-weight:800;font-size:15px;margin:4px 0;">${bestClose.name}</div><div>${bestClose.closeRate}% (${bestClose.sold}/${bestClose.total})</div></div>`;
+  if (worstClose) insights += `<div style="flex:1;min-width:160px;padding:10px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;font-size:12px;"><div style="font-weight:700;color:#dc2626;">ðŸš¨ Worst Close Rate</div><div style="font-weight:800;font-size:15px;margin:4px 0;">${worstClose.name}</div><div>${worstClose.closeRate}% (${worstClose.sold}/${worstClose.total})</div></div>`;
+  if (fastestClose) insights += `<div style="flex:1;min-width:160px;padding:10px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;font-size:12px;"><div style="font-weight:700;color:#2563eb;">âš¡ Fastest to Close</div><div style="font-weight:800;font-size:15px;margin:4px 0;">${fastestClose.name}</div><div>Avg ${fastestClose.avgDaysToClose} days</div></div>`;
+  if (bestAppt) insights += `<div style="flex:1;min-width:160px;padding:10px;background:#fefce8;border-radius:8px;border:1px solid #fde68a;font-size:12px;"><div style="font-weight:700;color:#ca8a04;">ðŸ“… Best Appt Rate</div><div style="font-weight:800;font-size:15px;margin:4px 0;">${bestAppt.name}</div><div>${bestAppt.apptRate}% (${bestAppt.apptSet}/${bestAppt.total})</div></div>`;
   insights += '</div>';
 
-  const funnelDateRange = _funnelData.dateRange ? `${_funnelData.dateRange.from || '?'} – ${_funnelData.dateRange.to || '?'}` : '';
+  const funnelDateRange = _funnelData.dateRange ? `${_funnelData.dateRange.from || '?'} â€“ ${_funnelData.dateRange.to || '?'}` : '';
 
   document.getElementById('app').innerHTML = `
     <div style="max-width:1200px;margin:0 auto;padding:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
         <div>
-          <div style="font-size:20px;font-weight:800;">🔬 Lead Source Funnel</div>
-          <div style="font-size:12px;color:var(--muted);">Lead In → Appointment Set → Sold · grouped by Source Type${funnelDateRange ? ` · <strong style="color:var(--text);">${funnelDateRange}</strong>` : ''}</div>
+          <div style="font-size:20px;font-weight:800;">ðŸ”¬ Lead Source Funnel</div>
+          <div style="font-size:12px;color:var(--muted);">Lead In â†’ Appointment Set â†’ Sold Â· grouped by Source Type${funnelDateRange ? ` Â· <strong style="color:var(--text);">${funnelDateRange}</strong>` : ''}</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <button class="topbar-btn" onclick="funnelExpandAll()" style="font-size:11px;padding:5px 10px;">Expand All</button>
           <button class="topbar-btn" onclick="funnelCollapseAll()" style="font-size:11px;padding:5px 10px;">Collapse All</button>
-          <button class="topbar-btn manage" onclick="showLeadFunnel()">↻ Refresh</button>
-          <button class="topbar-btn logout" onclick="showDashboard()">← Dashboard</button>
+          <button class="topbar-btn manage" onclick="showLeadFunnel()">â†» Refresh</button>
+          <button class="topbar-btn logout" onclick="showDashboard()">â† Dashboard</button>
         </div>
       </div>
 
@@ -2815,12 +2841,12 @@ function renderLeadFunnel() {
           <div style="font-size:22px;font-weight:800;">${totLeads}</div>
         </div>
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:10px;color:var(--muted);font-weight:600;">Appts Set 📅</div>
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Appts Set ðŸ“…</div>
           <div style="font-size:22px;font-weight:800;">${totAppt}</div>
           <div style="font-size:11px;color:var(--muted);">${overallAppt}% of leads</div>
         </div>
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:10px;color:var(--muted);font-weight:600;">Sold ✅</div>
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Sold âœ…</div>
           <div style="font-size:22px;font-weight:800;color:#16a34a;">${totSold}</div>
           <div style="font-size:11px;color:var(--muted);">${overallClose}% close rate</div>
         </div>
@@ -2839,7 +2865,7 @@ function renderLeadFunnel() {
       </div>
 
       <div style="margin-top:12px;font-size:10px;color:var(--muted);line-height:1.6;">
-        <strong>How to read:</strong> Appt % = what % of leads get an appointment. Close % = what % convert to a sale. Stale 3d+ = leads not contacted in 3+ days. Sources with &lt;5 leads excluded from insight cards. Colors: <span style="color:#16a34a;">■</span> strong <span style="color:#ca8a04;">■</span> moderate <span style="color:#dc2626;">■</span> weak
+        <strong>How to read:</strong> Appt % = what % of leads get an appointment. Close % = what % convert to a sale. Stale 3d+ = leads not contacted in 3+ days. Sources with &lt;5 leads excluded from insight cards. Colors: <span style="color:#16a34a;">â– </span> strong <span style="color:#ca8a04;">â– </span> moderate <span style="color:#dc2626;">â– </span> weak
       </div>
     </div>`;
 }
@@ -2858,9 +2884,9 @@ window.toggleSourceSort = toggleSourceSort;
 window.showLeadFunnel = showLeadFunnel;
 window.toggleFunnelSort = toggleFunnelSort;
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    VEHICLE DEMAND DASHBOARD (Admin)
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 let _vehData = null;
 let _vehExpanded = new Set();
 let _vehSort = { col: 'total', dir: 'desc' };
@@ -2906,7 +2932,7 @@ function renderVehicleDemand() {
   if (!_vehData) return;
   const { byMake, summary, dateRange } = _vehData;
   const s = summary;
-  const dateStr = dateRange ? `${dateRange.from || '?'} – ${dateRange.to || '?'}` : '';
+  const dateStr = dateRange ? `${dateRange.from || '?'} â€“ ${dateRange.to || '?'}` : '';
 
   // Sort makes
   const sorted = [...byMake].sort((a, b) => {
@@ -2938,7 +2964,7 @@ function renderVehicleDemand() {
   }
 
   function sa(col) {
-    return _vehSort.col === col ? (_vehSort.dir === 'desc' ? '▼' : '▲') : '↕';
+    return _vehSort.col === col ? (_vehSort.dir === 'desc' ? 'â–¼' : 'â–²') : 'â†•';
   }
 
   // Make brand colors
@@ -2952,7 +2978,7 @@ function renderVehicleDemand() {
   let accHTML = '';
   sorted.forEach(mk => {
     const expanded = _vehExpanded.has(mk.name);
-    const chevron = expanded ? '▾' : '▸';
+    const chevron = expanded ? 'â–¾' : 'â–¸';
     const clr = brandColors[mk.name] || '#64748b';
     const pctNew = mk.total > 0 ? Math.round(mk.new / mk.total * 100) : 0;
     const pctUsed = mk.total > 0 ? Math.round(mk.used / mk.total * 100) : 0;
@@ -3022,7 +3048,7 @@ function renderVehicleDemand() {
           <td style="text-align:center;font-weight:700;color:${closeClr(md.closeRate)};">${md.closeRate}%</td>
           <td style="text-align:center;">${statusDots(md.active, md.sold, md.inactive, md.total)}</td>
           <td style="text-align:center;">${lnk(md.withTrade, 'trade', '#f97316')}</td>
-          <td style="font-size:10px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${trimStr}">${trimStr || '–'}</td>
+          <td style="font-size:10px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${trimStr}">${trimStr || 'â€“'}</td>
         </tr>`;
       });
 
@@ -3047,14 +3073,14 @@ function renderVehicleDemand() {
     <div style="max-width:1200px;margin:0 auto;padding:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
         <div>
-          <div style="font-size:20px;font-weight:800;">🚗 Vehicle Demand Dashboard</div>
-          <div style="font-size:12px;color:var(--muted);">What customers are shopping for · grouped by Make${dateStr ? ` · <strong style="color:var(--text);">${dateStr}</strong>` : ''}</div>
+          <div style="font-size:20px;font-weight:800;">ðŸš— Vehicle Demand Dashboard</div>
+          <div style="font-size:12px;color:var(--muted);">What customers are shopping for Â· grouped by Make${dateStr ? ` Â· <strong style="color:var(--text);">${dateStr}</strong>` : ''}</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <button class="topbar-btn" onclick="vehExpandAll()" style="font-size:11px;padding:5px 10px;">Expand All</button>
           <button class="topbar-btn" onclick="vehCollapseAll()" style="font-size:11px;padding:5px 10px;">Collapse All</button>
-          <button class="topbar-btn manage" onclick="showVehicleDemand()">↻ Refresh</button>
-          <button class="topbar-btn logout" onclick="showDashboard()">← Dashboard</button>
+          <button class="topbar-btn manage" onclick="showVehicleDemand()">â†» Refresh</button>
+          <button class="topbar-btn logout" onclick="showDashboard()">â† Dashboard</button>
         </div>
       </div>
 
@@ -3074,11 +3100,11 @@ function renderVehicleDemand() {
           </div>
         </div>
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:10px;color:var(--muted);font-weight:600;">Active 🟢</div>
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Active ðŸŸ¢</div>
           <div style="font-size:22px;font-weight:800;">${s.active}</div>
         </div>
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:10px;color:var(--muted);font-weight:600;">Sold ✅</div>
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Sold âœ…</div>
           <div style="font-size:22px;font-weight:800;color:#16a34a;">${s.sold}</div>
           <div style="font-size:10px;color:var(--muted);">${s.closeRate}% close</div>
         </div>
@@ -3097,7 +3123,7 @@ function renderVehicleDemand() {
       <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
         <!-- Top 5 Models -->
         <div style="flex:1;min-width:250px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;">
-          <div style="font-weight:700;font-size:12px;margin-bottom:8px;">🔥 Top 5 Most Demanded</div>
+          <div style="font-weight:700;font-size:12px;margin-bottom:8px;">ðŸ”¥ Top 5 Most Demanded</div>
           ${(() => {
             const allModels = [];
             byMake.forEach(mk => mk.models.forEach(md => allModels.push({ make: mk.name, ...md })));
@@ -3105,7 +3131,7 @@ function renderVehicleDemand() {
             return allModels.slice(0, 5).map((m, i) =>
               '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;' + (i > 0 ? 'border-top:1px solid var(--line);' : '') + '">' +
                 '<span style="font-size:12px;font-weight:600;">' + (i+1) + '. ' + m.make + ' ' + m.name + '</span>' +
-                '<span style="font-size:11px;color:var(--muted);"><strong style="color:var(--text);">' + m.total + '</strong> leads · <span style="color:' + closeClr(m.closeRate) + ';">' + m.closeRate + '% sold</span></span>' +
+                '<span style="font-size:11px;color:var(--muted);"><strong style="color:var(--text);">' + m.total + '</strong> leads Â· <span style="color:' + closeClr(m.closeRate) + ';">' + m.closeRate + '% sold</span></span>' +
               '</div>'
             ).join('');
           })()}
@@ -3113,7 +3139,7 @@ function renderVehicleDemand() {
 
         <!-- Top Trades -->
         <div style="flex:1;min-width:250px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;">
-          <div style="font-weight:700;font-size:12px;margin-bottom:8px;">🔄 Top Trade-Ins</div>
+          <div style="font-weight:700;font-size:12px;margin-bottom:8px;">ðŸ”„ Top Trade-Ins</div>
           ${tradesHTML || '<div style="color:var(--muted);font-size:12px;">No trade data</div>'}
         </div>
       </div>
@@ -3122,7 +3148,7 @@ function renderVehicleDemand() {
       <div>${accHTML}</div>
 
       <div style="margin-top:12px;font-size:10px;color:var(--muted);line-height:1.6;">
-        <strong>How to read:</strong> New/Used bar = <span style="color:#3b82f6;">■</span> new <span style="color:#f97316;">■</span> used. Pipeline = <span style="color:#3b82f6;">■</span> active <span style="color:#16a34a;">■</span> sold <span style="color:#fca5a5;">■</span> inactive. Close % = sold ÷ total leads for that vehicle.
+        <strong>How to read:</strong> New/Used bar = <span style="color:#3b82f6;">â– </span> new <span style="color:#f97316;">â– </span> used. Pipeline = <span style="color:#3b82f6;">â– </span> active <span style="color:#16a34a;">â– </span> sold <span style="color:#fca5a5;">â– </span> inactive. Close % = sold Ã· total leads for that vehicle.
       </div>
     </div>`;
 }
@@ -3163,12 +3189,12 @@ function showVehLeads(makeName, modelName, filter) {
         <div>
           <div style="font-size:20px;font-weight:800;">${makeName} ${modelName}</div>
           <div style="font-size:12px;color:var(--muted);">
-            <span style="color:${filterColors[filter]};font-weight:700;">${filterLabel}</span> · ${leads.length} lead${leads.length !== 1 ? 's' : ''}
+            <span style="color:${filterColors[filter]};font-weight:700;">${filterLabel}</span> Â· ${leads.length} lead${leads.length !== 1 ? 's' : ''}
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
           ${filterBtns}
-          <button class="topbar-btn manage" onclick="renderVehicleDemand()" style="margin-left:8px;">← Vehicle Demand</button>
+          <button class="topbar-btn manage" onclick="renderVehicleDemand()" style="margin-left:8px;">â† Vehicle Demand</button>
         </div>
       </div>
 
@@ -3189,15 +3215,15 @@ function showVehLeads(makeName, modelName, filter) {
           <tbody>
             ${leads.length === 0 ? '<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--muted);">No leads match this filter.</td></tr>' : ''}
             ${leads.map(l => `<tr style="border-top:1px solid var(--line);">
-              <td style="padding:8px 12px;font-weight:600;white-space:nowrap;">${l.n || '–'}</td>
-              <td style="white-space:nowrap;">${l.p ? `<a href="tel:${l.p}" style="color:var(--accent);text-decoration:none;">${l.p}</a>` : '–'}</td>
-              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.e}">${l.e ? `<a href="mailto:${l.e}" style="color:var(--accent);text-decoration:none;">${l.e}</a>` : '–'}</td>
-              <td style="white-space:nowrap;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusClr(l.cat)};margin-right:4px;"></span>${l.s || '–'}</td>
-              <td style="white-space:nowrap;">${l.r || '–'}</td>
-              <td style="white-space:nowrap;">${l.d || '–'}</td>
-              <td style="text-align:center;"><span style="background:${l.nu === 'New' ? '#dbeafe' : l.nu === 'Used' ? '#ffedd5' : '#f4f4f5'};color:${l.nu === 'New' ? '#1d4ed8' : l.nu === 'Used' ? '#c2410c' : '#71717a'};padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;">${l.nu || '–'}</span></td>
-              <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.t}">${l.t || '–'}</td>
-              <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.tv}">${l.tv || '–'}</td>
+              <td style="padding:8px 12px;font-weight:600;white-space:nowrap;">${l.n || 'â€“'}</td>
+              <td style="white-space:nowrap;">${l.p ? `<a href="tel:${l.p}" style="color:var(--accent);text-decoration:none;">${l.p}</a>` : 'â€“'}</td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.e}">${l.e ? `<a href="mailto:${l.e}" style="color:var(--accent);text-decoration:none;">${l.e}</a>` : 'â€“'}</td>
+              <td style="white-space:nowrap;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusClr(l.cat)};margin-right:4px;"></span>${l.s || 'â€“'}</td>
+              <td style="white-space:nowrap;">${l.r || 'â€“'}</td>
+              <td style="white-space:nowrap;">${l.d || 'â€“'}</td>
+              <td style="text-align:center;"><span style="background:${l.nu === 'New' ? '#dbeafe' : l.nu === 'Used' ? '#ffedd5' : '#f4f4f5'};color:${l.nu === 'New' ? '#1d4ed8' : l.nu === 'Used' ? '#c2410c' : '#71717a'};padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;">${l.nu || 'â€“'}</span></td>
+              <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.t}">${l.t || 'â€“'}</td>
+              <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.tv}">${l.tv || 'â€“'}</td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -3208,9 +3234,9 @@ function showVehLeads(makeName, modelName, filter) {
 
 window.showVehLeads = showVehLeads;
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    ENGAGEMENT REPORT (Admin)
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 let _engagementData = null;
 let _engDays = 7;
 
@@ -3270,16 +3296,16 @@ function renderEngagement() {
       <div style="max-width:1000px;margin:0 auto;padding:16px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
           <div>
-            <div style="font-size:20px;font-weight:800;">📈 Engagement Report</div>
-            <div style="font-size:12px;color:var(--muted);">No data yet — tracking just started. Check back after users navigate the dashboard.</div>
+            <div style="font-size:20px;font-weight:800;">ðŸ“ˆ Engagement Report</div>
+            <div style="font-size:12px;color:var(--muted);">No data yet â€” tracking just started. Check back after users navigate the dashboard.</div>
           </div>
-          <button class="topbar-btn logout" onclick="showDashboard()">← Dashboard</button>
+          <button class="topbar-btn logout" onclick="showDashboard()">â† Dashboard</button>
         </div>
       </div>`;
     return;
   }
 
-  // ── 1. Page Popularity ──
+  // â”€â”€ 1. Page Popularity â”€â”€
   const pageCounts = {};
   const pageDwell = {};
   rows.forEach(r => {
@@ -3297,7 +3323,7 @@ function renderEngagement() {
     .sort((a, b) => b.count - a.count);
   const maxPageCount = pagePopularity.length ? pagePopularity[0].count : 1;
 
-  // ── 2. Drop-off (last page per session) ──
+  // â”€â”€ 2. Drop-off (last page per session) â”€â”€
   const sessionPages = {};
   rows.forEach(r => {
     if (!sessionPages[r.sessionId]) sessionPages[r.sessionId] = [];
@@ -3313,12 +3339,12 @@ function renderEngagement() {
   const dropOffArr = Object.entries(dropOffs).sort((a, b) => b[1] - a[1]);
   const totalSessions = Object.keys(sessionPages).length;
 
-  // ── 3. Session Depth ──
+  // â”€â”€ 3. Session Depth â”€â”€
   const sessionDepths = Object.values(sessionPages).map(p => p.length);
   const avgDepth = sessionDepths.length ? (sessionDepths.reduce((a, b) => a + b, 0) / sessionDepths.length).toFixed(1) : 0;
   const maxDepth = Math.max(...sessionDepths, 0);
 
-  // ── 4. Per-User Engagement ──
+  // â”€â”€ 4. Per-User Engagement â”€â”€
   const userStats = {};
   rows.forEach(r => {
     if (!userStats[r.email]) userStats[r.email] = { views: 0, sessions: new Set(), pages: new Set() };
@@ -3334,7 +3360,7 @@ function renderEngagement() {
     uniquePages: s.pages.size
   })).sort((a, b) => b.views - a.views);
 
-  // ── 5. Time Patterns (hour of day) ──
+  // â”€â”€ 5. Time Patterns (hour of day) â”€â”€
   const hourCounts = new Array(24).fill(0);
   const dayCounts = new Array(7).fill(0);
   rows.forEach(r => {
@@ -3346,25 +3372,25 @@ function renderEngagement() {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   function fmtDwell(sec) {
-    if (sec === null) return '–';
+    if (sec === null) return 'â€“';
     if (sec < 60) return sec + 's';
     return Math.floor(sec / 60) + 'm ' + (sec % 60) + 's';
   }
 
-  // ── Render ──
+  // â”€â”€ Render â”€â”€
   document.getElementById('app').innerHTML = `
     <div style="max-width:1100px;margin:0 auto;padding:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
         <div>
-          <div style="font-size:20px;font-weight:800;">📈 Engagement Report</div>
-          <div style="font-size:12px;color:var(--muted);">Page views, drop-offs & user activity · last ${_engDays} days · ${rows.length} views tracked</div>
+          <div style="font-size:20px;font-weight:800;">ðŸ“ˆ Engagement Report</div>
+          <div style="font-size:12px;color:var(--muted);">Page views, drop-offs & user activity Â· last ${_engDays} days Â· ${rows.length} views tracked</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
           ${[7, 14, 30].map(d =>
             `<button class="topbar-btn${_engDays === d ? ' active' : ''}" onclick="setEngDays(${d})" style="font-size:11px;padding:5px 10px;${_engDays === d ? 'background:var(--accent);color:#fff;' : ''}">${d}d</button>`
           ).join('')}
-          <button class="topbar-btn manage" onclick="showEngagement()">↻ Refresh</button>
-          <button class="topbar-btn logout" onclick="showDashboard()">← Dashboard</button>
+          <button class="topbar-btn manage" onclick="showEngagement()">â†» Refresh</button>
+          <button class="topbar-btn logout" onclick="showDashboard()">â† Dashboard</button>
         </div>
       </div>
 
@@ -3397,7 +3423,7 @@ function renderEngagement() {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
         <!-- Page Popularity -->
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;grid-column:${pagePopularity.length > 6 ? '1 / -1' : '1'};">
-          <div style="font-weight:700;font-size:13px;margin-bottom:10px;">🔥 Page Popularity</div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:10px;">ðŸ”¥ Page Popularity</div>
           ${pagePopularity.map(p => `
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
               <div style="width:130px;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;" title="${p.page}">${p.page}</div>
@@ -3413,7 +3439,7 @@ function renderEngagement() {
 
         <!-- Drop-off Points -->
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;">
-          <div style="font-weight:700;font-size:13px;margin-bottom:10px;">🚪 Session Exit Points</div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:10px;">ðŸšª Session Exit Points</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Where users leave the dashboard</div>
           ${dropOffArr.slice(0, 8).map(([page, count]) => {
             const pct = Math.round(count / totalSessions * 100);
@@ -3433,7 +3459,7 @@ function renderEngagement() {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
         <!-- Hourly Pattern -->
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;">
-          <div style="font-weight:700;font-size:13px;margin-bottom:10px;">🕐 Activity by Hour</div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:10px;">ðŸ• Activity by Hour</div>
           <div style="display:flex;align-items:flex-end;gap:2px;height:80px;">
             ${hourCounts.map((c, h) => {
               const pct = Math.round(c / maxHour * 100);
@@ -3448,7 +3474,7 @@ function renderEngagement() {
 
         <!-- Daily Pattern -->
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;">
-          <div style="font-weight:700;font-size:13px;margin-bottom:10px;">📅 Activity by Day</div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:10px;">ðŸ“… Activity by Day</div>
           ${dayNames.map((name, i) => {
             const pct = Math.round(dayCounts[i] / maxDay * 100);
             return `
@@ -3465,7 +3491,7 @@ function renderEngagement() {
 
       <!-- User Engagement Table -->
       <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;">
-        <div style="font-weight:700;font-size:13px;margin-bottom:10px;">👤 Per-User Engagement</div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:10px;">ðŸ‘¤ Per-User Engagement</div>
         <div style="overflow-x:auto;">
         <table style="width:100%;font-size:12px;">
           <thead><tr style="background:rgba(0,0,0,.02);">
@@ -3512,9 +3538,9 @@ window.showAutoNews = showAutoNews;
 window.toggleNewsGroup = toggleNewsGroup;
 window.toggleAllNewsGroups = toggleAllNewsGroups;
 
-/* ══════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    CUSTOM USER LINKS (Resources)
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 window._customLinks = [];
 
 async function loadCustomLinks() {
@@ -3537,8 +3563,8 @@ function renderCustomLinks() {
     const safeLabel = (lnk.label || 'Link').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const safeUrl = (lnk.url || '#').replace(/"/g, '&quot;');
     html += `<div class="custom-link-wrap">
-      <a href="${safeUrl}" target="_blank" class="res-link" style="flex:1;">🔖 ${safeLabel}</a>
-      <button class="custom-link-del" onclick="event.stopPropagation();removeCustomLink(${i});" title="Remove">✕</button>
+      <a href="${safeUrl}" target="_blank" class="res-link" style="flex:1;">ðŸ”– ${safeLabel}</a>
+      <button class="custom-link-del" onclick="event.stopPropagation();removeCustomLink(${i});" title="Remove">âœ•</button>
     </div>`;
   });
   container.innerHTML = html;
