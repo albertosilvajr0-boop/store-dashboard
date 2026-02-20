@@ -2484,8 +2484,8 @@ async function loadActivity() {
 
     // Summary stats
     const todayGroup = dayLogins.get(today) || [];
-    const todayEmails = new Set(todayGroup.map(u => u.email));
-    const notSignedIn = Object.values(userMap).filter(u => !todayEmails.has(u.email));
+    const todayUids = new Set(todayGroup.map(u => u.uid));
+    const notSignedIn = Object.values(userMap).filter(u => !todayUids.has(u.uid));
     const notSignedInSales = notSignedIn.filter(u => u.role === 'user');
     const notSignedInMgmt = notSignedIn.filter(u => ['admin','superadmin','manager'].includes(u.role));
     notSignedIn.sort((a, b) => (a.linkedName || a.email).localeCompare(b.linkedName || b.email));
