@@ -1096,7 +1096,7 @@ function checkLeadsAtRisk() {
   }).catch(() => {});
 }
 
-/* ── Pearson Correlation for KPI Analysis (admin only) ── */
+/* ── Pearson Correlation for KPI Analysis (all users) ── */
 function pearsonR(xs, ys) {
   const n = xs.length;
   if (n < 3) return null; // need at least 3 data points
@@ -1114,7 +1114,7 @@ function pearsonR(xs, ys) {
 }
 
 function buildCorrelationBox(rows, targetKey, targetLabel, kpiDefs) {
-  if ((!isAdmin() && !isManager()) || rows.length < 3) return '';
+  if (rows.length < 3) return '';
 
   const targetVals = rows.map(r => {
     if (targetKey === 'shown') return safeNum(shownVal(r));
