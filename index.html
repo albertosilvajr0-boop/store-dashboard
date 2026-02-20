@@ -2416,37 +2416,42 @@ async function loadActivity() {
     });
 
     // Fetch dailyLogins (last 14 days)
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 14);
-    const cutoffStr = cutoff.getFullYear() + '-' + String(cutoff.getMonth() + 1).padStart(2, '0') + '-' + String(cutoff.getDate()).padStart(2, '0');
-    const loginSnap = await getDocs(query(
-      collection(db, 'dailyLogins'),
-      where('date', '>=', cutoffStr),
-      orderBy('date', 'desc')
-    ));
+    let loginSnap = null;
+    try {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 14);
+      const cutoffStr = cutoff.getFullYear() + '-' + String(cutoff.getMonth() + 1).padStart(2, '0') + '-' + String(cutoff.getDate()).padStart(2, '0');
+      loginSnap = await getDocs(query(
+        collection(db, 'dailyLogins'),
+        where('date', '>=', cutoffStr),
+        orderBy('date', 'desc')
+      ));
+    } catch (e) { console.warn('dailyLogins query failed, falling back:', e); }
 
     // Build day → users map from dailyLogins
     const dayLogins = new Map(); // date string → [{email, linkedName, role, lastSeen}]
-    loginSnap.forEach(d => {
-      const data = d.data();
-      const dateStr = data.date;
-      if (!dayLogins.has(dateStr)) dayLogins.set(dateStr, []);
-      const lastSeen = data.lastSeen?.toDate ? data.lastSeen.toDate() : (data.lastSeen ? new Date(data.lastSeen) : null);
-      dayLogins.get(dateStr).push({
-        email: data.email || '',
-        linkedName: data.linkedName || '',
-        role: data.role || 'user',
-        uid: data.uid || '',
-        lastSeen: lastSeen,
-        clicks: (dateStr === today && userMap[data.uid]) ? userMap[data.uid].clicks : 0
+    if (loginSnap) {
+      loginSnap.forEach(d => {
+        const data = d.data();
+        const dateStr = data.date;
+        if (!dayLogins.has(dateStr)) dayLogins.set(dateStr, []);
+        const lastSeen = data.lastSeen?.toDate ? data.lastSeen.toDate() : (data.lastSeen ? new Date(data.lastSeen) : null);
+        dayLogins.get(dateStr).push({
+          email: data.email || '',
+          linkedName: data.linkedName || '',
+          role: data.role || 'user',
+          uid: data.uid || '',
+          lastSeen: lastSeen,
+          clicks: (dateStr === today && userMap[data.uid]) ? userMap[data.uid].clicks : 0
+        });
       });
-    });
+    }
 
     // Also include users from users collection for today if no dailyLogins yet (backward compat)
     const todayLogins = dayLogins.get(today) || [];
-    const todayUids = new Set(todayLogins.map(u => u.uid));
+    const todayUidSet = new Set(todayLogins.map(u => u.uid));
     Object.values(userMap).forEach(u => {
-      if (u.lastLogin && u.lastLogin.toDateString() === new Date().toDateString() && !todayUids.has(u.uid)) {
+      if (u.lastLogin && u.lastLogin.toDateString() === new Date().toDateString() && !todayUidSet.has(u.uid)) {
         if (!dayLogins.has(today)) dayLogins.set(today, []);
         dayLogins.get(today).push({
           email: u.email,
@@ -2458,6 +2463,24 @@ async function loadActivity() {
         });
       }
     });
+
+    // If dailyLogins was empty (first deploy / query failed), fall back to users collection lastLogin
+    if (dayLogins.size === 0 || (dayLogins.size === 1 && dayLogins.has(today))) {
+      Object.values(userMap).forEach(u => {
+        if (!u.lastLogin) return;
+        const d = u.lastLogin;
+        const dStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        if (dayLogins.has(dStr)) {
+          const existing = dayLogins.get(dStr);
+          if (existing.some(e => e.uid === u.uid)) return;
+        }
+        if (!dayLogins.has(dStr)) dayLogins.set(dStr, []);
+        dayLogins.get(dStr).push({
+          email: u.email, linkedName: u.linkedName, role: u.role,
+          uid: u.uid, lastSeen: u.lastLogin, clicks: u.clicks
+        });
+      });
+    }
 
     // Also add "never logged in" users
     const allLoggedUids = new Set();
