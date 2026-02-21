@@ -2499,7 +2499,7 @@ async function loadActivity() {
     userSnap.forEach(d => {
       const u = d.data();
       if (u.deleted) return; // Skip soft-deleted users
-      if (!u.linkedName) return; // Skip unconfigured/ghost users — only active users with a linked name
+      if (!u.linkedName && !['manager','superadmin'].includes(u.role)) return; // Skip unconfigured/ghost users
       const ll = u.lastLogin?.toDate ? u.lastLogin.toDate() : (u.lastLogin ? new Date(u.lastLogin) : null);
       const clicks = (u.clickDate === today) ? (u.clicksToday || 0) : 0;
       userMap[d.id] = {
