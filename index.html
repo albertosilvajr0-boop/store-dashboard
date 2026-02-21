@@ -698,6 +698,18 @@ onAuthStateChanged(auth, async (user) => {
     snap = await getDoc(userRef);
   }
   const data = snap.data() || {};
+
+  // Block deleted users from accessing the app
+  if (data.deleted) {
+    await signOut(auth);
+    document.getElementById('app').innerHTML = `
+      <div style="max-width:400px;margin:100px auto;text-align:center;padding:40px 20px;">
+        <h2 style="margin-bottom:8px;">Account Deactivated</h2>
+        <p style="color:var(--muted);">Your account has been deactivated. Contact your manager for assistance.</p>
+      </div>`;
+    return;
+  }
+
   let role = data.role || 'user';
   if (user.email === SUPERADMIN_EMAIL && role !== 'superadmin') {
     role = 'superadmin';
@@ -1856,6 +1868,7 @@ async function loadUsers() {
     let html = '';
     usersSnapshot.forEach((docu) => {
       const u = docu.data();
+      if (u.deleted) return; // Skip deleted users
       const email = u.email || '';
       const role = u.role || 'user';
       const linked = u.linkedName || '';
@@ -1905,7 +1918,8 @@ async function deleteUser(uid, email, role) {
   if (role === 'admin' || role === 'superadmin' || email === SUPERADMIN_EMAIL) { alert('Cannot delete admins.'); return; }
   if (!confirm('Delete this user?')) return;
   try {
-    await deleteDoc(doc(db, 'users', uid));
+    // Mark as deleted (prevents ghost re-creation via onAuthStateChanged)
+    await setDoc(doc(db, 'users', uid), { deleted: true, deletedAt: new Date() }, { merge: true });
     loadUsers();
     alert('User deleted.');
   } catch (e) { alert('Error: ' + e.message); }
@@ -2484,6 +2498,7 @@ async function loadActivity() {
     const today = todayDateStr();
     userSnap.forEach(d => {
       const u = d.data();
+      if (u.deleted) return; // Skip deleted users
       const ll = u.lastLogin?.toDate ? u.lastLogin.toDate() : (u.lastLogin ? new Date(u.lastLogin) : null);
       const clicks = (u.clickDate === today) ? (u.clicksToday || 0) : 0;
       userMap[d.id] = {
