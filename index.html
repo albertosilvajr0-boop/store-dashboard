@@ -3700,6 +3700,13 @@ function compCollapseAll() { _compExpanded = new Set(); renderCompAnalysis(); }
 
 let _compGroupKeys = [];
 let _compModelFilter = 'all';
+let _compSortCol = 'salePrice'; // default sort
+let _compSortDir = 'asc';
+function compSort(col) {
+  if (_compSortCol === col) _compSortDir = _compSortDir === 'asc' ? 'desc' : 'asc';
+  else { _compSortCol = col; _compSortDir = 'asc'; }
+  renderCompAnalysis();
+}
 
 function renderCompAnalysis() {
   if (!_compData) return;
@@ -3733,9 +3740,19 @@ function renderCompAnalysis() {
     trimGroups[gKey].items.push(v);
   });
 
-  // Sort each group's items by price low→high
+  // Sort each group's items by selected column
+  const getSortVal = (v) => {
+    if (_compSortCol === 'msrp') return v.msrp || 0;
+    if (_compSortCol === 'salePrice') return v.salePrice || 0;
+    if (_compSortCol === 'discount') return (v.msrp && v.salePrice) ? v.msrp - v.salePrice : 0;
+    if (_compSortCol === 'pctMsrp') return (v.msrp && v.salePrice) ? v.salePrice / v.msrp : 2;
+    return v.salePrice || 0;
+  };
   Object.values(trimGroups).forEach(g => {
-    g.items.sort((a, b) => (a.salePrice || Infinity) - (b.salePrice || Infinity));
+    g.items.sort((a, b) => {
+      const va = getSortVal(a), vb = getSortVal(b);
+      return _compSortDir === 'asc' ? va - vb : vb - va;
+    });
   });
 
   // Sort group keys alphabetically
@@ -3828,10 +3845,10 @@ function renderCompAnalysis() {
               <th style="padding:8px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Store</th>
               <th style="padding:8px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Year</th>
               <th style="padding:8px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Details</th>
-              <th style="padding:8px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">MSRP</th>
-              <th style="padding:8px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Sale Price</th>
-              <th style="padding:8px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Discount</th>
-              <th style="padding:8px 12px;text-align:center;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Deal</th>
+              <th onclick="compSort('msrp')" style="padding:8px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;">MSRP ${_compSortCol === 'msrp' ? (_compSortDir === 'asc' ? '▲' : '▼') : '<span style="color:#ccc;">⇅</span>'}</th>
+              <th onclick="compSort('salePrice')" style="padding:8px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;">Sale Price ${_compSortCol === 'salePrice' ? (_compSortDir === 'asc' ? '▲' : '▼') : '<span style="color:#ccc;">⇅</span>'}</th>
+              <th onclick="compSort('discount')" style="padding:8px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;">Discount ${_compSortCol === 'discount' ? (_compSortDir === 'asc' ? '▲' : '▼') : '<span style="color:#ccc;">⇅</span>'}</th>
+              <th onclick="compSort('pctMsrp')" style="padding:8px 12px;text-align:center;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;">% MSRP ${_compSortCol === 'pctMsrp' ? (_compSortDir === 'asc' ? '▲' : '▼') : '<span style="color:#ccc;">⇅</span>'}</th>
               <th style="padding:8px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Stock / VIN</th>
             </tr>
           </thead>
@@ -3845,11 +3862,16 @@ function renderCompAnalysis() {
         const isUs = v.store === 'SA CDJR';
         const storeBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;color:#fff;background:${isUs ? '#2563eb' : '#dc2626'};white-space:nowrap;">${isUs ? 'SA CDJR' : 'Ancira'}</span>`;
 
-        // Deal badge
-        let dealBadge = '';
-        if (v.deal) {
-          const dc = v.deal.toLowerCase().includes('great') ? '#16a34a' : v.deal.toLowerCase().includes('good') ? '#2563eb' : v.deal.toLowerCase().includes('fair') ? '#ca8a04' : '#dc2626';
-          dealBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;color:#fff;background:${dc};">${v.deal}</span>`;
+        // % of MSRP
+        const pctMsrp = (v.msrp > 0 && v.salePrice > 0) ? ((v.salePrice / v.msrp) * 100) : 0;
+        let pctColor = 'var(--muted)';
+        let pctLabel = '–';
+        if (pctMsrp > 0) {
+          pctLabel = pctMsrp.toFixed(1) + '%';
+          if (pctMsrp <= 80) pctColor = '#16a34a';
+          else if (pctMsrp <= 87) pctColor = '#059669';
+          else if (pctMsrp <= 92) pctColor = '#ca8a04';
+          else pctColor = '#dc2626';
         }
 
         // Hyperlinked price
@@ -3875,7 +3897,7 @@ function renderCompAnalysis() {
               <td style="padding:8px 12px;text-align:right;">${v.msrp > 0 ? fmt(v.msrp) : '–'}</td>
               <td style="padding:8px 12px;text-align:right;">${priceHTML}</td>
               <td style="padding:8px 12px;text-align:right;color:#16a34a;font-weight:600;">${discount > 0 ? fmt(discount) : '–'}</td>
-              <td style="padding:8px 12px;text-align:center;">${dealBadge || '–'}</td>
+              <td style="padding:8px 12px;text-align:center;font-weight:600;color:${pctColor};">${pctLabel}</td>
               <td style="padding:8px 12px;font-size:11px;color:var(--muted);white-space:nowrap;" title="${v.vin || ''}">${stockVin.join(' · ') || '–'}</td>
             </tr>`;
       });
@@ -3965,7 +3987,8 @@ function renderCompAnalysis() {
         • Each dropdown = one <strong>trim level</strong>. Rows are sorted by price <strong>lowest → highest</strong> across both stores.<br>
         • <span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">SA CDJR</span> = Us · <span style="background:#dc2626;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Ancira</span> = Competitor · The lowest-priced row is highlighted.<br>
         • <u style="color:#dc2626;">Underlined prices</u> are clickable — searches the VIN on Google to find the vehicle across dealer sites &amp; marketplaces<br>
-        • Deal badges from CarGurus: <span style="background:#16a34a;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Great Deal</span> <span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Good Deal</span> <span style="background:#ca8a04;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Fair Deal</span><br>
+        • <strong>% MSRP</strong> = Sale Price ÷ MSRP. Lower is better: <span style="color:#16a34a;font-weight:700;">≤80%</span> great · <span style="color:#059669;font-weight:700;">≤87%</span> good · <span style="color:#ca8a04;font-weight:700;">≤92%</span> fair · <span style="color:#dc2626;font-weight:700;">&gt;92%</span> low discount<br>
+        • Click <strong>MSRP</strong>, <strong>Sale Price</strong>, <strong>Discount</strong>, or <strong>% MSRP</strong> column headers to sort ▲▼<br>
         • Data source: <a href="https://www.cargurus.com/Cars/m-Ancira-Chrysler-Dodge-Jeep-RAM-sp243011" target="_blank" style="color:var(--accent);">Ancira on CarGurus</a> · <a href="https://www.cargurus.com/Cars/m-San-Antonio-Dodge-Chrysler-Jeep-Ram-sp302392" target="_blank" style="color:var(--accent);">SA CDJR on CarGurus</a><br>
         • Filtered to: New CDJR vehicles only (2025+ model year, under 1,000 miles)<br>
         • To auto-refresh: Set a daily trigger on <code>refreshCompetitorPricing_()</code> in Apps Script
@@ -3977,6 +4000,7 @@ window.showCompetitiveAnalysis = showCompetitiveAnalysis;
 window.setCompFilter = setCompFilter;
 window.setCompModelFilter = setCompModelFilter;
 window.toggleCompGroup = toggleCompGroup;
+window.compSort = compSort;
 window.compExpandAll = compExpandAll;
 window.compCollapseAll = compCollapseAll;
 window.toggleAllNewsGroups = toggleAllNewsGroups;
