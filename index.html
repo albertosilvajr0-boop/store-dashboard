@@ -1495,7 +1495,7 @@ function renderDashboard() {
             <a href="https://dealerconnect.chrysler.com/login/login.html?TYPE=33554433&REALMOID=06-d5cf97a8-bccd-103a-bcc8-83e513310cb3&GUID=&SMAUTHREASON=0&METHOD=GET&SMAGENTNAME=-SM-go2wTta208Z%2fzUCz5DbrvlEeym4%2faGv4KExpKsILVlca0WM5Is5FVfWQwWKj8l6iqbgVd8ZTMNXhZNBworA80NiZt2yCKScu&TARGET=-SM-https%3a%2f%2fdealerconnect%2echrysler%2ecom%2fportal%2fController%2fPortal" target="_blank" class="res-link">🔗 DealerConnect</a>
             <a href="https://gemini.google.com/app" target="_blank" class="res-link">✨ Gemini AI</a>
             <a href="#" onclick="event.preventDefault();closeResourcesMenu();showAutoNews();" class="res-link">📰 News (Last 48 hrs)</a>
-            ${isAdmin() ? '<a href="#" onclick="event.preventDefault();closeResourcesMenu();showCompetitiveAnalysis();" class="res-link">🏆 Competitive Analysis</a>' : ''}
+            ${(isAdmin() || isManager()) ? '<a href="#" onclick="event.preventDefault();closeResourcesMenu();showCompetitiveAnalysis();" class="res-link">🏆 Competitive Analysis</a>' : ''}
             <div id="customLinksSection"></div>
             <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
             <div id="addLinkForm" style="padding:6px 12px;">
@@ -3790,8 +3790,7 @@ function renderCompAnalysis() {
   const sortedKeys = Object.keys(trimGroups).sort();
   _compGroupKeys = sortedKeys;
 
-  // Auto-expand first 5 if nothing expanded
-  if (_compExpanded.size === 0) sortedKeys.slice(0, 5).forEach(k => _compExpanded.add(k));
+  // All groups start collapsed (user clicks to expand)
 
   // ── Summary stats ──
   let totalOurs = filtered.filter(v => v.store === 'SA CDJR').length;
