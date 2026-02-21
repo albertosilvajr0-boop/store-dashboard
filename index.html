@@ -3658,7 +3658,7 @@ async function showCompetitiveAnalysis() {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
           <h2 style="margin:0;font-size:20px;">🏆 Competitive Analysis</h2>
-          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Live pricing from CarGurus — Ancira CJD vs. SA CDJR new inventory</p>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Live pricing from CarGurus — SA CDJR vs. 7 area competitors</p>
         </div>
         <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
       </div>
@@ -3689,7 +3689,7 @@ async function showCompetitiveAnalysis() {
   }
 }
 
-function setCompFilter(make) { _compFilter = make; _compModelFilter = 'all'; renderCompAnalysis(); }
+function setCompFilter(make) { _compFilter = make; _compModelFilter = 'all'; _compStoreFilter = 'all'; renderCompAnalysis(); }
 function setCompModelFilter(model) { _compModelFilter = model; renderCompAnalysis(); }
 function toggleCompGroup(key) {
   if (_compExpanded.has(key)) _compExpanded.delete(key); else _compExpanded.add(key);
@@ -3700,6 +3700,7 @@ function compCollapseAll() { _compExpanded = new Set(); renderCompAnalysis(); }
 
 let _compGroupKeys = [];
 let _compModelFilter = 'all';
+let _compStoreFilter = 'all';
 let _compSortCol = 'salePrice'; // default sort
 let _compSortDir = 'asc';
 function compSort(col) {
@@ -3707,14 +3708,40 @@ function compSort(col) {
   else { _compSortCol = col; _compSortDir = 'asc'; }
   renderCompAnalysis();
 }
+function setCompStoreFilter(store) { _compStoreFilter = store; renderCompAnalysis(); }
 
 function renderCompAnalysis() {
   if (!_compData) return;
-  const { competitors, ourPricing, lastUpdated, anciraCount, ourCount } = _compData;
+  const { competitors, ourPricing, lastUpdated } = _compData;
+
+  // ── Dealer color map ──
+  const STORE_COLORS = {
+    'SA CDJR':         '#2563eb',
+    'Ancira CJD':      '#dc2626',
+    'Bluebonnet CDR':  '#7c3aed',
+    'Bluebonnet Jeep': '#9333ea',
+    'Boerne DCJR':     '#ea580c',
+    'Steele North Star':'#0d9488',
+    "Benson's IPAC":   '#b45309',
+    'Gunn CDJR':       '#4f46e5'
+  };
+  const STORE_SHORT = {
+    'SA CDJR':         'SA CDJR',
+    'Ancira CJD':      'Ancira',
+    'Bluebonnet CDR':  'BB CDR',
+    'Bluebonnet Jeep': 'BB Jeep',
+    'Boerne DCJR':     'Boerne',
+    'Steele North Star':'Steele NS',
+    "Benson's IPAC":   "Benson's",
+    'Gunn CDJR':       'Gunn'
+  };
 
   // ── Merge ALL vehicles into one unified list with a store label ──
   const allVehicles = [];
-  competitors.forEach(v => allVehicles.push({ ...v, store: v.dealer || 'Ancira CJD', storeColor: '#dc2626' }));
+  competitors.forEach(v => {
+    const storeName = v.dealer || 'Unknown';
+    allVehicles.push({ ...v, store: storeName, storeColor: STORE_COLORS[storeName] || '#6b7280' });
+  });
   ourPricing.forEach(v => allVehicles.push({ ...v, store: 'SA CDJR', storeColor: '#2563eb' }));
 
   // ── Collect all makes and models for filtering ──
@@ -3725,12 +3752,16 @@ function renderCompAnalysis() {
   });
   const allMakes = Object.keys(makeModelMap).sort();
 
-  // ── Apply make + model filters ──
+  // ── Apply make + model + store filters ──
   const filtered = allVehicles.filter(v => {
     if (_compFilter !== 'all' && v.make.toLowerCase() !== _compFilter.toLowerCase()) return false;
     if (_compModelFilter !== 'all' && v.model.toLowerCase() !== _compModelFilter.toLowerCase()) return false;
+    if (_compStoreFilter !== 'all' && v.store !== _compStoreFilter) return false;
     return true;
   });
+
+  // ── Collect all stores ──
+  const allStores = [...new Set(allVehicles.map(v => v.store))].sort((a, b) => a === 'SA CDJR' ? -1 : b === 'SA CDJR' ? 1 : a.localeCompare(b));
 
   // ── Group by Make > Model > Trim ──
   const trimGroups = {};
@@ -3763,27 +3794,19 @@ function renderCompAnalysis() {
   if (_compExpanded.size === 0) sortedKeys.slice(0, 5).forEach(k => _compExpanded.add(k));
 
   // ── Summary stats ──
-  let totalComp = competitors.filter(v => {
-    if (_compFilter !== 'all' && v.make.toLowerCase() !== _compFilter.toLowerCase()) return false;
-    if (_compModelFilter !== 'all' && v.model.toLowerCase() !== _compModelFilter.toLowerCase()) return false;
-    return true;
-  }).length;
-  let totalOurs = ourPricing.filter(v => {
-    if (_compFilter !== 'all' && v.make.toLowerCase() !== _compFilter.toLowerCase()) return false;
-    if (_compModelFilter !== 'all' && v.model.toLowerCase() !== _compModelFilter.toLowerCase()) return false;
-    return true;
-  }).length;
+  let totalOurs = filtered.filter(v => v.store === 'SA CDJR').length;
+  let totalComp = filtered.filter(v => v.store !== 'SA CDJR').length;
 
-  // Compare: for each trim group that has both stores, count wins
+  // Compare: for each trim group that has SA CDJR + competitor, count wins
   let totalWeBeat = 0, totalTheyBeat = 0, totalNoCompare = 0;
   Object.values(trimGroups).forEach(g => {
-    const anciraItems = g.items.filter(v => v.store !== 'SA CDJR');
+    const compItems = g.items.filter(v => v.store !== 'SA CDJR');
     const ourItems = g.items.filter(v => v.store === 'SA CDJR');
-    if (anciraItems.length > 0 && ourItems.length > 0) {
-      const bestAncira = Math.min(...anciraItems.filter(v => v.salePrice > 0).map(v => v.salePrice));
+    if (compItems.length > 0 && ourItems.length > 0) {
+      const bestComp = Math.min(...compItems.filter(v => v.salePrice > 0).map(v => v.salePrice));
       const bestOurs = Math.min(...ourItems.filter(v => v.salePrice > 0).map(v => v.salePrice));
-      if (bestOurs < Infinity && bestAncira < Infinity) {
-        if (bestOurs <= bestAncira) totalWeBeat++;
+      if (bestOurs < Infinity && bestComp < Infinity) {
+        if (bestOurs <= bestComp) totalWeBeat++;
         else totalTheyBeat++;
       } else { totalNoCompare++; }
     } else { totalNoCompare++; }
@@ -3806,16 +3829,21 @@ function renderCompAnalysis() {
     const count = g.items.length;
 
     // Best prices per store for the header
-    const ancPrices = g.items.filter(v => v.store !== 'SA CDJR' && v.salePrice > 0).map(v => v.salePrice);
-    const ourPrices = g.items.filter(v => v.store === 'SA CDJR' && v.salePrice > 0).map(v => v.salePrice);
-    const bestAnc = ancPrices.length > 0 ? Math.min(...ancPrices) : null;
-    const bestOur = ourPrices.length > 0 ? Math.min(...ourPrices) : null;
+    const ourPricesArr = g.items.filter(v => v.store === 'SA CDJR' && v.salePrice > 0).map(v => v.salePrice);
+    const compPricesArr = g.items.filter(v => v.store !== 'SA CDJR' && v.salePrice > 0);
+    const bestOur = ourPricesArr.length > 0 ? Math.min(...ourPricesArr) : null;
+
+    // Find best competitor and their name
+    let bestCompPrice = null, bestCompStore = '';
+    compPricesArr.forEach(v => {
+      if (!bestCompPrice || v.salePrice < bestCompPrice) { bestCompPrice = v.salePrice; bestCompStore = STORE_SHORT[v.store] || v.store; }
+    });
 
     // Winner badge
     let winBadge = '';
-    if (bestAnc && bestOur) {
-      if (bestOur < bestAnc) winBadge = '<span style="color:#16a34a;font-weight:700;font-size:11px;">✓ Us</span>';
-      else if (bestAnc < bestOur) winBadge = '<span style="color:#dc2626;font-weight:700;font-size:11px;">✗ Ancira</span>';
+    if (bestCompPrice && bestOur) {
+      if (bestOur < bestCompPrice) winBadge = '<span style="color:#16a34a;font-weight:700;font-size:11px;">✓ Us</span>';
+      else if (bestCompPrice < bestOur) winBadge = `<span style="color:#dc2626;font-weight:700;font-size:11px;">✗ ${bestCompStore}</span>`;
       else winBadge = '<span style="color:#ca8a04;font-weight:700;font-size:11px;">= Even</span>';
     }
 
@@ -3831,7 +3859,7 @@ function renderCompAnalysis() {
             </div>
           </div>
           <div style="display:flex;gap:14px;font-size:12px;align-items:center;">
-            ${bestAnc ? `<span style="color:#dc2626;">Ancira: <strong>${fmt(bestAnc)}</strong></span>` : ''}
+            ${bestCompPrice ? `<span style="color:#dc2626;">Best Comp: <strong>${fmt(bestCompPrice)}</strong> <span style="font-size:10px;color:var(--muted);">(${bestCompStore})</span></span>` : ''}
             ${bestOur ? `<span style="color:#2563eb;">Us: <strong>${fmt(bestOur)}</strong></span>` : ''}
             ${winBadge}
           </div>
@@ -3860,7 +3888,8 @@ function renderCompAnalysis() {
 
         // Store badge
         const isUs = v.store === 'SA CDJR';
-        const storeBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;color:#fff;background:${isUs ? '#2563eb' : '#dc2626'};white-space:nowrap;">${isUs ? 'SA CDJR' : 'Ancira'}</span>`;
+        const shortName = STORE_SHORT[v.store] || v.store;
+        const storeBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;color:#fff;background:${v.storeColor || '#6b7280'};white-space:nowrap;">${shortName}</span>`;
 
         // % of MSRP
         const pctMsrp = (v.msrp > 0 && v.salePrice > 0) ? ((v.salePrice / v.msrp) * 100) : 0;
@@ -3928,7 +3957,7 @@ function renderCompAnalysis() {
         <div>
           <div style="font-size:20px;font-weight:800;">🏆 Competitive Analysis</div>
           <div style="font-size:12px;color:var(--muted);">
-            Competitor: <strong>Ancira CJD</strong> · Us: <strong>SA CDJR</strong>
+            Competitor pricing across <strong>7 SA-area dealers</strong>
             ${lastUpdated ? ` · Updated <strong>${lastUpdated}</strong>` : ''}
             · <span style="font-size:11px;">Click any <u>underlined price</u> to search VIN on Google</span>
           </div>
@@ -3942,25 +3971,25 @@ function renderCompAnalysis() {
       </div>
 
       <!-- Summary Cards -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;">
-        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:10px;color:#dc2626;font-weight:600;">Ancira Listings</div>
-          <div style="font-size:22px;font-weight:800;">${totalComp}</div>
-        </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;">
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
           <div style="font-size:10px;color:#2563eb;font-weight:600;">Our Listings</div>
           <div style="font-size:22px;font-weight:800;">${totalOurs}</div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:#dc2626;font-weight:600;">Competitor Listings</div>
+          <div style="font-size:22px;font-weight:800;">${totalComp}</div>
         </div>
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
           <div style="font-size:10px;color:var(--muted);font-weight:600;">Trim Matchups</div>
           <div style="font-size:22px;font-weight:800;">${sortedKeys.length}</div>
         </div>
         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:10px;color:#16a34a;font-weight:600;">We Beat Ancira</div>
+          <div style="font-size:10px;color:#16a34a;font-weight:600;">We're Lowest</div>
           <div style="font-size:22px;font-weight:800;color:#16a34a;">${totalWeBeat}</div>
         </div>
         <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:10px;color:#dc2626;font-weight:600;">Ancira Beats Us</div>
+          <div style="font-size:10px;color:#dc2626;font-weight:600;">Competitor Lowest</div>
           <div style="font-size:22px;font-weight:800;color:#dc2626;">${totalTheyBeat}</div>
         </div>
       </div>
@@ -3979,17 +4008,28 @@ function renderCompAnalysis() {
         ${modelsForMake.map(m => `<button onclick="setCompModelFilter('${m}')" style="${modelTabStyle(m, _compModelFilter === m)}">${m}</button>`).join('')}
       </div>` : ''}
 
+      <!-- Store filter tabs -->
+      <div style="display:flex;gap:5px;margin-bottom:14px;flex-wrap:wrap;padding-left:4px;">
+        <span style="font-size:11px;color:var(--muted);align-self:center;margin-right:4px;">Store:</span>
+        <button onclick="setCompStoreFilter('all')" style="${modelTabStyle('all', _compStoreFilter === 'all')}">All Stores</button>
+        ${allStores.map(s => {
+          const sc = STORE_COLORS[s] || '#6b7280';
+          const active = _compStoreFilter === s;
+          return `<button onclick="setCompStoreFilter('${s.replace(/'/g, "\\'")}')" style="padding:4px 12px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid ${active ? sc : 'var(--line)'};background:${active ? sc : 'var(--card)'};color:${active ? '#fff' : 'var(--text)'};">${STORE_SHORT[s] || s}</button>`;
+        }).join('')}
+      </div>
+
       <!-- Trim-level Accordions -->
       ${accHTML}
 
       <div style="margin-top:14px;padding:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;font-size:11px;color:var(--muted);line-height:1.7;">
         <strong>📡 Live data from CarGurus</strong> — Both dealerships' pricing scraped automatically.<br>
         • Each dropdown = one <strong>trim level</strong>. Rows are sorted by price <strong>lowest → highest</strong> across both stores.<br>
-        • <span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">SA CDJR</span> = Us · <span style="background:#dc2626;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Ancira</span> = Competitor · The lowest-priced row is highlighted.<br>
+        • <span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">SA CDJR</span> = Us · Competitors: <span style="background:#dc2626;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Ancira</span> <span style="background:#7c3aed;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">BB CDR</span> <span style="background:#9333ea;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">BB Jeep</span> <span style="background:#ea580c;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Boerne</span> <span style="background:#0d9488;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Steele NS</span> <span style="background:#b45309;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Benson's</span> <span style="background:#4f46e5;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Gunn</span> · The lowest-priced row is highlighted.<br>
         • <u style="color:#dc2626;">Underlined prices</u> are clickable — searches the VIN on Google to find the vehicle across dealer sites &amp; marketplaces<br>
         • <strong>% MSRP</strong> = Sale Price ÷ MSRP. Lower is better: <span style="color:#16a34a;font-weight:700;">≤80%</span> great · <span style="color:#059669;font-weight:700;">≤87%</span> good · <span style="color:#ca8a04;font-weight:700;">≤92%</span> fair · <span style="color:#dc2626;font-weight:700;">&gt;92%</span> low discount<br>
         • Click <strong>MSRP</strong>, <strong>Sale Price</strong>, <strong>Discount</strong>, or <strong>% MSRP</strong> column headers to sort ▲▼<br>
-        • Data source: <a href="https://www.cargurus.com/Cars/m-Ancira-Chrysler-Dodge-Jeep-RAM-sp243011" target="_blank" style="color:var(--accent);">Ancira on CarGurus</a> · <a href="https://www.cargurus.com/Cars/m-San-Antonio-Dodge-Chrysler-Jeep-Ram-sp302392" target="_blank" style="color:var(--accent);">SA CDJR on CarGurus</a><br>
+        • Data: <a href="https://www.cargurus.com/Cars/m-Ancira-Chrysler-Dodge-Jeep-RAM-sp243011" target="_blank" style="color:var(--accent);">Ancira</a> · <a href="https://www.cargurus.com/Cars/m-San-Antonio-Dodge-Chrysler-Jeep-Ram-sp302392" target="_blank" style="color:var(--accent);">SA CDJR</a> · <a href="https://www.cargurus.com/Cars/m-Bluebonnet-Chrysler-Dodge-Ram-sp63224" target="_blank" style="color:var(--accent);">BB CDR</a> · <a href="https://www.cargurus.com/Cars/m-Bluebonnet-Jeep-sp278262" target="_blank" style="color:var(--accent);">BB Jeep</a> · <a href="https://www.cargurus.com/Cars/m-Boerne-Dodge-Chrysler-Jeep-Ram-sp63219" target="_blank" style="color:var(--accent);">Boerne</a> · <a href="https://www.cargurus.com/Cars/m-Steele-North-Star-Chrysler-Dodge-Jeep-Ram-sp315995" target="_blank" style="color:var(--accent);">Steele NS</a> · <a href="https://www.cargurus.com/Cars/m-Bensons-Ingram-Park-Chrysler-Dodge-Jeep-Ram-sp63252" target="_blank" style="color:var(--accent);">Benson's</a> · <a href="https://www.cargurus.com/Cars/m-Gunn-Chrysler-Dodge-Jeep-Ram-sp63225" target="_blank" style="color:var(--accent);">Gunn</a><br>
         • Filtered to: New CDJR vehicles only (2025+ model year, under 1,000 miles)<br>
         • To auto-refresh: Set a daily trigger on <code>refreshCompetitorPricing_()</code> in Apps Script
       </div>
@@ -4000,6 +4040,7 @@ window.showCompetitiveAnalysis = showCompetitiveAnalysis;
 window.setCompFilter = setCompFilter;
 window.setCompModelFilter = setCompModelFilter;
 window.toggleCompGroup = toggleCompGroup;
+window.setCompStoreFilter = setCompStoreFilter;
 window.compSort = compSort;
 window.compExpandAll = compExpandAll;
 window.compCollapseAll = compCollapseAll;
