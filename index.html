@@ -3654,7 +3654,7 @@ async function showCompetitiveAnalysis() {
   logPageView('Competitive Analysis');
   const app = document.getElementById('app');
   app.innerHTML = `
-    <div style="max-width:1100px;margin:0 auto;padding:18px 12px;">
+    <div style="max-width:1300px;margin:0 auto;padding:18px 12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
           <h2 style="margin:0;font-size:20px;">🏆 Competitive Analysis</h2>
@@ -3820,8 +3820,10 @@ function renderCompAnalysis() {
               <th style="padding:8px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Year</th>
               <th style="padding:8px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Trim</th>
               <th style="padding:8px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Details</th>
+              <th style="padding:8px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Ancira MSRP</th>
               <th style="padding:8px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;color:#dc2626;">Ancira Price</th>
               <th style="padding:8px 12px;text-align:center;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Ancira Deal</th>
+              <th style="padding:8px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Our MSRP</th>
               <th style="padding:8px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;color:#2563eb;">Our Price (SA CDJR)</th>
               <th style="padding:8px 12px;text-align:center;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Δ (Us vs Them)</th>
               <th style="padding:8px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Stock / VIN</th>
@@ -3834,6 +3836,7 @@ function renderCompAnalysis() {
 
       g.items.forEach(v => {
         const ourSale = v.ourMatch?.salePrice || 0;
+        const ourMsrp = v.ourMatch?.msrp || 0;
         const delta = (ourSale > 0 && v.salePrice > 0) ? ourSale - v.salePrice : null;
 
         // Delta color: green = we're cheaper (negative delta), red = they're cheaper
@@ -3847,7 +3850,15 @@ function renderCompAnalysis() {
         }
 
         const approx = v.ourMatch?.approxMatch ? ' <span title="Approximate trim match" style="cursor:help;">≈</span>' : '';
-        const ourLabel = ourSale > 0 ? `${fmt(ourSale)}${approx}` : '<span style="color:var(--muted);font-style:italic;">—</span>';
+
+        // Hyperlinked sale prices
+        const anciraPriceHTML = v.salePrice > 0
+          ? (v.url ? `<a href="${v.url}" target="_blank" rel="noopener" style="color:#dc2626;font-weight:700;text-decoration:underline;text-underline-offset:2px;" title="View on CarGurus">${fmt(v.salePrice)}</a>` : `<span style="font-weight:700;color:#dc2626;">${fmt(v.salePrice)}</span>`)
+          : '–';
+
+        const ourPriceHTML = ourSale > 0
+          ? (v.ourMatch?.url ? `<a href="${v.ourMatch.url}" target="_blank" rel="noopener" style="color:#2563eb;font-weight:700;text-decoration:underline;text-underline-offset:2px;" title="View on CarGurus">${fmt(ourSale)}</a>${approx}` : `<span style="font-weight:700;color:#2563eb;">${fmt(ourSale)}</span>${approx}`)
+          : '<span style="color:var(--muted);font-style:italic;">—</span>';
 
         // Deal badge color
         let dealBadge = '';
@@ -3859,25 +3870,25 @@ function renderCompAnalysis() {
         // Details column: color + drivetrain
         const details = [v.color, v.drivetrain].filter(Boolean).join(' · ') || '–';
 
-        // Stock/VIN column with link
+        // Stock/VIN column
         const stockVin = [];
         if (v.stock) stockVin.push('#' + v.stock);
         const vinShort = v.vin ? v.vin.slice(-6) : '';
         if (vinShort) stockVin.push(vinShort);
-        const stockVinHTML = v.url
-          ? `<a href="${v.url}" target="_blank" style="color:var(--accent);text-decoration:none;" title="${v.vin || ''}">${stockVin.join(' · ') || '–'}</a>`
-          : (stockVin.join(' · ') || '–');
+        const stockVinText = stockVin.join(' · ') || '–';
 
         accHTML += `
             <tr style="border-bottom:1px solid var(--line);">
               <td style="padding:8px 12px;">${v.year}</td>
               <td style="padding:8px 12px;font-weight:600;">${v.trim || '–'}</td>
               <td style="padding:8px 12px;color:var(--muted);font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${details}">${details}</td>
-              <td style="padding:8px 12px;text-align:right;font-weight:700;color:#dc2626;">${fmt(v.salePrice)}</td>
+              <td style="padding:8px 12px;text-align:right;">${v.msrp > 0 ? fmt(v.msrp) : '–'}</td>
+              <td style="padding:8px 12px;text-align:right;">${anciraPriceHTML}</td>
               <td style="padding:8px 12px;text-align:center;">${dealBadge || '–'}</td>
-              <td style="padding:8px 12px;text-align:right;font-weight:700;color:#2563eb;">${ourLabel}</td>
+              <td style="padding:8px 12px;text-align:right;">${ourMsrp > 0 ? fmt(ourMsrp) : '–'}</td>
+              <td style="padding:8px 12px;text-align:right;">${ourPriceHTML}</td>
               <td style="padding:8px 12px;text-align:center;font-weight:700;color:${deltaColor};background:${deltaBg};border-radius:4px;">${deltaLabel}</td>
-              <td style="padding:8px 12px;font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${stockVinHTML}</td>
+              <td style="padding:8px 12px;font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.vin || ''}">${stockVinText}</td>
             </tr>`;
       });
 
@@ -3896,7 +3907,7 @@ function renderCompAnalysis() {
   const tabStyle = (f) => `padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${f === _compFilter ? 'var(--accent)' : 'var(--line)'};background:${f === _compFilter ? 'var(--accent)' : 'var(--card)'};color:${f === _compFilter ? '#fff' : 'var(--text)'};`;
 
   document.getElementById('app').innerHTML = `
-    <div style="max-width:1100px;margin:0 auto;padding:16px 12px;">
+    <div style="max-width:1300px;margin:0 auto;padding:16px 12px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
           <div style="font-size:20px;font-weight:800;">🏆 Competitive Analysis</div>
@@ -3904,6 +3915,7 @@ function renderCompAnalysis() {
             Competitor: <strong>Ancira CJD</strong> (<a href="https://www.anciracjd.com" target="_blank" style="color:var(--accent);">anciracjd.com</a>)
             · Us: <strong>SA CDJR</strong> (<a href="https://www.sanantoniododgechryslerjeepram.com" target="_blank" style="color:var(--accent);">sanantoniododge.com</a>)
             ${lastUpdated ? ` · Updated <strong>${lastUpdated}</strong>` : ''}
+            · <span style="font-size:11px;">Click any <u>underlined price</u> to view listing on CarGurus</span>
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -3950,6 +3962,7 @@ function renderCompAnalysis() {
       <div style="margin-top:14px;padding:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;font-size:11px;color:var(--muted);line-height:1.7;">
         <strong>📡 Live data from CarGurus</strong> — Both dealerships' pricing scraped automatically.<br>
         • <span style="color:#16a34a;font-weight:700;">Green Δ</span> = We're cheaper (good!) · <span style="color:#dc2626;font-weight:700;">Red Δ</span> = Ancira is cheaper · <span style="color:#ca8a04;font-weight:700;">—</span> = No matching model found on our lot<br>
+        • <u style="color:#dc2626;">Underlined prices</u> are clickable — opens the vehicle listing on CarGurus in a new tab<br>
         • <strong>≈</strong> = Approximate trim match (closest by price when no exact trim match found)<br>
         • Deal badges from CarGurus: <span style="background:#16a34a;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Great Deal</span> <span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Good Deal</span> <span style="background:#ca8a04;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Fair Deal</span><br>
         • Data source: <a href="https://www.cargurus.com/Cars/m-Ancira-Chrysler-Dodge-Jeep-RAM-sp243011" target="_blank" style="color:var(--accent);">Ancira on CarGurus</a> · <a href="https://www.cargurus.com/Cars/m-San-Antonio-Dodge-Chrysler-Jeep-Ram-sp302392" target="_blank" style="color:var(--accent);">SA CDJR on CarGurus</a><br>
