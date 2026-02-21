@@ -383,7 +383,7 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPOc6viwiuhThXtpEfBtMBxTWHYoaDjTDtroS4-dpHCPQ53WKOwcy3zkNgi8E7LLCT/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby8IyxL3dKgPfesVW9tEg4zdWzqAVAkeZBVvX-8UTKKDPsDvTjks3pnAGzlp92VprMN/exec';
 const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
 
 /* ── Crash reporter ── */
@@ -1495,6 +1495,7 @@ function renderDashboard() {
             <a href="https://dealerconnect.chrysler.com/login/login.html?TYPE=33554433&REALMOID=06-d5cf97a8-bccd-103a-bcc8-83e513310cb3&GUID=&SMAUTHREASON=0&METHOD=GET&SMAGENTNAME=-SM-go2wTta208Z%2fzUCz5DbrvlEeym4%2faGv4KExpKsILVlca0WM5Is5FVfWQwWKj8l6iqbgVd8ZTMNXhZNBworA80NiZt2yCKScu&TARGET=-SM-https%3a%2f%2fdealerconnect%2echrysler%2ecom%2fportal%2fController%2fPortal" target="_blank" class="res-link">🔗 DealerConnect</a>
             <a href="https://gemini.google.com/app" target="_blank" class="res-link">✨ Gemini AI</a>
             <a href="#" onclick="event.preventDefault();closeResourcesMenu();showAutoNews();" class="res-link">📰 News (Last 48 hrs)</a>
+            ${isAdmin() ? '<a href="#" onclick="event.preventDefault();closeResourcesMenu();showCompetitiveAnalysis();" class="res-link">🏆 Competitive Analysis</a>' : ''}
             <div id="customLinksSection"></div>
             <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
             <div id="addLinkForm" style="padding:6px 12px;">
@@ -3640,6 +3641,329 @@ window.showEngagement = showEngagement;
 window.setEngDays = setEngDays;
 window.showAutoNews = showAutoNews;
 window.toggleNewsGroup = toggleNewsGroup;
+
+/* ══════════════════════════════════════════
+   COMPETITIVE ANALYSIS (Admin)
+   ══════════════════════════════════════════ */
+let _compData = null;
+let _compFilter = 'all';
+let _compExpanded = new Set();
+
+async function showCompetitiveAnalysis() {
+  if (!isAdmin()) return;
+  logPageView('Competitive Analysis');
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="max-width:1100px;margin:0 auto;padding:18px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h2 style="margin:0;font-size:20px;">🏆 Competitive Analysis</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Live pricing from CarGurus — Ancira CJD vs. SA CDJR new inventory</p>
+        </div>
+        <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
+      </div>
+      <div class="loading-wrap"><div class="spinner"></div></div>
+    </div>`;
+
+  try {
+    const url = `${SCRIPT_URL}?route=comp_analysis&session=${encodeURIComponent(window.sessionToken || '')}`;
+    const resp = await fetch(url);
+    const raw = await resp.text();
+    let result;
+    try { result = JSON.parse(raw); } catch { throw new Error('Non-JSON response from backend'); }
+    if (!result.ok) throw new Error(result.error || 'Backend error');
+    _compData = result;
+    _compFilter = 'all';
+    _compExpanded = new Set();
+    renderCompAnalysis();
+  } catch (err) {
+    app.innerHTML = `
+      <div style="max-width:800px;margin:40px auto;padding:20px;">
+        <div class="detail-card" style="color:#dc2626;text-align:center;">
+          <h2>Error Loading Competitive Analysis</h2>
+          <p>${err.message}</p>
+          <p style="color:var(--muted);font-size:13px;margin-top:8px;">Make sure the <code>comp_analysis</code> route is added to your Apps Script backend and the <strong>CompAnalysis</strong> sheet tab exists.</p>
+          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">← Back</button>
+        </div>
+      </div>`;
+  }
+}
+
+function setCompFilter(make) { _compFilter = make; renderCompAnalysis(); }
+function toggleCompGroup(key) {
+  if (_compExpanded.has(key)) _compExpanded.delete(key); else _compExpanded.add(key);
+  renderCompAnalysis();
+}
+function compExpandAll() { _compExpanded = new Set(_compGroupKeys || []); renderCompAnalysis(); }
+function compCollapseAll() { _compExpanded = new Set(); renderCompAnalysis(); }
+
+let _compGroupKeys = [];
+
+function renderCompAnalysis() {
+  if (!_compData) return;
+  const { competitors, ourPricing, lastUpdated, anciraCount, ourCount } = _compData;
+
+  // Build "our" lookup: key = "MAKE|MODEL|TRIM" → best item (prefer lowest price)
+  const ourLookup = {};
+  ourPricing.forEach(v => {
+    // Normalize trim for matching (strip trailing drivetrain info)
+    const normTrim = (v.trim || '').replace(/\s*(4WD|4x4|FWD|RWD|AWD|4X2|2WD)\s*/gi, '').trim();
+    const key = `${v.make}|${v.model}|${normTrim}`.toUpperCase();
+    if (!ourLookup[key] || (v.salePrice > 0 && v.salePrice < (ourLookup[key].salePrice || Infinity))) ourLookup[key] = v;
+  });
+
+  // Looser lookup by make|model for approximate matching
+  const ourByModel = {};
+  ourPricing.forEach(v => {
+    const key = `${v.make}|${v.model}`.toUpperCase();
+    if (!ourByModel[key]) ourByModel[key] = [];
+    ourByModel[key].push(v);
+  });
+
+  // Group competitors by Make → Model
+  const groups = {};
+  competitors.forEach(v => {
+    if (_compFilter !== 'all' && v.make.toLowerCase() !== _compFilter.toLowerCase()) return;
+    const gKey = `${v.make} ${v.model}`;
+    if (!groups[gKey]) groups[gKey] = { make: v.make, model: v.model, items: [] };
+
+    // Find our match: exact trim first, then closest by sale price
+    const normTrim = (v.trim || '').replace(/\s*(4WD|4x4|FWD|RWD|AWD|4X2|2WD)\s*/gi, '').trim();
+    const exactKey = `${v.make}|${v.model}|${normTrim}`.toUpperCase();
+    let ourMatch = ourLookup[exactKey] || null;
+
+    if (!ourMatch) {
+      const modelKey = `${v.make}|${v.model}`.toUpperCase();
+      const candidates = ourByModel[modelKey] || [];
+      if (candidates.length > 0 && v.salePrice > 0) {
+        // Find closest by sale price
+        let best = null, bestDiff = Infinity;
+        candidates.forEach(c => {
+          if (c.salePrice <= 0) return;
+          const diff = Math.abs(c.salePrice - v.salePrice);
+          if (diff < bestDiff) { bestDiff = diff; best = c; }
+        });
+        if (best && bestDiff < 25000) ourMatch = { ...best, approxMatch: true };
+      }
+    }
+
+    groups[gKey].items.push({ ...v, ourMatch });
+  });
+
+  // Sort groups by make then model
+  const sortedKeys = Object.keys(groups).sort();
+  _compGroupKeys = sortedKeys;
+
+  // Auto-expand first 3 if nothing expanded
+  if (_compExpanded.size === 0) sortedKeys.slice(0, 3).forEach(k => _compExpanded.add(k));
+
+  // Summary stats
+  let totalComp = 0, totalWeBeat = 0, totalTheyBeat = 0, totalNoMatch = 0;
+  competitors.forEach(v => {
+    if (_compFilter !== 'all' && v.make.toLowerCase() !== _compFilter.toLowerCase()) return;
+    totalComp++;
+  });
+
+  Object.values(groups).forEach(g => g.items.forEach(v => {
+    if (!v.ourMatch || !v.ourMatch.salePrice) totalNoMatch++;
+    else if (v.ourMatch.salePrice <= v.salePrice) totalWeBeat++;
+    else totalTheyBeat++;
+  }));
+
+  // Makes for filter tabs
+  const allMakes = [...new Set(competitors.map(v => v.make))].sort();
+
+  // Format currency
+  const fmt = (n) => n ? '$' + n.toLocaleString('en-US') : '–';
+  const fmtDelta = (d) => {
+    if (!d) return '–';
+    const abs = Math.abs(d);
+    const str = '$' + abs.toLocaleString('en-US');
+    return d > 0 ? '+' + str : '-' + str;
+  };
+
+  // Build accordion HTML
+  let accHTML = '';
+  sortedKeys.forEach(gKey => {
+    const g = groups[gKey];
+    const open = _compExpanded.has(gKey);
+    const count = g.items.length;
+
+    // Min/max sale prices and competitive position for this group
+    const anciraPrices = g.items.filter(v => v.salePrice > 0).map(v => v.salePrice);
+    const minSale = anciraPrices.length > 0 ? Math.min(...anciraPrices) : Infinity;
+    const weWinCount = g.items.filter(v => v.ourMatch?.salePrice > 0 && v.ourMatch.salePrice <= v.salePrice).length;
+    const theyWinCount = g.items.filter(v => v.ourMatch?.salePrice > 0 && v.ourMatch.salePrice > v.salePrice).length;
+
+    accHTML += `
+      <div style="margin-bottom:8px;border:1px solid var(--line);border-radius:10px;overflow:hidden;">
+        <div onclick="toggleCompGroup('${gKey.replace(/'/g, "\\'")}')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--card);cursor:pointer;user-select:none;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:14px;">${open ? '▼' : '▶'}</span>
+            <div>
+              <span style="font-weight:700;font-size:14px;">${gKey}</span>
+              <span style="margin-left:8px;font-size:11px;color:var(--muted);">${count} listing${count > 1 ? 's' : ''}</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;font-size:12px;">
+            ${minSale < Infinity ? `<span style="color:var(--muted);">From <strong style="color:var(--text);">${fmt(minSale)}</strong></span>` : ''}
+            ${weWinCount > 0 ? `<span style="color:#16a34a;font-weight:600;">✓ ${weWinCount} we beat</span>` : ''}
+            ${theyWinCount > 0 ? `<span style="color:#dc2626;font-weight:600;">${theyWinCount} they beat</span>` : ''}
+          </div>
+        </div>`;
+
+    if (open) {
+      accHTML += `<div style="padding:0;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="background:#f8fafc;">
+              <th style="padding:8px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Year</th>
+              <th style="padding:8px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Trim</th>
+              <th style="padding:8px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Details</th>
+              <th style="padding:8px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;color:#dc2626;">Ancira Price</th>
+              <th style="padding:8px 12px;text-align:center;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Ancira Deal</th>
+              <th style="padding:8px 12px;text-align:right;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;color:#2563eb;">Our Price (SA CDJR)</th>
+              <th style="padding:8px 12px;text-align:center;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Δ (Us vs Them)</th>
+              <th style="padding:8px 12px;text-align:left;font-weight:700;border-bottom:1px solid var(--line);white-space:nowrap;">Stock / VIN</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+      // Sort items by trim then year
+      g.items.sort((a, b) => (a.trim || '').localeCompare(b.trim || '') || a.year - b.year);
+
+      g.items.forEach(v => {
+        const ourSale = v.ourMatch?.salePrice || 0;
+        const delta = (ourSale > 0 && v.salePrice > 0) ? ourSale - v.salePrice : null;
+
+        // Delta color: green = we're cheaper (negative delta), red = they're cheaper
+        let deltaColor = 'var(--muted)';
+        let deltaLabel = '–';
+        let deltaBg = 'transparent';
+        if (delta !== null) {
+          if (delta < 0) { deltaColor = '#16a34a'; deltaLabel = fmtDelta(delta) + ' ✓'; deltaBg = '#f0fdf4'; }
+          else if (delta > 0) { deltaColor = '#dc2626'; deltaLabel = fmtDelta(delta); deltaBg = '#fef2f2'; }
+          else { deltaColor = '#ca8a04'; deltaLabel = 'Even'; deltaBg = '#fefce8'; }
+        }
+
+        const approx = v.ourMatch?.approxMatch ? ' <span title="Approximate trim match" style="cursor:help;">≈</span>' : '';
+        const ourLabel = ourSale > 0 ? `${fmt(ourSale)}${approx}` : '<span style="color:var(--muted);font-style:italic;">—</span>';
+
+        // Deal badge color
+        let dealBadge = '';
+        if (v.deal) {
+          const dc = v.deal.toLowerCase().includes('great') ? '#16a34a' : v.deal.toLowerCase().includes('good') ? '#2563eb' : v.deal.toLowerCase().includes('fair') ? '#ca8a04' : '#dc2626';
+          dealBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;color:#fff;background:${dc};">${v.deal}</span>`;
+        }
+
+        // Details column: color + drivetrain
+        const details = [v.color, v.drivetrain].filter(Boolean).join(' · ') || '–';
+
+        // Stock/VIN column with link
+        const stockVin = [];
+        if (v.stock) stockVin.push('#' + v.stock);
+        const vinShort = v.vin ? v.vin.slice(-6) : '';
+        if (vinShort) stockVin.push(vinShort);
+        const stockVinHTML = v.url
+          ? `<a href="${v.url}" target="_blank" style="color:var(--accent);text-decoration:none;" title="${v.vin || ''}">${stockVin.join(' · ') || '–'}</a>`
+          : (stockVin.join(' · ') || '–');
+
+        accHTML += `
+            <tr style="border-bottom:1px solid var(--line);">
+              <td style="padding:8px 12px;">${v.year}</td>
+              <td style="padding:8px 12px;font-weight:600;">${v.trim || '–'}</td>
+              <td style="padding:8px 12px;color:var(--muted);font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${details}">${details}</td>
+              <td style="padding:8px 12px;text-align:right;font-weight:700;color:#dc2626;">${fmt(v.salePrice)}</td>
+              <td style="padding:8px 12px;text-align:center;">${dealBadge || '–'}</td>
+              <td style="padding:8px 12px;text-align:right;font-weight:700;color:#2563eb;">${ourLabel}</td>
+              <td style="padding:8px 12px;text-align:center;font-weight:700;color:${deltaColor};background:${deltaBg};border-radius:4px;">${deltaLabel}</td>
+              <td style="padding:8px 12px;font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${stockVinHTML}</td>
+            </tr>`;
+      });
+
+      accHTML += `</tbody></table></div>`;
+    }
+    accHTML += `</div>`;
+  });
+
+  if (sortedKeys.length === 0) {
+    accHTML = `<div class="detail-card" style="text-align:center;padding:40px;color:var(--muted);">
+      No competitor data found${_compFilter !== 'all' ? ' for ' + _compFilter : ''}. Make sure <code>refreshCompetitorPricing_()</code> has been run to scrape CarGurus data.
+    </div>`;
+  }
+
+  // Build filter tabs
+  const tabStyle = (f) => `padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${f === _compFilter ? 'var(--accent)' : 'var(--line)'};background:${f === _compFilter ? 'var(--accent)' : 'var(--card)'};color:${f === _compFilter ? '#fff' : 'var(--text)'};`;
+
+  document.getElementById('app').innerHTML = `
+    <div style="max-width:1100px;margin:0 auto;padding:16px 12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div style="font-size:20px;font-weight:800;">🏆 Competitive Analysis</div>
+          <div style="font-size:12px;color:var(--muted);">
+            Competitor: <strong>Ancira CJD</strong> (<a href="https://www.anciracjd.com" target="_blank" style="color:var(--accent);">anciracjd.com</a>)
+            · Us: <strong>SA CDJR</strong> (<a href="https://www.sanantoniododgechryslerjeepram.com" target="_blank" style="color:var(--accent);">sanantoniododge.com</a>)
+            ${lastUpdated ? ` · Updated <strong>${lastUpdated}</strong>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <button class="topbar-btn" onclick="compExpandAll()" style="font-size:11px;padding:5px 10px;">Expand All</button>
+          <button class="topbar-btn" onclick="compCollapseAll()" style="font-size:11px;padding:5px 10px;">Collapse All</button>
+          <button class="topbar-btn manage" onclick="showCompetitiveAnalysis()">↻ Refresh</button>
+          <button class="topbar-btn logout" onclick="showDashboard()">← Dashboard</button>
+        </div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Ancira New CDJR</div>
+          <div style="font-size:22px;font-weight:800;">${anciraCount || totalComp}</div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;">Our New CDJR</div>
+          <div style="font-size:22px;font-weight:800;">${ourCount || ourPricing.length}</div>
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:#16a34a;font-weight:600;">We Beat Ancira</div>
+          <div style="font-size:22px;font-weight:800;color:#16a34a;">${totalWeBeat}</div>
+        </div>
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:#dc2626;font-weight:600;">Ancira Beats Us</div>
+          <div style="font-size:22px;font-weight:800;color:#dc2626;">${totalTheyBeat}</div>
+        </div>
+        <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:#ca8a04;font-weight:600;">No Match Found</div>
+          <div style="font-size:22px;font-weight:800;color:#ca8a04;">${totalNoMatch}</div>
+        </div>
+      </div>
+
+      <!-- Make filter tabs -->
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+        <button onclick="setCompFilter('all')" style="${tabStyle('all')}">All</button>
+        ${allMakes.map(m => `<button onclick="setCompFilter('${m}')" style="${tabStyle(m)}">${m}</button>`).join('')}
+      </div>
+
+      <!-- Vehicle Comparison Accordion -->
+      ${accHTML}
+
+      <div style="margin-top:14px;padding:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;font-size:11px;color:var(--muted);line-height:1.7;">
+        <strong>📡 Live data from CarGurus</strong> — Both dealerships' pricing scraped automatically.<br>
+        • <span style="color:#16a34a;font-weight:700;">Green Δ</span> = We're cheaper (good!) · <span style="color:#dc2626;font-weight:700;">Red Δ</span> = Ancira is cheaper · <span style="color:#ca8a04;font-weight:700;">—</span> = No matching model found on our lot<br>
+        • <strong>≈</strong> = Approximate trim match (closest by price when no exact trim match found)<br>
+        • Deal badges from CarGurus: <span style="background:#16a34a;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Great Deal</span> <span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Good Deal</span> <span style="background:#ca8a04;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Fair Deal</span><br>
+        • Data source: <a href="https://www.cargurus.com/Cars/m-Ancira-Chrysler-Dodge-Jeep-RAM-sp243011" target="_blank" style="color:var(--accent);">Ancira on CarGurus</a> · <a href="https://www.cargurus.com/Cars/m-San-Antonio-Dodge-Chrysler-Jeep-Ram-sp302392" target="_blank" style="color:var(--accent);">SA CDJR on CarGurus</a><br>
+        • Filtered to: New CDJR vehicles only (2025+ model year, under 1,000 miles)<br>
+        • To auto-refresh: Set a daily trigger on <code>refreshCompetitorPricing_()</code> in Apps Script
+      </div>
+    </div>`;
+}
+
+window.showCompetitiveAnalysis = showCompetitiveAnalysis;
+window.setCompFilter = setCompFilter;
+window.toggleCompGroup = toggleCompGroup;
+window.compExpandAll = compExpandAll;
+window.compCollapseAll = compCollapseAll;
 window.toggleAllNewsGroups = toggleAllNewsGroups;
 
 /* ══════════════════════════════════════════
