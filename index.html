@@ -3853,11 +3853,11 @@ function renderCompAnalysis() {
 
         // Hyperlinked sale prices
         const anciraPriceHTML = v.salePrice > 0
-          ? (v.url ? `<a href="${v.url}" target="_blank" rel="noopener" style="color:#dc2626;font-weight:700;text-decoration:underline;text-underline-offset:2px;" title="View on CarGurus">${fmt(v.salePrice)}</a>` : `<span style="font-weight:700;color:#dc2626;">${fmt(v.salePrice)}</span>`)
+          ? (v.url ? `<a href="${v.url}" target="_blank" rel="noopener" style="color:#dc2626;font-weight:700;text-decoration:underline;text-underline-offset:2px;" title="Search VIN on Google">${fmt(v.salePrice)}</a>` : `<span style="font-weight:700;color:#dc2626;">${fmt(v.salePrice)}</span>`)
           : '–';
 
         const ourPriceHTML = ourSale > 0
-          ? (v.ourMatch?.url ? `<a href="${v.ourMatch.url}" target="_blank" rel="noopener" style="color:#2563eb;font-weight:700;text-decoration:underline;text-underline-offset:2px;" title="View on CarGurus">${fmt(ourSale)}</a>${approx}` : `<span style="font-weight:700;color:#2563eb;">${fmt(ourSale)}</span>${approx}`)
+          ? (v.ourMatch?.url ? `<a href="${v.ourMatch.url}" target="_blank" rel="noopener" style="color:#2563eb;font-weight:700;text-decoration:underline;text-underline-offset:2px;" title="Search VIN on Google">${fmt(ourSale)}</a>${approx}` : `<span style="font-weight:700;color:#2563eb;">${fmt(ourSale)}</span>${approx}`)
           : '<span style="color:var(--muted);font-style:italic;">—</span>';
 
         // Deal badge color
@@ -3915,7 +3915,7 @@ function renderCompAnalysis() {
             Competitor: <strong>Ancira CJD</strong> (<a href="https://www.anciracjd.com" target="_blank" style="color:var(--accent);">anciracjd.com</a>)
             · Us: <strong>SA CDJR</strong> (<a href="https://www.sanantoniododgechryslerjeepram.com" target="_blank" style="color:var(--accent);">sanantoniododge.com</a>)
             ${lastUpdated ? ` · Updated <strong>${lastUpdated}</strong>` : ''}
-            · <span style="font-size:11px;">Click any <u>underlined price</u> to view listing on CarGurus</span>
+            · <span style="font-size:11px;">Click any <u>underlined price</u> to search VIN on Google</span>
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -3962,7 +3962,7 @@ function renderCompAnalysis() {
       <div style="margin-top:14px;padding:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;font-size:11px;color:var(--muted);line-height:1.7;">
         <strong>📡 Live data from CarGurus</strong> — Both dealerships' pricing scraped automatically.<br>
         • <span style="color:#16a34a;font-weight:700;">Green Δ</span> = We're cheaper (good!) · <span style="color:#dc2626;font-weight:700;">Red Δ</span> = Ancira is cheaper · <span style="color:#ca8a04;font-weight:700;">—</span> = No matching model found on our lot<br>
-        • <u style="color:#dc2626;">Underlined prices</u> are clickable — opens the vehicle listing on CarGurus in a new tab<br>
+        • <u style="color:#dc2626;">Underlined prices</u> are clickable — searches the VIN on Google to find the vehicle across dealer sites &amp; marketplaces<br>
         • <strong>≈</strong> = Approximate trim match (closest by price when no exact trim match found)<br>
         • Deal badges from CarGurus: <span style="background:#16a34a;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Great Deal</span> <span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Good Deal</span> <span style="background:#ca8a04;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">Fair Deal</span><br>
         • Data source: <a href="https://www.cargurus.com/Cars/m-Ancira-Chrysler-Dodge-Jeep-RAM-sp243011" target="_blank" style="color:var(--accent);">Ancira on CarGurus</a> · <a href="https://www.cargurus.com/Cars/m-San-Antonio-Dodge-Chrysler-Jeep-Ram-sp302392" target="_blank" style="color:var(--accent);">SA CDJR on CarGurus</a><br>
