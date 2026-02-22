@@ -1507,6 +1507,7 @@ function renderDashboard() {
             <a href="https://dealerconnect.chrysler.com/login/login.html?TYPE=33554433&REALMOID=06-d5cf97a8-bccd-103a-bcc8-83e513310cb3&GUID=&SMAUTHREASON=0&METHOD=GET&SMAGENTNAME=-SM-go2wTta208Z%2fzUCz5DbrvlEeym4%2faGv4KExpKsILVlca0WM5Is5FVfWQwWKj8l6iqbgVd8ZTMNXhZNBworA80NiZt2yCKScu&TARGET=-SM-https%3a%2f%2fdealerconnect%2echrysler%2ecom%2fportal%2fController%2fPortal" target="_blank" class="res-link">🔗 DealerConnect</a>
             <a href="https://gemini.google.com/app" target="_blank" class="res-link">✨ Gemini AI</a>
             <a href="#" onclick="event.preventDefault();closeResourcesMenu();showAutoNews();" class="res-link">📰 News (Last 48 hrs)</a>
+            <a href="#" onclick="event.preventDefault();closeResourcesMenu();showRecallLookup();" class="res-link">🔔 Recall & TSB Lookup</a>
             ${(isAdmin() || isManager()) ? '<a href="#" onclick="event.preventDefault();closeResourcesMenu();showCompetitiveAnalysis();" class="res-link">🏆 Competitive Analysis</a>' : ''}
             <div id="customLinksSection"></div>
             <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
@@ -4060,6 +4061,231 @@ window.compSort = compSort;
 window.compExpandAll = compExpandAll;
 window.compCollapseAll = compCollapseAll;
 window.toggleAllNewsGroups = toggleAllNewsGroups;
+
+/* ══════════════════════════════════════════
+   🔔 RECALL & TSB LOOKUP (NHTSA)
+   ══════════════════════════════════════════ */
+function showRecallLookup() {
+  logPageView('Recall Lookup');
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="max-width:900px;margin:0 auto;padding:18px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h2 style="margin:0;font-size:20px;">🔔 Recall & TSB Lookup</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">NHTSA vehicle safety data — recalls, complaints & manufacturer communications</p>
+        </div>
+        <button class="topbar-btn manage" onclick="showDashboard()">← Back</button>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px;">
+        <div style="font-weight:700;font-size:15px;margin-bottom:12px;">Enter a VIN</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <input type="text" id="recallVinInput" placeholder="e.g. 1C4RJFBG5LC123456" maxlength="17"
+            style="flex:1;min-width:220px;padding:12px 14px;border:1px solid var(--line);border-radius:8px;font-size:15px;font-family:monospace;text-transform:uppercase;"
+            onkeydown="if(event.key==='Enter')runRecallLookup()">
+          <button class="btn" onclick="runRecallLookup()" id="recallSearchBtn" style="padding:12px 24px;font-size:14px;">🔍 Look Up</button>
+        </div>
+        <div style="margin-top:8px;color:var(--muted);font-size:12px;">Works with any US-market vehicle. Data provided free by NHTSA.</div>
+      </div>
+
+      <div id="recallResults"></div>
+    </div>`;
+}
+
+async function runRecallLookup() {
+  const input = document.getElementById('recallVinInput');
+  const vin = (input?.value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (vin.length !== 17) { alert('Please enter a valid 17-character VIN.'); return; }
+  input.value = vin;
+
+  const el = document.getElementById('recallResults');
+  const btn = document.getElementById('recallSearchBtn');
+  btn.disabled = true; btn.textContent = '⏳ Searching...';
+  el.innerHTML = '<div class="loading-wrap"><div class="spinner"></div></div>';
+
+  try {
+    // Step 1: Decode VIN
+    const decodeResp = await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/decodevinvalues/' + vin + '?format=json');
+    const decodeData = await decodeResp.json();
+    const v = decodeData.Results?.[0] || {};
+    const make = v.Make || '';
+    const model = v.Model || '';
+    const year = v.ModelYear || '';
+    const trim = v.Trim || '';
+    const engine = [v.DisplacementL ? v.DisplacementL + 'L' : '', v.EngineCylinders ? v.EngineCylinders + '-cyl' : '', v.FuelTypePrimary || ''].filter(Boolean).join(' ');
+    const drivetrain = v.DriveType || '';
+    const bodyClass = v.BodyClass || '';
+    const plant = v.PlantCity ? (v.PlantCity + (v.PlantState ? ', ' + v.PlantState : '') + (v.PlantCountry ? ', ' + v.PlantCountry : '')) : '';
+    const errorCode = v.ErrorCode || '';
+
+    if (!make || !model || !year || (errorCode && !errorCode.startsWith('0'))) {
+      el.innerHTML = `
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:20px;text-align:center;">
+          <div style="font-size:18px;font-weight:700;color:#dc2626;">VIN Not Recognized</div>
+          <p style="color:#991b1b;margin:8px 0 0;">NHTSA could not decode this VIN. Double-check it and try again.</p>
+        </div>`;
+      btn.disabled = false; btn.textContent = '🔍 Look Up';
+      return;
+    }
+
+    // Step 2: Fetch recalls + complaints in parallel
+    const [recallResp, complaintResp] = await Promise.all([
+      fetch('https://api.nhtsa.gov/recalls/recallsByVehicle?make=' + encodeURIComponent(make) + '&model=' + encodeURIComponent(model) + '&modelYear=' + year),
+      fetch('https://api.nhtsa.gov/complaints/complaintsByVehicle?make=' + encodeURIComponent(make) + '&model=' + encodeURIComponent(model) + '&modelYear=' + year)
+    ]);
+    const recallData = await recallResp.json();
+    const complaintData = await complaintResp.json();
+
+    const recalls = recallData.results || [];
+    const complaints = complaintData.results || [];
+
+    // Build vehicle info card
+    let html = `
+      <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:12px;padding:20px;margin-bottom:16px;color:#fff;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="font-size:36px;">🚗</div>
+          <div>
+            <div style="font-size:22px;font-weight:800;">${year} ${make} ${model}${trim ? ' ' + trim : ''}</div>
+            <div style="font-size:13px;opacity:.85;margin-top:2px;">${[engine, drivetrain, bodyClass].filter(Boolean).join(' · ')}</div>
+            ${plant ? '<div style="font-size:12px;opacity:.7;margin-top:2px;">Built: ' + plant + '</div>' : ''}
+            <div style="font-size:11px;opacity:.6;margin-top:4px;font-family:monospace;">VIN: ${vin}</div>
+          </div>
+        </div>
+      </div>`;
+
+    // Summary cards
+    const recallCount = recalls.length;
+    const complaintCount = complaints.length;
+    html += `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">
+        <div style="background:${recallCount > 0 ? '#fef2f2' : '#f0fdf4'};border:1px solid ${recallCount > 0 ? '#fecaca' : '#bbf7d0'};border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:11px;font-weight:600;color:${recallCount > 0 ? '#991b1b' : '#166534'};text-transform:uppercase;">Recalls</div>
+          <div style="font-size:28px;font-weight:800;color:${recallCount > 0 ? '#dc2626' : '#16a34a'};">${recallCount}</div>
+        </div>
+        <div style="background:${complaintCount > 0 ? '#fffbeb' : '#f0fdf4'};border:1px solid ${complaintCount > 0 ? '#fde68a' : '#bbf7d0'};border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:11px;font-weight:600;color:${complaintCount > 0 ? '#92400e' : '#166534'};text-transform:uppercase;">Complaints</div>
+          <div style="font-size:28px;font-weight:800;color:${complaintCount > 0 ? '#d97706' : '#16a34a'};">${complaintCount}</div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center;cursor:pointer;" onclick="window.open('https://www.nhtsa.gov/vehicle/' + ${year} + '/' + encodeURIComponent('${make}') + '/' + encodeURIComponent('${model}') + '#702','_blank')">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;">TSBs / Bulletins</div>
+          <div style="font-size:14px;font-weight:700;color:var(--accent);margin-top:6px;">View on NHTSA →</div>
+        </div>
+      </div>`;
+
+    // Recalls section
+    if (recallCount > 0) {
+      html += '<div style="margin-bottom:20px;">';
+      html += '<div style="font-weight:700;font-size:16px;margin-bottom:10px;color:#dc2626;">⚠️ Recalls (' + recallCount + ')</div>';
+      recalls.forEach((r, i) => {
+        const component = r.Component || 'Unknown Component';
+        const summary = r.Summary || 'No summary available.';
+        const consequence = r.Consequence || '';
+        const remedy = r.Remedy || '';
+        const campaignNum = r.NHTSACampaignNumber || '';
+        const reportDate = r.ReportReceivedDate || '';
+        html += `
+          <div style="background:var(--card);border:1px solid #fecaca;border-radius:10px;margin-bottom:8px;overflow:hidden;">
+            <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.rc-arrow').textContent=this.nextElementSibling.style.display==='none'?'▸':'▾'"
+              style="padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;">
+              <span class="rc-arrow" style="color:var(--muted);font-size:12px;">▸</span>
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:14px;">${component}</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px;">${campaignNum}${reportDate ? ' · ' + reportDate : ''}</div>
+              </div>
+              <span style="background:#fef2f2;color:#dc2626;font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;white-space:nowrap;">RECALL</span>
+            </div>
+            <div style="display:none;padding:0 16px 14px;border-top:1px solid #fee2e2;">
+              <div style="margin-top:12px;">
+                <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Summary</div>
+                <div style="font-size:13px;line-height:1.5;">${summary}</div>
+              </div>
+              ${consequence ? '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:600;color:#dc2626;text-transform:uppercase;margin-bottom:4px;">Risk</div><div style="font-size:13px;line-height:1.5;">' + consequence + '</div></div>' : ''}
+              ${remedy ? '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:600;color:#16a34a;text-transform:uppercase;margin-bottom:4px;">Remedy</div><div style="font-size:13px;line-height:1.5;">' + remedy + '</div></div>' : ''}
+            </div>
+          </div>`;
+      });
+      html += '</div>';
+    } else {
+      html += `
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-bottom:16px;text-align:center;">
+          <span style="font-size:18px;">✅</span>
+          <span style="font-weight:600;color:#166534;margin-left:6px;">No recalls found for this vehicle</span>
+        </div>`;
+    }
+
+    // Complaints section
+    if (complaintCount > 0) {
+      // Group complaints by component
+      const compGroups = {};
+      complaints.forEach(c => {
+        const comp = c.components || 'OTHER';
+        if (!compGroups[comp]) compGroups[comp] = [];
+        compGroups[comp].push(c);
+      });
+      const sortedComponents = Object.keys(compGroups).sort((a, b) => compGroups[b].length - compGroups[a].length);
+
+      html += '<div style="margin-bottom:20px;">';
+      html += '<div style="font-weight:700;font-size:16px;margin-bottom:10px;color:#d97706;">📋 Consumer Complaints (' + complaintCount + ')</div>';
+
+      sortedComponents.forEach(comp => {
+        const items = compGroups[comp];
+        html += `
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden;">
+            <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.rc-arrow').textContent=this.nextElementSibling.style.display==='none'?'▸':'▾'"
+              style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;">
+              <span class="rc-arrow" style="color:var(--muted);font-size:12px;">▸</span>
+              <div style="flex:1;font-weight:600;font-size:14px;">${comp}</div>
+              <span style="background:#fffbeb;color:#92400e;font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;">${items.length}</span>
+            </div>
+            <div style="display:none;padding:0 16px 12px;border-top:1px solid var(--line);max-height:400px;overflow-y:auto;">
+              ${items.map(c => {
+                const date = c.dateOfIncident || c.dateComplaintFiled || '';
+                const crash = c.crash === 'Yes';
+                const fire = c.fire === 'Yes';
+                const injuries = parseInt(c.numberOfInjuries) || 0;
+                const flags = [crash ? '💥 Crash' : '', fire ? '🔥 Fire' : '', injuries > 0 ? '🤕 ' + injuries + ' injured' : ''].filter(Boolean).join(' · ');
+                return '<div style="padding:10px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:1.5;">' +
+                  (date ? '<div style="font-size:11px;color:var(--muted);margin-bottom:3px;">' + date + (flags ? ' · <span style="color:#dc2626;">' + flags + '</span>' : '') + '</div>' : '') +
+                  (c.summary || 'No details provided.') +
+                '</div>';
+              }).join('')}
+            </div>
+          </div>`;
+      });
+      html += '</div>';
+    }
+
+    // Helpful links
+    html += `
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px;">
+        <div style="font-weight:600;font-size:14px;margin-bottom:10px;">🔗 More Resources</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <a href="https://www.nhtsa.gov/vehicle/${year}/${encodeURIComponent(make)}/${encodeURIComponent(model)}" target="_blank"
+            style="background:#eff6ff;color:#1d4ed8;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;">NHTSA Full Report →</a>
+          <a href="https://www.google.com/search?q=${encodeURIComponent(year + ' ' + make + ' ' + model + ' problems common issues')}" target="_blank"
+            style="background:#f5f3ff;color:#6d28d9;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;">Google: Common Issues →</a>
+          <a href="https://www.google.com/search?q=${encodeURIComponent(vin)}" target="_blank"
+            style="background:#fefce8;color:#854d0e;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;">Google VIN →</a>
+        </div>
+      </div>`;
+
+    el.innerHTML = html;
+
+  } catch (err) {
+    console.error('Recall lookup error:', err);
+    el.innerHTML = `
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:20px;text-align:center;">
+        <div style="font-size:18px;font-weight:700;color:#dc2626;">Lookup Failed</div>
+        <p style="color:#991b1b;margin:8px 0 0;">Could not reach NHTSA servers. Check your internet connection and try again.</p>
+        <pre style="text-align:left;font-size:11px;color:var(--muted);margin-top:12px;max-width:600px;overflow-x:auto;">${err.message}</pre>
+      </div>`;
+  }
+  btn.disabled = false; btn.textContent = '🔍 Look Up';
+}
+
+window.showRecallLookup = showRecallLookup;
+window.runRecallLookup = runRecallLookup;
 
 /* ══════════════════════════════════════════
    CUSTOM USER LINKS (Resources)
