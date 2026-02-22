@@ -4090,6 +4090,21 @@ function showRecallLookup() {
       </div>
 
       <div id="recallResults"></div>
+
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-top:16px;">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px;">📂 Bulk VIN Recall Check</div>
+        <div style="color:var(--muted);font-size:12px;margin-bottom:12px;">Upload a spreadsheet (.csv or .xlsx) with VINs. We'll check each one for recalls and produce a downloadable report.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <label style="flex:1;min-width:220px;padding:14px;border:2px dashed var(--line);border-radius:8px;text-align:center;cursor:pointer;transition:border-color .2s;" 
+            onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--line)'">
+            <input type="file" id="bulkVinFile" accept=".csv,.xlsx,.xls,.txt" style="display:none;" onchange="bulkVinFileSelected(this)">
+            <div id="bulkVinFileName" style="font-size:14px;font-weight:500;color:var(--muted);">Click to choose file or drag & drop</div>
+          </label>
+          <button class="btn" onclick="runBulkRecallCheck()" id="bulkRecallBtn" style="padding:12px 24px;font-size:14px;" disabled>🚀 Run Check</button>
+        </div>
+        <div id="bulkProgress" style="margin-top:12px;display:none;"></div>
+        <div id="bulkResults" style="margin-top:12px;"></div>
+      </div>
     </div>`;
 }
 
@@ -4284,8 +4299,230 @@ async function runRecallLookup() {
   btn.disabled = false; btn.textContent = '🔍 Look Up';
 }
 
+/* ── Bulk VIN Recall Check ── */
+let _bulkVins = [];
+
+function bulkVinFileSelected(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  document.getElementById('bulkVinFileName').textContent = file.name;
+  document.getElementById('bulkResults').innerHTML = '';
+  document.getElementById('bulkProgress').style.display = 'none';
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'csv' || ext === 'txt') {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      _bulkVins = extractVinsFromText(e.target.result);
+      finishBulkParse();
+    };
+    reader.readAsText(file);
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    // Load SheetJS if not present
+    if (!window.XLSX) {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload = () => readXlsxFile(file);
+      s.onerror = () => { alert('Could not load spreadsheet library. Try a .csv file instead.'); };
+      document.head.appendChild(s);
+    } else {
+      readXlsxFile(file);
+    }
+  } else {
+    alert('Please upload a .csv, .xlsx, or .txt file.');
+  }
+}
+
+function readXlsxFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      let allText = '';
+      wb.SheetNames.forEach(name => {
+        const ws = wb.Sheets[name];
+        allText += XLSX.utils.sheet_to_csv(ws) + '\n';
+      });
+      _bulkVins = extractVinsFromText(allText);
+      finishBulkParse();
+    } catch (err) {
+      alert('Error reading spreadsheet: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function extractVinsFromText(text) {
+  // Find all 17-char alphanumeric strings (excluding I, O, Q per VIN spec)
+  const matches = text.match(/\b[A-HJ-NPR-Z0-9]{17}\b/gi) || [];
+  // Deduplicate and uppercase
+  const seen = new Set();
+  return matches.map(v => v.toUpperCase()).filter(v => {
+    if (seen.has(v)) return false;
+    seen.add(v);
+    return true;
+  });
+}
+
+function finishBulkParse() {
+  const btn = document.getElementById('bulkRecallBtn');
+  const results = document.getElementById('bulkResults');
+  if (_bulkVins.length === 0) {
+    btn.disabled = true;
+    results.innerHTML = '<div style="color:#dc2626;font-size:13px;">No valid 17-character VINs found in this file.</div>';
+  } else {
+    btn.disabled = false;
+    results.innerHTML = '<div style="color:#16a34a;font-size:13px;font-weight:500;">✓ Found <strong>' + _bulkVins.length + '</strong> unique VINs. Ready to check.</div>';
+  }
+}
+
+async function runBulkRecallCheck() {
+  if (_bulkVins.length === 0) return;
+  const btn = document.getElementById('bulkRecallBtn');
+  const prog = document.getElementById('bulkProgress');
+  const results = document.getElementById('bulkResults');
+  btn.disabled = true;
+  prog.style.display = 'block';
+
+  const total = _bulkVins.length;
+  const rows = []; // {vin, year, make, model, trim, recallCount, recallComponents, recallSummaries, status}
+  let processed = 0;
+  let withRecalls = 0;
+
+  function updateProgress() {
+    const pct = Math.round((processed / total) * 100);
+    prog.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <div style="flex:1;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${pct < 100 ? '#3b82f6' : '#16a34a'};border-radius:4px;transition:width .3s;"></div>
+        </div>
+        <span style="font-size:13px;font-weight:600;min-width:60px;text-align:right;">${processed}/${total}</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);">
+        ${pct < 100 ? '⏳ Checking VINs with NHTSA... please keep this page open.' : ''}
+        ${withRecalls > 0 ? '<span style="color:#dc2626;font-weight:500;">' + withRecalls + ' VINs with recalls found so far</span>' : ''}
+      </div>`;
+  }
+
+  updateProgress();
+
+  // Process VINs in batches with small delay to avoid rate limits
+  for (let i = 0; i < total; i++) {
+    const vin = _bulkVins[i];
+    try {
+      // Decode VIN
+      const decResp = await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/decodevinvalues/' + vin + '?format=json');
+      const decData = await decResp.json();
+      const v = decData.Results?.[0] || {};
+      const make = v.Make || '';
+      const model = v.Model || '';
+      const year = v.ModelYear || '';
+      const trim = v.Trim || '';
+
+      if (!make || !model || !year) {
+        rows.push({ vin, year: '', make: '', model: '', trim: '', recallCount: 0, recallComponents: '', recallSummaries: '', status: 'VIN NOT RECOGNIZED' });
+        processed++;
+        updateProgress();
+        continue;
+      }
+
+      // Check recalls
+      const recResp = await fetch('https://api.nhtsa.gov/recalls/recallsByVehicle?make=' + encodeURIComponent(make) + '&model=' + encodeURIComponent(model) + '&modelYear=' + year);
+      const recData = await recResp.json();
+      const recalls = recData.results || [];
+
+      const components = recalls.map(r => r.Component || '').filter(Boolean).join('; ');
+      const summaries = recalls.map(r => (r.NHTSACampaignNumber || '') + ': ' + (r.Summary || '').slice(0, 150)).join(' | ');
+
+      if (recalls.length > 0) withRecalls++;
+
+      rows.push({
+        vin, year, make, model, trim,
+        recallCount: recalls.length,
+        recallComponents: components,
+        recallSummaries: summaries,
+        status: recalls.length > 0 ? 'HAS RECALLS' : 'CLEAR'
+      });
+    } catch (err) {
+      rows.push({ vin, year: '', make: '', model: '', trim: '', recallCount: 0, recallComponents: '', recallSummaries: '', status: 'API ERROR' });
+    }
+    processed++;
+    updateProgress();
+
+    // Small delay to be nice to NHTSA servers
+    if (i < total - 1) await new Promise(r => setTimeout(r, 200));
+  }
+
+  // Generate CSV
+  const csvHeader = 'VIN,Year,Make,Model,Trim,Status,Recall Count,Recall Components,Recall Details';
+  const csvRows = rows.map(r => {
+    const esc = (s) => '"' + String(s || '').replace(/"/g, '""') + '"';
+    return [esc(r.vin), r.year, esc(r.make), esc(r.model), esc(r.trim), r.status, r.recallCount, esc(r.recallComponents), esc(r.recallSummaries)].join(',');
+  });
+  const csv = csvHeader + '\n' + csvRows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const dateStr = new Date().toISOString().slice(0, 10);
+
+  // Show summary + download
+  results.innerHTML = `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-top:8px;">
+      <div style="font-weight:700;font-size:15px;color:#166534;margin-bottom:8px;">✅ Bulk Check Complete</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 16px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Total VINs</div>
+          <div style="font-size:22px;font-weight:800;">${total}</div>
+        </div>
+        <div style="background:${withRecalls > 0 ? '#fef2f2' : '#fff'};border:1px solid ${withRecalls > 0 ? '#fecaca' : '#e5e7eb'};border-radius:8px;padding:10px 16px;text-align:center;">
+          <div style="font-size:11px;color:${withRecalls > 0 ? '#991b1b' : 'var(--muted)'};text-transform:uppercase;">With Recalls</div>
+          <div style="font-size:22px;font-weight:800;color:${withRecalls > 0 ? '#dc2626' : '#16a34a'};">${withRecalls}</div>
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 16px;text-align:center;">
+          <div style="font-size:11px;color:#166534;text-transform:uppercase;">Clear</div>
+          <div style="font-size:22px;font-weight:800;color:#16a34a;">${total - withRecalls - rows.filter(r => r.status === 'VIN NOT RECOGNIZED' || r.status === 'API ERROR').length}</div>
+        </div>
+      </div>
+      <a href="${url}" download="Recall_Check_${dateStr}.csv"
+        style="display:inline-block;background:#16a34a;color:#fff;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none;cursor:pointer;">
+        ⬇ Download Report (.csv)
+      </a>
+      <span style="font-size:12px;color:var(--muted);margin-left:8px;">Opens in Excel / Google Sheets</span>
+    </div>`;
+
+  // Also show a quick preview table
+  if (rows.length > 0) {
+    let tableHtml = `
+      <div style="margin-top:12px;border:1px solid var(--line);border-radius:10px;overflow:hidden;max-height:400px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="background:#f8fafc;position:sticky;top:0;">
+            <th style="padding:8px 10px;text-align:left;font-weight:600;border-bottom:1px solid var(--line);">VIN</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:600;border-bottom:1px solid var(--line);">Vehicle</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:600;border-bottom:1px solid var(--line);">Status</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:600;border-bottom:1px solid var(--line);">Recalls</th>
+          </tr></thead><tbody>`;
+    rows.forEach(r => {
+      const statusColor = r.status === 'CLEAR' ? '#16a34a' : r.status === 'HAS RECALLS' ? '#dc2626' : '#6b7280';
+      const statusBg = r.status === 'CLEAR' ? '#f0fdf4' : r.status === 'HAS RECALLS' ? '#fef2f2' : '#f9fafb';
+      tableHtml += `<tr style="border-bottom:1px solid var(--line);">
+        <td style="padding:8px 10px;font-family:monospace;font-size:11px;">${r.vin}</td>
+        <td style="padding:8px 10px;">${r.year ? r.year + ' ' + r.make + ' ' + r.model : '—'}</td>
+        <td style="padding:8px 10px;text-align:center;">
+          <span style="background:${statusBg};color:${statusColor};padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;">${r.status}</span>
+        </td>
+        <td style="padding:8px 10px;text-align:center;font-weight:600;color:${r.recallCount > 0 ? '#dc2626' : 'var(--muted)'};">${r.recallCount}</td>
+      </tr>`;
+    });
+    tableHtml += '</tbody></table></div>';
+    results.innerHTML += tableHtml;
+  }
+
+  btn.disabled = false;
+}
+
 window.showRecallLookup = showRecallLookup;
 window.runRecallLookup = runRecallLookup;
+window.bulkVinFileSelected = bulkVinFileSelected;
+window.runBulkRecallCheck = runBulkRecallCheck;
 
 /* ══════════════════════════════════════════
    CUSTOM USER LINKS (Resources)
