@@ -771,59 +771,34 @@ const personCache = new Map();
 const callListCache = new Map();
 function cacheKey(name) { return (name || '').toUpperCase().trim(); }
 
-const PERSON_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000;
 async function fetchPerson(name) {
   const key = cacheKey(name);
   if (personCache.has(key)) return personCache.get(key);
 
-  // ── Try Firestore first ──
-  let firestoreResult = null;
-  let firestoreAge = Infinity;
+  // ── Firestore only (snapshots update once daily) ──
   try {
     const snapDoc = await getDoc(doc(db, 'personSnapshots', name.toUpperCase()));
     if (snapDoc.exists()) {
       const raw = snapDoc.data();
-      const updatedAt = raw.updatedAt?.toDate?.() || new Date(raw.updatedAt);
-      firestoreAge = Date.now() - updatedAt.getTime();
       const payload = JSON.parse(raw.jsonData);
-      firestoreResult = { ok: true, data: payload, _source: 'firestore' };
-      console.log(`[Firestore] ${name} loaded (age: ${Math.round(firestoreAge/1000)}s)`);
-
-      // If fresh enough, return immediately
-      if (firestoreAge < PERSON_SNAPSHOT_MAX_AGE_MS) {
-        personCache.set(key, firestoreResult);
-        return firestoreResult;
-      }
+      const result = { ok: true, data: payload, _source: 'firestore' };
+      personCache.set(key, result);
+      const updatedAt = raw.updatedAt?.toDate?.() || new Date(raw.updatedAt);
+      console.log(`[Firestore] ${name} loaded (age: ${Math.round((Date.now() - updatedAt.getTime())/60000)}min)`);
+      return result;
     }
   } catch (fsErr) {
-    console.warn('[Firestore] Person read failed:', fsErr.message);
+    console.warn('[Firestore] Person read failed for', name, ':', fsErr.message);
   }
 
-  // ── GAS fallback (wrapped in try-catch for CORS) ──
-  try {
-    const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-    const resp = await fetch(url);
-    const data = await resp.json();
-    if (data?.ok) { personCache.set(key, data); return data; }
-  } catch (gasErr) {
-    console.warn(`[GAS] Person fetch failed for ${name} (CORS expected):`, gasErr.message);
-  }
-
-  // ── Use stale Firestore data if GAS failed ──
-  if (firestoreResult) {
-    console.log(`[Firestore] Using stale snapshot for ${name} (age: ${Math.round(firestoreAge/60000)}min)`);
-    personCache.set(key, firestoreResult);
-    return firestoreResult;
-  }
-
-  return { ok: false, error: 'No data available' };
+  return { ok: false, error: 'No snapshot found for ' + name };
 }
 
 async function fetchCalls(name) {
   const key = cacheKey(name);
   if (callListCache.has(key)) return callListCache.get(key);
 
-  // ── Try Firestore personSnapshot for embedded callsByDate ──
+  // ── Firestore only (embedded in personSnapshot) ──
   try {
     const snapDoc = await getDoc(doc(db, 'personSnapshots', name.toUpperCase()));
     if (snapDoc.exists()) {
@@ -836,17 +811,7 @@ async function fetchCalls(name) {
       }
     }
   } catch (fsErr) {
-    console.warn('[Firestore] Calls read failed:', fsErr.message);
-  }
-
-  // ── GAS fallback (wrapped in try-catch for CORS) ──
-  try {
-    const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-    const resp = await fetch(url);
-    const data = await resp.json();
-    if (data?.ok) { callListCache.set(key, data); return data; }
-  } catch (gasErr) {
-    console.warn(`[GAS] Calls fetch failed for ${name} (CORS expected):`, gasErr.message);
+    console.warn('[Firestore] Calls read failed for', name, ':', fsErr.message);
   }
 
   return { ok: false, error: 'No call data available' };
@@ -1026,25 +991,14 @@ async function showDashboard() {
       const lbDoc = await getDoc(doc(db, 'dashboardSnapshots', 'leaderboards'));
       if (lbDoc.exists()) {
         const fsRaw = lbDoc.data();
+        payload = JSON.parse(fsRaw.jsonData);
         const updatedAt = fsRaw.updatedAt?.toDate?.() || new Date(fsRaw.updatedAt);
-        const ageMs = Date.now() - updatedAt.getTime();
-        if (ageMs < 20 * 60 * 1000) {
-          payload = JSON.parse(fsRaw.jsonData);
-          console.log(`[Firestore] Leaderboards loaded (age: ${Math.round(ageMs/1000)}s)`);
-        }
+        console.log(`[Firestore] Leaderboards loaded (age: ${Math.round((Date.now() - updatedAt.getTime())/60000)}min)`);
       }
     } catch (fsErr) {
       console.warn('[Firestore] Leaderboard read failed:', fsErr.message);
     }
-    if (!payload) {
-      const url = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken || '')}`;
-      const resp = await fetch(url);
-      const raw = await resp.text();
-      let result;
-      try { result = JSON.parse(raw); } catch { throw new Error(`Non-JSON response.\nHTTP ${resp.status}\n\n${raw}`); }
-      if (!result.ok) throw new Error(result.error || 'Backend returned ok:false');
-      payload = (result.data) ? result.data : result;
-    }
+    if (!payload) throw new Error('Leaderboard snapshot not available in Firestore.\nSnapshots update each morning — please check that the daily trigger ran.');
     dashboardData.sales = Array.isArray(payload?.sales) ? payload.sales : [];
     dashboardData.bdc   = Array.isArray(payload?.bdc)   ? payload.bdc   : [];
     dashboardData.bdc = dashboardData.bdc.map(x => ({ calls: 0, texts: 0, ...x }));
