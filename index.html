@@ -4966,7 +4966,7 @@ function initChat() {
   // Load last-seen timestamps from Firestore
   _loadChatLastSeen();
 
-  // Load user list for DM dropdown
+  // Load all users for DM dropdown
   _loadChatUsers();
 
   // Render channel buttons
@@ -5041,14 +5041,18 @@ async function _loadChatUsers() {
   try {
     const snap = await getDocs(collection(db, 'users'));
     _chatUsers = [];
+
     snap.forEach(d => {
       const data = d.data();
-      const name = data.linkedName || data.displayName || data.email || '';
+      if (data.deleted) return; // skip deleted users (same filter as Manage Users)
+      const name = data.linkedName || data.presenceName || data.displayName || data.email || '';
       if (!name) return;
       // Don't include self
       if (d.id === window.userData?.uid) return;
-      _chatUsers.push({ uid: d.id, name: name, email: data.email || '' });
+
+      _chatUsers.push({ uid: d.id, name: name, email: data.email || '', role: data.role || 'user' });
     });
+
     // Sort alphabetically by name
     _chatUsers.sort((a, b) => a.name.localeCompare(b.name));
     _renderDmSelect();
@@ -5061,7 +5065,7 @@ function _renderDmSelect() {
   const select = document.getElementById('chatDmSelect');
   if (!select) return;
 
-  let html = '<option value="">✉ Direct Message…</option>';
+  let html = `<option value="">✉ Direct Message…</option>`;
   _chatUsers.forEach(u => {
     const display = _formatChatName(u.name);
     html += `<option value="${u.uid}">${display}</option>`;
