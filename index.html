@@ -309,6 +309,118 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
   display: inline-block; margin-right: 4px; animation: pulse 2s infinite;
 }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+
+/* ── Team Chat ── */
+.chat-fab {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9000;
+  width: 56px; height: 56px; border-radius: 50%; border: none;
+  background: linear-gradient(135deg, var(--accent), #fb923c);
+  color: #fff; font-size: 24px; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .15s, box-shadow .15s;
+}
+.chat-fab:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(0,0,0,.3); }
+.chat-fab .unread-badge {
+  position: absolute; top: -4px; right: -4px;
+  background: #dc2626; color: #fff; font-size: 11px; font-weight: 700;
+  min-width: 20px; height: 20px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 5px; border: 2px solid var(--bg);
+}
+
+.chat-drawer {
+  position: fixed; bottom: 90px; right: 24px; z-index: 9001;
+  width: 380px; max-height: 520px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,.18);
+  display: none; flex-direction: column;
+  overflow: hidden;
+}
+.chat-drawer.open { display: flex; }
+
+.chat-drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; background: var(--header); color: var(--headerText);
+  border-radius: 16px 16px 0 0;
+}
+.chat-drawer-header h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.chat-drawer-close {
+  background: none; border: none; color: #a8a29e; font-size: 20px;
+  cursor: pointer; padding: 0 4px; line-height: 1;
+}
+.chat-drawer-close:hover { color: #fff; }
+
+.chat-channels {
+  display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--line);
+  background: #fafaf9; overflow-x: auto;
+}
+.chat-ch-btn {
+  padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--line);
+  background: var(--chipBg); color: var(--text); white-space: nowrap;
+  transition: all .15s;
+}
+.chat-ch-btn.active { background: var(--chipOn); color: #fff; border-color: transparent; }
+
+.chat-messages {
+  flex: 1; overflow-y: auto; padding: 12px; min-height: 200px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.chat-messages::-webkit-scrollbar { width: 5px; }
+.chat-messages::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 3px; }
+
+.chat-msg {
+  max-width: 85%; padding: 8px 12px; border-radius: 12px;
+  font-size: 13px; line-height: 1.45; word-break: break-word;
+}
+.chat-msg.other {
+  align-self: flex-start; background: #f4f4f5; color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+.chat-msg.mine {
+  align-self: flex-end; background: var(--accent); color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.chat-msg .chat-sender {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .3px; margin-bottom: 2px; opacity: .7;
+}
+.chat-msg.mine .chat-sender { opacity: .85; }
+.chat-msg .chat-time {
+  font-size: 10px; opacity: .5; margin-top: 3px; text-align: right;
+}
+
+.chat-date-divider {
+  text-align: center; font-size: 10px; color: var(--muted);
+  font-weight: 600; margin: 8px 0 4px;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+
+.chat-input-row {
+  display: flex; gap: 8px; padding: 10px 12px;
+  border-top: 1px solid var(--line); background: #fafaf9;
+  border-radius: 0 0 16px 16px;
+}
+.chat-input {
+  flex: 1; border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 12px; font-size: 13px; outline: none;
+  font-family: inherit; resize: none;
+}
+.chat-input:focus { border-color: var(--accent); }
+.chat-send-btn {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 8px; padding: 8px 14px; font-weight: 700;
+  font-size: 13px; cursor: pointer; white-space: nowrap;
+  transition: filter .15s;
+}
+.chat-send-btn:hover { filter: brightness(1.1); }
+.chat-send-btn:disabled { opacity: .5; cursor: default; }
+
+@media (max-width: 480px) {
+  .chat-drawer { right: 8px; left: 8px; width: auto; bottom: 82px; max-height: 65vh; }
+  .chat-fab { bottom: 16px; right: 16px; width: 50px; height: 50px; font-size: 20px; }
+}
 </style>
 </head>
 
@@ -354,6 +466,31 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
   </div>
 </div>
 
+<!-- Team Chat FAB + Drawer -->
+<button class="chat-fab" id="chatFab" onclick="toggleChat()" style="display:none;" title="Team Chat">
+  💬
+  <span class="unread-badge" id="chatUnreadBadge" style="display:none;">0</span>
+</button>
+
+<div class="chat-drawer" id="chatDrawer">
+  <div class="chat-drawer-header">
+    <h3>💬 Team Chat</h3>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span id="chatOnlineCount" style="font-size:11px;color:#a8a29e;"></span>
+      <button class="chat-drawer-close" onclick="toggleChat()">✕</button>
+    </div>
+  </div>
+  <div class="chat-channels" id="chatChannels"></div>
+  <div class="chat-messages" id="chatMessages">
+    <p style="color:var(--muted);text-align:center;font-size:13px;margin-top:40px;">Select a channel to start chatting</p>
+  </div>
+  <div class="chat-input-row">
+    <input type="text" class="chat-input" id="chatInput" placeholder="Type a message..."
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}">
+    <button class="chat-send-btn" id="chatSendBtn" onclick="sendChatMessage()">Send</button>
+  </div>
+</div>
+
 <script type="module">
 /************ Firebase imports ************/
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
@@ -363,7 +500,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
 import {
   getFirestore, doc, setDoc, getDoc, getDocs, collection, deleteDoc, updateDoc, increment,
-  addDoc, query, where, orderBy, limit, Timestamp
+  addDoc, query, where, orderBy, limit, Timestamp, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
 /************ Firebase config ************/
@@ -556,8 +693,6 @@ const PERSON_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000;
 async function fetchPerson(name) {
   const key = cacheKey(name);
   if (personCache.has(key)) return personCache.get(key);
-
-  // ── 1. Try Firestore first (fast, no CORS issues) ──
   try {
     const snapDoc = await getDoc(doc(db, 'personSnapshots', name.toUpperCase()));
     if (snapDoc.exists()) {
@@ -570,63 +705,25 @@ async function fetchPerson(name) {
         personCache.set(key, result);
         console.log(`[Firestore] ${name} loaded (age: ${Math.round(ageMs/1000)}s)`);
         return result;
-      } else {
-        // Stale but still usable — cache it and return while GAS fallback runs
-        const payload = JSON.parse(raw.jsonData);
-        const staleResult = { ok: true, data: payload, _source: 'firestore-stale' };
-        personCache.set(key, staleResult);
-        console.log(`[Firestore] ${name} loaded (STALE: ${Math.round(ageMs/60000)}min old, using anyway)`);
-        return staleResult;
       }
     }
   } catch (fsErr) {
     console.warn('[Firestore] Person read failed, falling back to GAS:', fsErr.message);
   }
-
-  // ── 2. GAS fallback (wrapped in try-catch to survive CORS errors) ──
-  try {
-    const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-    const resp = await fetch(url, { redirect: 'follow' });
-    const data = await resp.json();
-    if (data?.ok) personCache.set(key, data);
-    return data;
-  } catch (gasErr) {
-    console.warn(`[GAS] Person fetch failed for ${name} (likely CORS):`, gasErr.message);
-    return { ok: false, error: 'Data temporarily unavailable', _source: 'gas-failed' };
-  }
+  const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  if (data?.ok) personCache.set(key, data);
+  return data;
 }
 async function fetchCalls(name) {
   const key = cacheKey(name);
   if (callListCache.has(key)) return callListCache.get(key);
-
-  // ── Try Firestore personSnapshot for embedded call data ──
-  try {
-    const snapDoc = await getDoc(doc(db, 'personSnapshots', name.toUpperCase()));
-    if (snapDoc.exists()) {
-      const raw = snapDoc.data();
-      const payload = JSON.parse(raw.jsonData || '{}');
-      if (payload.callsByDate && payload.callsByDate.length > 0) {
-        const result = { ok: true, callsByDate: payload.callsByDate, _source: 'firestore' };
-        callListCache.set(key, result);
-        console.log(`[Firestore] Calls for ${name} loaded from snapshot`);
-        return result;
-      }
-    }
-  } catch (fsErr) {
-    console.warn('[Firestore] Call data read failed:', fsErr.message);
-  }
-
-  // ── GAS fallback (wrapped to survive CORS) ──
-  try {
-    const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-    const resp = await fetch(url, { redirect: 'follow' });
-    const data = await resp.json();
-    if (data?.ok) callListCache.set(key, data);
-    return data;
-  } catch (gasErr) {
-    console.warn(`[GAS] Calls fetch failed for ${name} (likely CORS):`, gasErr.message);
-    return { ok: false, error: 'Call data temporarily unavailable', _source: 'gas-failed' };
-  }
+  const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  if (data?.ok) callListCache.set(key, data);
+  return data;
 }
 
 /* ── Prefetch helpers ── */
@@ -826,26 +923,13 @@ async function showDashboard() {
       console.warn('[Firestore] Leaderboard read failed:', fsErr.message);
     }
     if (!payload) {
-      try {
-        const url = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken || '')}`;
-        const resp = await fetch(url, { redirect: 'follow' });
-        const raw = await resp.text();
-        let result;
-        try { result = JSON.parse(raw); } catch { throw new Error(`Non-JSON response.\nHTTP ${resp.status}\n\n${raw}`); }
-        if (!result.ok) throw new Error(result.error || 'Backend returned ok:false');
-        payload = (result.data) ? result.data : result;
-      } catch (gasErr) {
-        console.warn('[GAS] Leaderboard fallback failed (likely CORS):', gasErr.message);
-        // Try Firestore one more time without age check as last resort
-        try {
-          const lbDoc2 = await getDoc(doc(db, 'dashboardSnapshots', 'leaderboards'));
-          if (lbDoc2.exists()) {
-            payload = JSON.parse(lbDoc2.data().jsonData);
-            console.log('[Firestore] Using stale leaderboard data as fallback');
-          }
-        } catch { /* nothing left to try */ }
-        if (!payload) throw new Error('Dashboard data unavailable. Firestore snapshots may need to be refreshed — run warmDashboardCache_() in Apps Script.');
-      }
+      const url = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken || '')}`;
+      const resp = await fetch(url);
+      const raw = await resp.text();
+      let result;
+      try { result = JSON.parse(raw); } catch { throw new Error(`Non-JSON response.\nHTTP ${resp.status}\n\n${raw}`); }
+      if (!result.ok) throw new Error(result.error || 'Backend returned ok:false');
+      payload = (result.data) ? result.data : result;
     }
     dashboardData.sales = Array.isArray(payload?.sales) ? payload.sales : [];
     dashboardData.bdc   = Array.isArray(payload?.bdc)   ? payload.bdc   : [];
@@ -860,6 +944,7 @@ async function showDashboard() {
     checkLeadsAtRisk();
     loadCustomLinks();
     loadCallPatterns();
+    initChat();
   } catch (err) {
     console.error('Dashboard error:', err);
     document.getElementById('app').innerHTML = `
@@ -1289,32 +1374,8 @@ function loadCallPatterns() {
   const container = document.getElementById('callPatternsBox');
   if (!container) return;
 
-  // ── Try Firestore first ──
-  getDoc(doc(db, 'dashboardSnapshots', 'callPatterns')).then(snapDoc => {
-    if (snapDoc.exists()) {
-      const raw = snapDoc.data();
-      const payload = JSON.parse(raw.jsonData || '{}');
-      if (payload.heatmap || payload.total) {
-        _callPatternsData = payload.ok !== undefined ? payload : { ok: true, ...payload };
-        _callPatternsFilter = 'total';
-        renderCallPatternsFromCache();
-        console.log('[Firestore] Call patterns loaded from snapshot');
-        return;
-      }
-    }
-    // Firestore didn't have it — try GAS
-    _loadCallPatternsFromGAS();
-  }).catch(() => {
-    _loadCallPatternsFromGAS();
-  });
-}
-
-function _loadCallPatternsFromGAS() {
-  const container = document.getElementById('callPatternsBox');
-  if (!container) return;
-
   const url = `${SCRIPT_URL}?route=callpatterns&session=${encodeURIComponent(window.sessionToken || '')}`;
-  fetch(url, { redirect: 'follow' }).then(r => r.text()).then(raw => {
+  fetch(url).then(r => r.text()).then(raw => {
     let result;
     try { result = JSON.parse(raw); } catch { return; }
     if (!result.ok) return;
@@ -1322,11 +1383,7 @@ function _loadCallPatternsFromGAS() {
     _callPatternsFilter = 'total';
     renderCallPatternsFromCache();
   }).catch(err => {
-    console.warn('[GAS] Call patterns load failed (likely CORS):', err.message);
-    // Don't crash — just leave the section empty or show a subtle message
-    if (container) {
-      container.innerHTML = `<div style="padding:12px;color:var(--muted);font-size:12px;text-align:center;">Call patterns data loading from cache...</div>`;
-    }
+    console.error('Call patterns load error:', err);
   });
 }
 
@@ -4841,6 +4898,263 @@ window.removeCustomLink = removeCustomLink;
 window.addUser = addUser;
 window.deleteUser = deleteUser;
 window.toggleSort = toggleSort;
+
+/* ══════════════════════════════════════════
+   TEAM CHAT (Firestore real-time)
+   ══════════════════════════════════════════ */
+const CHAT_CHANNELS = [
+  { id: 'general',      label: '💬 General' },
+  { id: 'sales',        label: '🚗 Sales' },
+  { id: 'bdc',          label: '📞 BDC' },
+  { id: 'managers',     label: '📋 Managers' }
+];
+
+let _chatChannel = 'general';
+let _chatOpen = false;
+let _chatUnsub = null;       // Firestore onSnapshot unsubscribe
+let _chatUnread = 0;
+let _chatLastSeen = {};      // channel -> timestamp of last seen message
+let _chatInitialized = false;
+
+function initChat() {
+  if (_chatInitialized) return;
+  if (!window.userData?.uid) return;
+  _chatInitialized = true;
+
+  // Show FAB
+  const fab = document.getElementById('chatFab');
+  if (fab) fab.style.display = 'flex';
+
+  // Load last-seen timestamps from Firestore
+  _loadChatLastSeen();
+
+  // Render channel buttons
+  _renderChatChannels();
+
+  // Subscribe to default channel
+  _subscribeChatChannel(_chatChannel);
+}
+
+function toggleChat() {
+  _chatOpen = !_chatOpen;
+  const drawer = document.getElementById('chatDrawer');
+  if (drawer) drawer.classList.toggle('open', _chatOpen);
+
+  if (_chatOpen) {
+    // Mark current channel as read
+    _markChannelRead(_chatChannel);
+    _updateUnreadBadge();
+    // Focus input
+    setTimeout(() => {
+      const inp = document.getElementById('chatInput');
+      if (inp) inp.focus();
+    }, 100);
+  }
+}
+window.toggleChat = toggleChat;
+
+function _renderChatChannels() {
+  const container = document.getElementById('chatChannels');
+  if (!container) return;
+
+  // Filter: managers-only channel
+  const channels = CHAT_CHANNELS.filter(ch => {
+    if (ch.id === 'managers' && !isAdmin() && !isManager()) return false;
+    return true;
+  });
+
+  container.innerHTML = channels.map(ch => {
+    const active = ch.id === _chatChannel ? 'active' : '';
+    return `<button class="chat-ch-btn ${active}" onclick="switchChatChannel('${ch.id}')">${ch.label}</button>`;
+  }).join('');
+}
+
+function switchChatChannel(channelId) {
+  if (_chatChannel === channelId) return;
+  _chatChannel = channelId;
+  _renderChatChannels();
+  _subscribeChatChannel(channelId);
+  _markChannelRead(channelId);
+  _updateUnreadBadge();
+}
+window.switchChatChannel = switchChatChannel;
+
+function _subscribeChatChannel(channelId) {
+  // Unsubscribe from previous listener
+  if (_chatUnsub) { _chatUnsub(); _chatUnsub = null; }
+
+  const msgBox = document.getElementById('chatMessages');
+  if (msgBox) msgBox.innerHTML = '<p style="color:var(--muted);text-align:center;font-size:12px;margin-top:40px;">Loading messages...</p>';
+
+  // Query: last 80 messages in this channel, ordered by time
+  const q = query(
+    collection(db, 'chatMessages'),
+    where('channel', '==', channelId),
+    orderBy('createdAt', 'desc'),
+    limit(80)
+  );
+
+  _chatUnsub = onSnapshot(q, (snapshot) => {
+    const messages = [];
+    snapshot.forEach(d => {
+      const data = d.data();
+      messages.push({ id: d.id, ...data });
+    });
+
+    // Reverse so oldest is first (we queried desc for the limit)
+    messages.reverse();
+    _renderChatMessages(messages);
+
+    // Update unread count if chat is closed
+    if (!_chatOpen && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      const lastMsgTime = lastMsg.createdAt?.toMillis?.() || lastMsg.createdAt?.seconds * 1000 || 0;
+      const lastSeen = _chatLastSeen[channelId] || 0;
+      if (lastMsgTime > lastSeen && lastMsg.senderUid !== window.userData?.uid) {
+        _chatUnread++;
+        _updateUnreadBadge();
+      }
+    }
+
+    // Auto-scroll to bottom
+    if (msgBox) {
+      setTimeout(() => { msgBox.scrollTop = msgBox.scrollHeight; }, 50);
+    }
+
+    // If chat is open on this channel, mark as read
+    if (_chatOpen) {
+      _markChannelRead(channelId);
+    }
+  }, (err) => {
+    console.error('[Chat] Listener error:', err);
+    const msgBox = document.getElementById('chatMessages');
+    if (msgBox) msgBox.innerHTML = '<p style="color:#dc2626;text-align:center;font-size:12px;margin-top:40px;">Error loading messages</p>';
+  });
+}
+
+function _renderChatMessages(messages) {
+  const msgBox = document.getElementById('chatMessages');
+  if (!msgBox) return;
+  const myUid = window.userData?.uid || '';
+
+  if (!messages.length) {
+    msgBox.innerHTML = '<p style="color:var(--muted);text-align:center;font-size:13px;margin-top:40px;">No messages yet — say hello! 👋</p>';
+    return;
+  }
+
+  let html = '';
+  let lastDateStr = '';
+
+  messages.forEach(msg => {
+    const isMine = msg.senderUid === myUid;
+    const ts = msg.createdAt?.toDate?.() || (msg.createdAt?.seconds ? new Date(msg.createdAt.seconds * 1000) : new Date());
+
+    // Date divider
+    const dateStr = ts.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    if (dateStr !== lastDateStr) {
+      // Check if it's today
+      const today = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const label = dateStr === today ? 'Today' : dateStr;
+      html += `<div class="chat-date-divider">${label}</div>`;
+      lastDateStr = dateStr;
+    }
+
+    const timeStr = ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const senderDisplay = _formatChatName(msg.senderName || 'Unknown');
+    const escapedText = (msg.text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+
+    html += `
+      <div class="chat-msg ${isMine ? 'mine' : 'other'}">
+        ${!isMine ? `<div class="chat-sender">${senderDisplay}</div>` : ''}
+        <div>${escapedText}</div>
+        <div class="chat-time">${timeStr}</div>
+      </div>`;
+  });
+
+  msgBox.innerHTML = html;
+}
+
+function _formatChatName(name) {
+  // "FIRST LAST" -> "First L."
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2) return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  const first = parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+  const lastInit = parts[parts.length - 1].charAt(0).toUpperCase() + '.';
+  return first + ' ' + lastInit;
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chatInput');
+  const btn = document.getElementById('chatSendBtn');
+  if (!input || !btn) return;
+
+  const text = input.value.trim();
+  if (!text) return;
+  if (!window.userData?.uid) return;
+
+  btn.disabled = true;
+  input.value = '';
+
+  try {
+    await addDoc(collection(db, 'chatMessages'), {
+      text: text,
+      senderUid: window.userData.uid,
+      senderName: window.userData.linkedName || window.userData.email || 'Unknown',
+      channel: _chatChannel,
+      createdAt: serverTimestamp()
+    });
+  } catch (err) {
+    console.error('[Chat] Send error:', err);
+    // Put the text back so they don't lose it
+    input.value = text;
+    alert('Failed to send message. Please try again.');
+  }
+
+  btn.disabled = false;
+  input.focus();
+}
+window.sendChatMessage = sendChatMessage;
+
+// ── Unread tracking ──
+async function _loadChatLastSeen() {
+  if (!window.userData?.uid) return;
+  try {
+    const snap = await getDoc(doc(db, 'chatLastSeen', window.userData.uid));
+    if (snap.exists()) {
+      _chatLastSeen = snap.data() || {};
+    }
+  } catch (e) { /* ignore */ }
+}
+
+async function _markChannelRead(channelId) {
+  _chatLastSeen[channelId] = Date.now();
+  _chatUnread = 0;
+  _updateUnreadBadge();
+
+  if (!window.userData?.uid) return;
+  try {
+    await setDoc(doc(db, 'chatLastSeen', window.userData.uid), _chatLastSeen, { merge: true });
+  } catch (e) { /* ignore */ }
+}
+
+function _updateUnreadBadge() {
+  const badge = document.getElementById('chatUnreadBadge');
+  if (!badge) return;
+  if (_chatUnread > 0) {
+    badge.textContent = _chatUnread > 99 ? '99+' : _chatUnread;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// Clean up listener on page unload
+window.addEventListener('beforeunload', () => {
+  if (_chatUnsub) _chatUnsub();
+});
+
+window.initChat = initChat;
 
 /* Boot */
 if (auth.currentUser) { showDashboard(); } else { showLogin(); }
