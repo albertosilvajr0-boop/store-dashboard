@@ -20,8 +20,8 @@ messaging.onBackgroundMessage((payload) => {
 
   self.registration.showNotification(title || 'New Message', {
     body: body || 'You have a new message',
-    icon: icon || '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    icon: icon || '/San-Antonio-CDJR-logo-192x192.png',
+    badge: '/San-Antonio-CDJR-logo-192x192.png',
     tag: data.channel || 'chat',          // collapse same-channel notifications
     renotify: true,                        // vibrate even if tag matches
     data: { url: data.link || '/' }
