@@ -3041,6 +3041,95 @@ window.showLeadFunnel = showLeadFunnel;
 window.toggleFunnelSort = toggleFunnelSort;
 
 /* ══════════════════════════════════════════
+   BROWSER BACK BUTTON SUPPORT
+   ══════════════════════════════════════════ */
+let _skipPush = false;
+
+function navPush(state) {
+  if (_skipPush) return;
+  history.pushState(state, '', '#' + state.view);
+}
+
+// Wrap navigation functions to push history
+const _origShowDashboard = showDashboard;
+showDashboard = async function() {
+  navPush({ view: 'dashboard' });
+  return _origShowDashboard();
+};
+window.showDashboard = showDashboard;
+
+const _origShowPerson = showPersonDetails;
+showPersonDetails = async function(name, type) {
+  navPush({ view: 'person', name, type });
+  return _origShowPerson(name, type);
+};
+window.showPersonDetails = showPersonDetails;
+
+const _origViewCalls = viewCallSheets;
+viewCallSheets = async function(name) {
+  navPush({ view: 'calls', name });
+  return _origViewCalls(name);
+};
+window.viewCallSheets = viewCallSheets;
+
+const _origShowReassign = showReassignments;
+showReassignments = async function() {
+  navPush({ view: 'reassignments' });
+  return _origShowReassign();
+};
+window.showReassignments = showReassignments;
+
+const _origShowSources = showSourceLeaderboard;
+showSourceLeaderboard = async function() {
+  navPush({ view: 'sources' });
+  return _origShowSources();
+};
+window.showSourceLeaderboard = showSourceLeaderboard;
+
+const _origShowFunnel = showLeadFunnel;
+showLeadFunnel = async function() {
+  navPush({ view: 'funnel' });
+  return _origShowFunnel();
+};
+window.showLeadFunnel = showLeadFunnel;
+
+if (typeof showVehicleDemand === 'function') {
+  const _origShowVeh = showVehicleDemand;
+  showVehicleDemand = async function() {
+    navPush({ view: 'vehicle' });
+    return _origShowVeh();
+  };
+  window.showVehicleDemand = showVehicleDemand;
+}
+
+// Handle browser back/forward buttons
+window.addEventListener('popstate', (e) => {
+  const state = e.state;
+  _skipPush = true;
+  if (!state || state.view === 'dashboard') {
+    _origShowDashboard();
+  } else if (state.view === 'person') {
+    _origShowPerson(state.name, state.type);
+  } else if (state.view === 'calls') {
+    _origViewCalls(state.name);
+  } else if (state.view === 'reassignments') {
+    _origShowReassign();
+  } else if (state.view === 'sources') {
+    _origShowSources();
+  } else if (state.view === 'funnel') {
+    _origShowFunnel();
+  } else if (state.view === 'vehicle' && typeof _origShowVeh !== 'undefined') {
+    _origShowVeh();
+  } else {
+    _origShowDashboard();
+  }
+  _skipPush = false;
+});
+
+// Set initial state
+history.replaceState({ view: 'dashboard' }, '', '#dashboard');
+
+/* ══════════════════════════════════════════
    VEHICLE DEMAND DASHBOARD (Admin)
    ══════════════════════════════════════════ */
 let _vehData = null;
