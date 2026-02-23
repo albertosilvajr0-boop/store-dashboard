@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#1c1917"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="SA Dashboard"/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/icons/icon-192.png"/>
 <title>BDC &amp; Sales Leaderboards</title>
 
 <style>
@@ -433,6 +439,45 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
   text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px;
 }
 
+/* @mention autocomplete */
+.chat-mention-popup {
+  position: absolute; bottom: 100%; left: 0; right: 0;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 10px 10px 0 0; max-height: 180px; overflow-y: auto;
+  box-shadow: 0 -4px 16px rgba(0,0,0,.12); z-index: 100;
+  display: none;
+}
+.chat-mention-popup.visible { display: block; }
+.chat-mention-item {
+  padding: 8px 14px; font-size: 12px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; gap: 8px;
+  transition: background .1s;
+}
+.chat-mention-item:hover, .chat-mention-item.active {
+  background: #f5f3ff; color: #7c3aed;
+}
+.chat-mention-item .mention-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.chat-mention-tag {
+  background: #ede9fe; color: #7c3aed; padding: 1px 4px;
+  border-radius: 3px; font-weight: 700; font-size: 12px;
+}
+
+/* PWA install prompt */
+.pwa-install-banner {
+  display: none; padding: 10px 16px;
+  background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+  color: #fff; font-size: 13px; font-weight: 600;
+  align-items: center; justify-content: center; gap: 12px;
+  cursor: pointer; text-align: center;
+}
+.pwa-install-banner:hover { filter: brightness(1.1); }
+.pwa-install-banner .pwa-dismiss {
+  background: rgba(255,255,255,.2); border: none; color: #fff;
+  border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 11px;
+}
+
 .chat-messages {
   flex: 1; overflow-y: auto; padding: 12px; min-height: 200px;
   display: flex; flex-direction: column; gap: 6px;
@@ -566,11 +611,19 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
   <div class="chat-messages" id="chatMessages">
     <p style="color:var(--muted);text-align:center;font-size:13px;margin-top:40px;">Select a conversation to start chatting</p>
   </div>
-  <div class="chat-input-row" id="chatInputRow">
+  <div style="position:relative;">
+    <div class="chat-mention-popup" id="chatMentionPopup"></div>
+    <div class="chat-input-row" id="chatInputRow">
     <input type="text" class="chat-input" id="chatInput" placeholder="Type a message..."
-      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}">
+      onkeydown="handleChatKeydown(event)">
     <button class="chat-send-btn" id="chatSendBtn" onclick="sendChatMessage()">Send</button>
+    </div>
   </div>
+</div>
+
+<div class="pwa-install-banner" id="pwaInstallBanner" onclick="installPWA()">
+  📱 Install SA Dashboard on your device for push notifications
+  <button class="pwa-dismiss" onclick="event.stopPropagation();dismissPwaInstall();">✕</button>
 </div>
 
 <script type="module">
@@ -584,6 +637,7 @@ import {
   getFirestore, doc, setDoc, getDoc, getDocs, collection, deleteDoc, updateDoc, increment,
   addDoc, query, where, orderBy, limit, Timestamp, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging.js';
 
 /************ Firebase config ************/
 const firebaseConfig = {
@@ -601,6 +655,15 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
+
+// ── Firebase Cloud Messaging (Push Notifications) ──
+let messaging = null;
+const FCM_VAPID_KEY = 'PASTE_YOUR_VAPID_KEY_HERE'; // Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
+try {
+  messaging = getMessaging(app);
+} catch (e) {
+  console.warn('[FCM] Messaging not supported in this browser:', e.message);
+}
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxU-KSYkSuyaamd7ybCZlg1QLClfUbc8Ds_AiPZzVdC7hvYSjrc13Ux_hTQfZU_CTa2/exec';
 const SUPERADMIN_EMAIL = 'albertosilvajr0@gmail.com';
@@ -1014,6 +1077,7 @@ async function showDashboard() {
     loadCustomLinks();
     loadCallPatterns();
     initChat();
+    initPushNotifications();
   } catch (err) {
     console.error('Dashboard error:', err);
     document.getElementById('app').innerHTML = `
@@ -3348,9 +3412,26 @@ async function showVehicleDemand() {
   logPageView('Vehicle Demand');
   showLoading();
   try {
-    const url = `${SCRIPT_URL}?route=vehicledemand&session=${encodeURIComponent(window.sessionToken || '')}`;
-    const resp = await fetch(url);
-    const data = await resp.json();
+    let data = null;
+    // ── Firestore first ──
+    try {
+      const snapDoc = await getDoc(doc(db, 'dashboardSnapshots', 'vehicledemand'));
+      if (snapDoc.exists()) {
+        const raw = snapDoc.data();
+        data = JSON.parse(raw.jsonData);
+        data.ok = true;
+        const updatedAt = raw.updatedAt?.toDate?.() || new Date(raw.updatedAt);
+        console.log(`[Firestore] Vehicle demand loaded (age: ${Math.round((Date.now() - updatedAt.getTime())/60000)}min)`);
+      }
+    } catch (fsErr) {
+      console.warn('[Firestore] Vehicle demand read failed:', fsErr.message);
+    }
+    // ── GAS fallback ──
+    if (!data) {
+      const url = `${SCRIPT_URL}?route=vehicledemand&session=${encodeURIComponent(window.sessionToken || '')}`;
+      const resp = await fetch(url);
+      data = await resp.json();
+    }
     if (!data.ok) { alert('Error loading vehicle data'); showDashboard(); return; }
     _vehData = data;
     _vehSort = { col: 'total', dir: 'desc' };
@@ -4013,11 +4094,27 @@ async function showCompetitiveAnalysis() {
     </div>`;
 
   try {
-    const url = `${SCRIPT_URL}?route=comp_analysis&session=${encodeURIComponent(window.sessionToken || '')}`;
-    const resp = await fetch(url);
-    const raw = await resp.text();
-    let result;
-    try { result = JSON.parse(raw); } catch { throw new Error('Non-JSON response from backend'); }
+    let result = null;
+    // ── Firestore first ──
+    try {
+      const snapDoc = await getDoc(doc(db, 'dashboardSnapshots', 'comp_analysis'));
+      if (snapDoc.exists()) {
+        const raw = snapDoc.data();
+        result = JSON.parse(raw.jsonData);
+        result.ok = true;
+        const updatedAt = raw.updatedAt?.toDate?.() || new Date(raw.updatedAt);
+        console.log(`[Firestore] Comp analysis loaded (age: ${Math.round((Date.now() - updatedAt.getTime())/60000)}min)`);
+      }
+    } catch (fsErr) {
+      console.warn('[Firestore] Comp analysis read failed:', fsErr.message);
+    }
+    // ── GAS fallback ──
+    if (!result) {
+      const url = `${SCRIPT_URL}?route=comp_analysis&session=${encodeURIComponent(window.sessionToken || '')}`;
+      const resp = await fetch(url);
+      const raw = await resp.text();
+      try { result = JSON.parse(raw); } catch { throw new Error('Non-JSON response from backend'); }
+    }
     if (!result.ok) throw new Error(result.error || 'Backend error');
     _compData = result;
     _compFilter = 'all';
@@ -5488,7 +5585,8 @@ function _renderChatMessages(messages) {
 
     const timeStr = ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     const senderDisplay = _formatChatName(msg.senderName || 'Unknown');
-    const escapedText = (msg.text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+    const escapedText = (msg.text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')
+      .replace(/@(\w+\s\w\.)/g, '<span class="chat-mention-tag">@$1</span>');
 
     html += `
       <div class="chat-msg ${isMine ? 'mine' : 'other'}">
@@ -5520,8 +5618,13 @@ async function sendChatMessage() {
   if (!text) return;
   if (!window.userData?.uid) return;
 
+  // Capture mentions before clearing
+  const mentions = _chatMentions.map(m => m.uid);
+
   btn.disabled = true;
   input.value = '';
+  _chatMentions = [];
+  _closeMentionPopup();
 
   try {
     const msgData = {
@@ -5531,6 +5634,11 @@ async function sendChatMessage() {
       channel: _chatChannel,
       createdAt: serverTimestamp()
     };
+
+    // Add @mention UIDs
+    if (mentions.length > 0) {
+      msgData.mentions = mentions;
+    }
 
     // Add DM-specific fields
     if (_chatMode === 'dm' && _chatDmTarget) {
@@ -5543,7 +5651,6 @@ async function sendChatMessage() {
     await addDoc(collection(db, 'chatMessages'), msgData);
   } catch (err) {
     console.error('[Chat] Send error:', err);
-    // Put the text back so they don't lose it
     input.value = text;
     alert('Failed to send message. Please try again.');
   }
@@ -5657,6 +5764,283 @@ window.addEventListener('beforeunload', () => {
 });
 
 window.initChat = initChat;
+
+/* ══════════════════════════════════════════
+   PWA + PUSH NOTIFICATIONS + @MENTIONS
+   ══════════════════════════════════════════ */
+
+// ── Service Worker Registration ──
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return null;
+  try {
+    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    console.log('[SW] Registered:', reg.scope);
+    return reg;
+  } catch (e) {
+    console.warn('[SW] Registration failed:', e.message);
+    return null;
+  }
+}
+
+// ── FCM Token Management ──
+async function requestNotificationPermission() {
+  if (!messaging) return;
+  if (!('Notification' in window)) return;
+
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      console.log('[FCM] Notification permission denied');
+      return;
+    }
+
+    const swReg = await navigator.serviceWorker.ready;
+    const token = await getToken(messaging, {
+      vapidKey: FCM_VAPID_KEY,
+      serviceWorkerRegistration: swReg
+    });
+
+    if (token && window.userData?.uid) {
+      // Store token in user's Firestore doc (array of tokens for multi-device)
+      const userRef = doc(db, 'users', window.userData.uid);
+      const userDoc = await getDoc(userRef);
+      const existing = userDoc.exists() ? (userDoc.data().fcmTokens || []) : [];
+
+      if (!existing.includes(token)) {
+        existing.push(token);
+        await setDoc(userRef, { fcmTokens: existing }, { merge: true });
+        console.log('[FCM] Token saved to Firestore');
+      } else {
+        console.log('[FCM] Token already registered');
+      }
+    }
+  } catch (e) {
+    console.warn('[FCM] Token registration failed:', e.message);
+  }
+}
+
+// ── Foreground Message Handler ──
+function setupForegroundMessages() {
+  if (!messaging) return;
+  onMessage(messaging, (payload) => {
+    console.log('[FCM] Foreground message:', payload);
+    const { title, body } = payload.notification || {};
+    const data = payload.data || {};
+
+    // Don't show notification if user is actively viewing that channel
+    if (_chatOpen && _chatChannel === data.channel) return;
+
+    // Show a toast-style notification
+    showChatToast(title || 'New Message', body || '', data.channel);
+  });
+}
+
+function showChatToast(title, body, channel) {
+  // Remove existing toast
+  const old = document.getElementById('chatToast');
+  if (old) old.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'chatToast';
+  toast.style.cssText = 'position:fixed;top:16px;right:16px;background:#1c1917;color:#fff;padding:12px 18px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:10001;max-width:320px;cursor:pointer;animation:slideIn .3s ease;font-size:13px;';
+  toast.innerHTML = `<div style="font-weight:700;margin-bottom:2px;">${title}</div><div style="opacity:.8;font-size:12px;">${body}</div>`;
+  toast.onclick = () => {
+    toast.remove();
+    if (!_chatOpen) toggleChat();
+    if (channel && !channel.startsWith('dm_')) switchChatChannel(channel);
+  };
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 5000);
+}
+
+// ── @Mention Autocomplete ──
+let _chatMentions = []; // Array of {uid, name} for current message
+let _mentionActive = false;
+let _mentionQuery = '';
+let _mentionStartIdx = -1;
+let _mentionSelectedIdx = 0;
+
+function handleChatKeydown(event) {
+  if (_mentionActive) {
+    const popup = document.getElementById('chatMentionPopup');
+    const items = popup ? popup.querySelectorAll('.chat-mention-item') : [];
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      _mentionSelectedIdx = Math.min(_mentionSelectedIdx + 1, items.length - 1);
+      _highlightMentionItem(items);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      _mentionSelectedIdx = Math.max(_mentionSelectedIdx - 1, 0);
+      _highlightMentionItem(items);
+      return;
+    }
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      event.preventDefault();
+      if (items[_mentionSelectedIdx]) {
+        const uid = items[_mentionSelectedIdx].dataset.uid;
+        const name = items[_mentionSelectedIdx].dataset.name;
+        _insertMention(uid, name);
+      }
+      return;
+    }
+    if (event.key === 'Escape') {
+      _closeMentionPopup();
+      return;
+    }
+  }
+
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    sendChatMessage();
+  }
+}
+window.handleChatKeydown = handleChatKeydown;
+
+function _onChatInputChange() {
+  const input = document.getElementById('chatInput');
+  if (!input) return;
+
+  const val = input.value;
+  const cursorPos = input.selectionStart;
+
+  // Look backwards from cursor for an @ that starts a mention
+  let atIdx = -1;
+  for (let i = cursorPos - 1; i >= 0; i--) {
+    if (val[i] === '@') { atIdx = i; break; }
+    if (val[i] === ' ' && i < cursorPos - 1) break; // stop at space before query
+  }
+
+  if (atIdx >= 0 && (atIdx === 0 || val[atIdx - 1] === ' ')) {
+    const queryStr = val.substring(atIdx + 1, cursorPos).toLowerCase();
+    _mentionActive = true;
+    _mentionQuery = queryStr;
+    _mentionStartIdx = atIdx;
+    _mentionSelectedIdx = 0;
+    _renderMentionPopup(queryStr);
+  } else {
+    _closeMentionPopup();
+  }
+}
+
+function _renderMentionPopup(q) {
+  const popup = document.getElementById('chatMentionPopup');
+  if (!popup) return;
+
+  const filtered = _chatUsers.filter(u =>
+    u.name.toLowerCase().includes(q) ||
+    _formatChatName(u.name).toLowerCase().includes(q)
+  ).slice(0, 8);
+
+  if (!filtered.length) {
+    popup.classList.remove('visible');
+    return;
+  }
+
+  const statusColors = { active: '#22c55e', idle: '#f97316', offline: '#a1a1aa' };
+
+  popup.innerHTML = filtered.map((u, i) => `
+    <div class="chat-mention-item ${i === _mentionSelectedIdx ? 'active' : ''}"
+         data-uid="${u.uid}" data-name="${u.name}"
+         onclick="selectMention('${u.uid}','${u.name.replace(/'/g,"\\'")}')">
+      <span class="mention-dot" style="background:${statusColors[u.status] || '#a1a1aa'};"></span>
+      ${_formatChatName(u.name)}
+    </div>
+  `).join('');
+  popup.classList.add('visible');
+}
+
+function _highlightMentionItem(items) {
+  items.forEach((el, i) => {
+    el.classList.toggle('active', i === _mentionSelectedIdx);
+  });
+}
+
+function selectMention(uid, name) {
+  _insertMention(uid, name);
+}
+window.selectMention = selectMention;
+
+function _insertMention(uid, name) {
+  const input = document.getElementById('chatInput');
+  if (!input) return;
+
+  const displayName = _formatChatName(name);
+  const before = input.value.substring(0, _mentionStartIdx);
+  const after = input.value.substring(input.selectionStart);
+  input.value = before + '@' + displayName + ' ' + after;
+
+  // Track this mention
+  if (!_chatMentions.find(m => m.uid === uid)) {
+    _chatMentions.push({ uid, name });
+  }
+
+  _closeMentionPopup();
+  input.focus();
+  const newPos = _mentionStartIdx + displayName.length + 2; // @name + space
+  input.setSelectionRange(newPos, newPos);
+}
+
+function _closeMentionPopup() {
+  _mentionActive = false;
+  _mentionQuery = '';
+  _mentionStartIdx = -1;
+  const popup = document.getElementById('chatMentionPopup');
+  if (popup) popup.classList.remove('visible');
+}
+
+// Attach input listener for @mention detection
+setTimeout(() => {
+  const chatInput = document.getElementById('chatInput');
+  if (chatInput) {
+    chatInput.addEventListener('input', _onChatInputChange);
+  }
+}, 500);
+
+// ── PWA Install Prompt ──
+let _deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  // Show install banner if not dismissed before
+  if (!localStorage.getItem('pwa-install-dismissed')) {
+    const banner = document.getElementById('pwaInstallBanner');
+    if (banner) banner.style.display = 'flex';
+  }
+});
+
+function installPWA() {
+  if (!_deferredInstallPrompt) {
+    // Already installed or not supported — guide user
+    alert('To install: tap your browser menu (⋮ or Share) → "Add to Home Screen" or "Install App"');
+    return;
+  }
+  _deferredInstallPrompt.prompt();
+  _deferredInstallPrompt.userChoice.then((result) => {
+    console.log('[PWA] Install choice:', result.outcome);
+    _deferredInstallPrompt = null;
+    const banner = document.getElementById('pwaInstallBanner');
+    if (banner) banner.style.display = 'none';
+  });
+}
+window.installPWA = installPWA;
+
+function dismissPwaInstall() {
+  localStorage.setItem('pwa-install-dismissed', '1');
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) banner.style.display = 'none';
+}
+window.dismissPwaInstall = dismissPwaInstall;
+
+// ── Initialize Push on Login ──
+async function initPushNotifications() {
+  await registerServiceWorker();
+  await requestNotificationPermission();
+  setupForegroundMessages();
+}
 
 /* Boot */
 if (auth.currentUser) { showDashboard(); } else { showLogin(); }
