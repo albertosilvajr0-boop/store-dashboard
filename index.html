@@ -728,42 +728,85 @@ const PERSON_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000;
 async function fetchPerson(name) {
   const key = cacheKey(name);
   if (personCache.has(key)) return personCache.get(key);
+
+  // ── Try Firestore first ──
+  let firestoreResult = null;
+  let firestoreAge = Infinity;
   try {
     const snapDoc = await getDoc(doc(db, 'personSnapshots', name.toUpperCase()));
     if (snapDoc.exists()) {
       const raw = snapDoc.data();
       const updatedAt = raw.updatedAt?.toDate?.() || new Date(raw.updatedAt);
-      const ageMs = Date.now() - updatedAt.getTime();
-      if (ageMs < PERSON_SNAPSHOT_MAX_AGE_MS) {
-        const payload = JSON.parse(raw.jsonData);
-        const result = { ok: true, data: payload, _source: 'firestore' };
-        personCache.set(key, result);
-        console.log(`[Firestore] ${name} loaded (age: ${Math.round(ageMs/1000)}s)`);
+      firestoreAge = Date.now() - updatedAt.getTime();
+      const payload = JSON.parse(raw.jsonData);
+      firestoreResult = { ok: true, data: payload, _source: 'firestore' };
+      console.log(`[Firestore] ${name} loaded (age: ${Math.round(firestoreAge/1000)}s)`);
+
+      // If fresh enough, return immediately
+      if (firestoreAge < PERSON_SNAPSHOT_MAX_AGE_MS) {
+        personCache.set(key, firestoreResult);
+        return firestoreResult;
+      }
+    }
+  } catch (fsErr) {
+    console.warn('[Firestore] Person read failed:', fsErr.message);
+  }
+
+  // ── GAS fallback (wrapped in try-catch for CORS) ──
+  try {
+    const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data?.ok) { personCache.set(key, data); return data; }
+  } catch (gasErr) {
+    console.warn(`[GAS] Person fetch failed for ${name} (CORS expected):`, gasErr.message);
+  }
+
+  // ── Use stale Firestore data if GAS failed ──
+  if (firestoreResult) {
+    console.log(`[Firestore] Using stale snapshot for ${name} (age: ${Math.round(firestoreAge/60000)}min)`);
+    personCache.set(key, firestoreResult);
+    return firestoreResult;
+  }
+
+  return { ok: false, error: 'No data available' };
+}
+
+async function fetchCalls(name) {
+  const key = cacheKey(name);
+  if (callListCache.has(key)) return callListCache.get(key);
+
+  // ── Try Firestore personSnapshot for embedded callsByDate ──
+  try {
+    const snapDoc = await getDoc(doc(db, 'personSnapshots', name.toUpperCase()));
+    if (snapDoc.exists()) {
+      const raw = snapDoc.data();
+      const payload = JSON.parse(raw.jsonData);
+      if (payload.callsByDate || payload.calls) {
+        const result = { ok: true, data: payload.callsByDate || payload.calls, _source: 'firestore' };
+        callListCache.set(key, result);
         return result;
       }
     }
   } catch (fsErr) {
-    console.warn('[Firestore] Person read failed, falling back to GAS:', fsErr.message);
+    console.warn('[Firestore] Calls read failed:', fsErr.message);
   }
-  const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  if (data?.ok) personCache.set(key, data);
-  return data;
-}
-async function fetchCalls(name) {
-  const key = cacheKey(name);
-  if (callListCache.has(key)) return callListCache.get(key);
-  const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  if (data?.ok) callListCache.set(key, data);
-  return data;
+
+  // ── GAS fallback (wrapped in try-catch for CORS) ──
+  try {
+    const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data?.ok) { callListCache.set(key, data); return data; }
+  } catch (gasErr) {
+    console.warn(`[GAS] Calls fetch failed for ${name} (CORS expected):`, gasErr.message);
+  }
+
+  return { ok: false, error: 'No call data available' };
 }
 
 /* ── Prefetch helpers ── */
 const _prefetchingPerson = new Set();
-const _prefetchingCalls = new Set();
 
 function prefetchPerson(name) {
   if (!name) return;
@@ -772,39 +815,28 @@ function prefetchPerson(name) {
   _prefetchingPerson.add(key);
   fetchPerson(name).catch(() => {}).finally(() => _prefetchingPerson.delete(key));
 }
-function prefetchCalls(name) {
-  if (!name) return;
-  const key = cacheKey(name);
-  if (callListCache.has(key) || _prefetchingCalls.has(key)) return;
-  _prefetchingCalls.add(key);
-  fetchCalls(name).catch(() => {}).finally(() => _prefetchingCalls.delete(key));
-}
 
 // Hover prefetch: triggered on mouseenter of leaderboard rows
 function onRowHover(name) {
   prefetchPerson(name);
-  prefetchCalls(name);
 }
 
-// Staggered prefetch: fetch all names with delays so we don't overwhelm GAS
+// Staggered prefetch: fetch person snapshots from Firestore (no GAS spam)
 function prefetchForDashboard(data) {
   const allNames = new Set();
   (data.sales || []).forEach(x => { if (x.name) allNames.add(x.name); });
   (data.bdc || []).forEach(x => { if (x.name) allNames.add(x.name); });
   if (window.userData?.linkedName) allNames.add(window.userData.linkedName);
 
-  // Priority: own name + top 3 immediately
-  const topSales = (data.sales || []).map(x => x.name);
-  const topBDC = (data.bdc || []).map(x => x.name);
+  // Priority: own name first
   const mine = window.userData?.linkedName ? [window.userData.linkedName] : [];
-  const priority = [...new Set([...mine, ...topSales, ...topBDC])];
-  priority.forEach(n => { prefetchPerson(n); prefetchCalls(n); });
+  const priority = [...new Set([...mine])];
+  priority.forEach(n => prefetchPerson(n));
 
-  // Rest: stagger 500ms apart to avoid overwhelming GAS
+  // Rest: stagger 200ms apart (Firestore reads are fast, no need for 500ms)
   const rest = [...allNames].filter(n => !priority.includes(n));
   rest.forEach((n, i) => {
-    setTimeout(() => prefetchPerson(n), (i + 1) * 500);
-    setTimeout(() => prefetchCalls(n), (i + 1) * 500 + 250);
+    setTimeout(() => prefetchPerson(n), (i + 1) * 200);
   });
 }
 
@@ -1887,7 +1919,7 @@ async function showPersonDetails(name, type) {
   const appEl = document.getElementById('app');
 
   // Also start fetching calls in background so they're ready when user clicks "View Call Sheets"
-  prefetchCalls(name);
+  fetchCalls(name).catch(() => {});
 
   // Instant preview: use dashboard data we already have while full details load
   const preview = getDashboardRow(name);
