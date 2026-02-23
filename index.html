@@ -2914,7 +2914,13 @@ async function loadActivity() {
     const notSignedIn = Object.values(userMap).filter(u => !todayUids.has(u.uid));
     const notSignedInSales = notSignedIn.filter(u => u.role === 'user');
     const notSignedInMgmt = notSignedIn.filter(u => ['admin','superadmin','manager'].includes(u.role));
-    notSignedIn.sort((a, b) => (a.linkedName || a.email).localeCompare(b.linkedName || b.email));
+    notSignedIn.sort((a, b) => {
+      // Most recent login first; never-logged-in users go last
+      if (!a.lastLogin && !b.lastLogin) return (a.linkedName || a.email).localeCompare(b.linkedName || b.email);
+      if (!a.lastLogin) return 1;
+      if (!b.lastLogin) return -1;
+      return b.lastLogin - a.lastLogin;
+    });
 
     const salesLoggedIn = todayGroup.filter(u => u.role === 'user').length;
     const mgmtLoggedIn = todayGroup.filter(u => ['admin','superadmin','manager'].includes(u.role)).length;
