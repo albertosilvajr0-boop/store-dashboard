@@ -798,14 +798,15 @@ async function fetchCalls(name) {
   const key = cacheKey(name);
   if (callListCache.has(key)) return callListCache.get(key);
 
-  // ── Firestore only (embedded in personSnapshot) ──
+  // ── Firestore only (embedded in personSnapshot as callList) ──
   try {
     const snapDoc = await getDoc(doc(db, 'personSnapshots', name.toUpperCase()));
     if (snapDoc.exists()) {
       const raw = snapDoc.data();
       const payload = JSON.parse(raw.jsonData);
-      if (payload.callsByDate || payload.calls) {
-        const result = { ok: true, data: payload.callsByDate || payload.calls, _source: 'firestore' };
+      // callList = { name, calls: [...] } — matches what viewCallSheets expects
+      if (payload.callList && payload.callList.calls) {
+        const result = { ok: true, data: payload.callList, _source: 'firestore' };
         callListCache.set(key, result);
         return result;
       }
@@ -814,7 +815,7 @@ async function fetchCalls(name) {
     console.warn('[Firestore] Calls read failed for', name, ':', fsErr.message);
   }
 
-  return { ok: false, error: 'No call data available' };
+  return { ok: false, error: 'No call data available — run the daily snapshot to include call sheets.' };
 }
 
 /* ── Prefetch helpers ── */
