@@ -556,6 +556,8 @@ const PERSON_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000;
 async function fetchPerson(name) {
   const key = cacheKey(name);
   if (personCache.has(key)) return personCache.get(key);
+
+  // ── 1. Try Firestore first (fast, no CORS issues) ──
   try {
     const snapDoc = await getDoc(doc(db, 'personSnapshots', name.toUpperCase()));
     if (snapDoc.exists()) {
@@ -568,25 +570,63 @@ async function fetchPerson(name) {
         personCache.set(key, result);
         console.log(`[Firestore] ${name} loaded (age: ${Math.round(ageMs/1000)}s)`);
         return result;
+      } else {
+        // Stale but still usable — cache it and return while GAS fallback runs
+        const payload = JSON.parse(raw.jsonData);
+        const staleResult = { ok: true, data: payload, _source: 'firestore-stale' };
+        personCache.set(key, staleResult);
+        console.log(`[Firestore] ${name} loaded (STALE: ${Math.round(ageMs/60000)}min old, using anyway)`);
+        return staleResult;
       }
     }
   } catch (fsErr) {
     console.warn('[Firestore] Person read failed, falling back to GAS:', fsErr.message);
   }
-  const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  if (data?.ok) personCache.set(key, data);
-  return data;
+
+  // ── 2. GAS fallback (wrapped in try-catch to survive CORS errors) ──
+  try {
+    const url = `${SCRIPT_URL}?route=person&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
+    const resp = await fetch(url, { redirect: 'follow' });
+    const data = await resp.json();
+    if (data?.ok) personCache.set(key, data);
+    return data;
+  } catch (gasErr) {
+    console.warn(`[GAS] Person fetch failed for ${name} (likely CORS):`, gasErr.message);
+    return { ok: false, error: 'Data temporarily unavailable', _source: 'gas-failed' };
+  }
 }
 async function fetchCalls(name) {
   const key = cacheKey(name);
   if (callListCache.has(key)) return callListCache.get(key);
-  const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  if (data?.ok) callListCache.set(key, data);
-  return data;
+
+  // ── Try Firestore personSnapshot for embedded call data ──
+  try {
+    const snapDoc = await getDoc(doc(db, 'personSnapshots', name.toUpperCase()));
+    if (snapDoc.exists()) {
+      const raw = snapDoc.data();
+      const payload = JSON.parse(raw.jsonData || '{}');
+      if (payload.callsByDate && payload.callsByDate.length > 0) {
+        const result = { ok: true, callsByDate: payload.callsByDate, _source: 'firestore' };
+        callListCache.set(key, result);
+        console.log(`[Firestore] Calls for ${name} loaded from snapshot`);
+        return result;
+      }
+    }
+  } catch (fsErr) {
+    console.warn('[Firestore] Call data read failed:', fsErr.message);
+  }
+
+  // ── GAS fallback (wrapped to survive CORS) ──
+  try {
+    const url = `${SCRIPT_URL}?route=calls_for&name=${encodeURIComponent(name)}&session=${encodeURIComponent(window.sessionToken || '')}`;
+    const resp = await fetch(url, { redirect: 'follow' });
+    const data = await resp.json();
+    if (data?.ok) callListCache.set(key, data);
+    return data;
+  } catch (gasErr) {
+    console.warn(`[GAS] Calls fetch failed for ${name} (likely CORS):`, gasErr.message);
+    return { ok: false, error: 'Call data temporarily unavailable', _source: 'gas-failed' };
+  }
 }
 
 /* ── Prefetch helpers ── */
@@ -786,13 +826,26 @@ async function showDashboard() {
       console.warn('[Firestore] Leaderboard read failed:', fsErr.message);
     }
     if (!payload) {
-      const url = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken || '')}`;
-      const resp = await fetch(url);
-      const raw = await resp.text();
-      let result;
-      try { result = JSON.parse(raw); } catch { throw new Error(`Non-JSON response.\nHTTP ${resp.status}\n\n${raw}`); }
-      if (!result.ok) throw new Error(result.error || 'Backend returned ok:false');
-      payload = (result.data) ? result.data : result;
+      try {
+        const url = `${SCRIPT_URL}?route=leaderboards&session=${encodeURIComponent(window.sessionToken || '')}`;
+        const resp = await fetch(url, { redirect: 'follow' });
+        const raw = await resp.text();
+        let result;
+        try { result = JSON.parse(raw); } catch { throw new Error(`Non-JSON response.\nHTTP ${resp.status}\n\n${raw}`); }
+        if (!result.ok) throw new Error(result.error || 'Backend returned ok:false');
+        payload = (result.data) ? result.data : result;
+      } catch (gasErr) {
+        console.warn('[GAS] Leaderboard fallback failed (likely CORS):', gasErr.message);
+        // Try Firestore one more time without age check as last resort
+        try {
+          const lbDoc2 = await getDoc(doc(db, 'dashboardSnapshots', 'leaderboards'));
+          if (lbDoc2.exists()) {
+            payload = JSON.parse(lbDoc2.data().jsonData);
+            console.log('[Firestore] Using stale leaderboard data as fallback');
+          }
+        } catch { /* nothing left to try */ }
+        if (!payload) throw new Error('Dashboard data unavailable. Firestore snapshots may need to be refreshed — run warmDashboardCache_() in Apps Script.');
+      }
     }
     dashboardData.sales = Array.isArray(payload?.sales) ? payload.sales : [];
     dashboardData.bdc   = Array.isArray(payload?.bdc)   ? payload.bdc   : [];
@@ -1236,8 +1289,32 @@ function loadCallPatterns() {
   const container = document.getElementById('callPatternsBox');
   if (!container) return;
 
+  // ── Try Firestore first ──
+  getDoc(doc(db, 'dashboardSnapshots', 'callPatterns')).then(snapDoc => {
+    if (snapDoc.exists()) {
+      const raw = snapDoc.data();
+      const payload = JSON.parse(raw.jsonData || '{}');
+      if (payload.heatmap || payload.total) {
+        _callPatternsData = payload.ok !== undefined ? payload : { ok: true, ...payload };
+        _callPatternsFilter = 'total';
+        renderCallPatternsFromCache();
+        console.log('[Firestore] Call patterns loaded from snapshot');
+        return;
+      }
+    }
+    // Firestore didn't have it — try GAS
+    _loadCallPatternsFromGAS();
+  }).catch(() => {
+    _loadCallPatternsFromGAS();
+  });
+}
+
+function _loadCallPatternsFromGAS() {
+  const container = document.getElementById('callPatternsBox');
+  if (!container) return;
+
   const url = `${SCRIPT_URL}?route=callpatterns&session=${encodeURIComponent(window.sessionToken || '')}`;
-  fetch(url).then(r => r.text()).then(raw => {
+  fetch(url, { redirect: 'follow' }).then(r => r.text()).then(raw => {
     let result;
     try { result = JSON.parse(raw); } catch { return; }
     if (!result.ok) return;
@@ -1245,7 +1322,11 @@ function loadCallPatterns() {
     _callPatternsFilter = 'total';
     renderCallPatternsFromCache();
   }).catch(err => {
-    console.error('Call patterns load error:', err);
+    console.warn('[GAS] Call patterns load failed (likely CORS):', err.message);
+    // Don't crash — just leave the section empty or show a subtle message
+    if (container) {
+      container.innerHTML = `<div style="padding:12px;color:var(--muted);font-size:12px;text-align:center;">Call patterns data loading from cache...</div>`;
+    }
   });
 }
 
