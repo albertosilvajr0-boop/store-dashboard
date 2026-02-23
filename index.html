@@ -4979,7 +4979,6 @@ const CHAT_CHANNELS = [
 let _chatChannel = 'general';
 let _chatOpen = false;
 let _chatUnsub = null;       // Firestore onSnapshot unsubscribe
-let _chatUnread = 0;
 let _chatLastSeen = {};      // channel -> timestamp of last seen message
 let _chatInitialized = false;
 let _chatUsers = [];         // all users for DM dropdown
@@ -4995,17 +4994,36 @@ function initChat() {
   const fab = document.getElementById('chatFab');
   if (fab) fab.style.display = 'flex';
 
-  // Load last-seen timestamps from Firestore
+  // Start presence heartbeat (writes lastSeen every 2 min)
+  _chatPresenceHeartbeat();
+  _chatPresenceTimer = setInterval(_chatPresenceHeartbeat, 120000);
+
+  // Load last-seen timestamps from Firestore (triggers initial unread scan)
   _loadChatLastSeen();
 
-  // Load all users for DM dropdown
+  // Rescan unread counts every 60s for channels we're not listening to
+  setInterval(() => _scanAllUnread(), 60000);
+
+  // Load all users for DM dropdown (refresh every 60s for presence dots)
   _loadChatUsers();
+  setInterval(_loadChatUsers, 60000);
 
   // Render channel buttons
   _renderChatChannels();
 
   // Subscribe to default channel
   _subscribeChatChannel(_chatChannel);
+}
+
+let _chatPresenceTimer = null;
+const CHAT_ACTIVE_MS = 5 * 60 * 1000;   // green: seen within 5 min
+const CHAT_IDLE_MS   = 30 * 60 * 1000;  // orange: seen within 30 min
+
+function _chatPresenceHeartbeat() {
+  if (!window.userData?.uid) return;
+  setDoc(doc(db, 'users', window.userData.uid), {
+    chatLastSeen: new Date()
+  }, { merge: true }).catch(() => {});
 }
 
 function toggleChat() {
@@ -5073,21 +5091,52 @@ async function _loadChatUsers() {
   try {
     const snap = await getDocs(collection(db, 'users'));
     _chatUsers = [];
+    const now = Date.now();
 
     snap.forEach(d => {
       const data = d.data();
-      if (data.deleted) return; // skip deleted users (same filter as Manage Users)
+      if (data.deleted) return;
       const name = data.linkedName || data.presenceName || data.displayName || data.email || '';
       if (!name) return;
-      // Don't include self
       if (d.id === window.userData?.uid) return;
 
-      _chatUsers.push({ uid: d.id, name: name, email: data.email || '', role: data.role || 'user' });
+      // Determine presence from chatLastSeen field
+      let status = 'offline';
+      let lastSeen = null;
+      if (data.chatLastSeen?.toDate) lastSeen = data.chatLastSeen.toDate();
+      else if (data.chatLastSeen) lastSeen = new Date(data.chatLastSeen);
+
+      if (lastSeen) {
+        const age = now - lastSeen.getTime();
+        if (age <= CHAT_ACTIVE_MS) status = 'active';
+        else if (age <= CHAT_IDLE_MS) status = 'idle';
+      }
+
+      _chatUsers.push({ uid: d.id, name, email: data.email || '', role: data.role || 'user', status });
     });
 
-    // Sort alphabetically by name
-    _chatUsers.sort((a, b) => a.name.localeCompare(b.name));
+    // Sort: active first, then idle, then offline — alphabetical within each group
+    const statusOrder = { active: 0, idle: 1, offline: 2 };
+    _chatUsers.sort((a, b) => {
+      const s = statusOrder[a.status] - statusOrder[b.status];
+      if (s !== 0) return s;
+      return a.name.localeCompare(b.name);
+    });
+
     _renderDmSelect();
+
+    // Update online count in chat header
+    const activeCount = _chatUsers.filter(u => u.status === 'active').length;
+    const idleCount = _chatUsers.filter(u => u.status === 'idle').length;
+    const countEl = document.getElementById('chatOnlineCount');
+    if (countEl) {
+      const parts = [];
+      if (activeCount > 0) parts.push(`${activeCount} active`);
+      if (idleCount > 0) parts.push(`${idleCount} away`);
+      countEl.innerHTML = parts.length > 0
+        ? `<span style="color:#22c55e;">●</span> ${parts.join(', ')}`
+        : '';
+    }
   } catch (e) {
     console.warn('[Chat] Failed to load users for DM:', e);
   }
@@ -5097,10 +5146,16 @@ function _renderDmSelect() {
   const select = document.getElementById('chatDmSelect');
   if (!select) return;
 
+  const activeCount = _chatUsers.filter(u => u.status === 'active').length;
+  const idleCount = _chatUsers.filter(u => u.status === 'idle').length;
+
   let html = `<option value="">✉ Direct Message…</option>`;
   _chatUsers.forEach(u => {
     const display = _formatChatName(u.name);
-    html += `<option value="${u.uid}">${display}</option>`;
+    let dot = '⚫';
+    if (u.status === 'active') dot = '🟢';
+    else if (u.status === 'idle') dot = '🟠';
+    html += `<option value="${u.uid}">${dot} ${display}</option>`;
   });
   select.innerHTML = html;
 }
@@ -5193,15 +5248,17 @@ function _subscribeChatChannel(channelId) {
     messages.reverse();
     _renderChatMessages(messages);
 
-    // Update unread count if chat is closed
-    if (!_chatOpen && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      const lastMsgTime = lastMsg.createdAt?.toMillis?.() || lastMsg.createdAt?.seconds * 1000 || 0;
+    // Update unread count for THIS channel if chat is closed or viewing a different channel
+    if (!_chatOpen || _chatChannel !== channelId) {
       const lastSeen = _chatLastSeen[channelId] || 0;
-      if (lastMsgTime > lastSeen && lastMsg.senderUid !== window.userData?.uid) {
-        _chatUnread++;
-        _updateUnreadBadge();
-      }
+      let count = 0;
+      messages.forEach(msg => {
+        if (msg.senderUid === window.userData?.uid) return;
+        const msgTime = msg.createdAt?.toMillis?.() || (msg.createdAt?.seconds ? msg.createdAt.seconds * 1000 : 0);
+        if (msgTime > lastSeen) count++;
+      });
+      _chatUnreadMap[channelId] = count;
+      _updateUnreadBadge();
     }
 
     // Auto-scroll to bottom
@@ -5210,7 +5267,7 @@ function _subscribeChatChannel(channelId) {
     }
 
     // If chat is open on this channel, mark as read
-    if (_chatOpen) {
+    if (_chatOpen && _chatChannel === channelId) {
       _markChannelRead(channelId);
     }
   }, (err) => {
@@ -5314,7 +5371,9 @@ async function sendChatMessage() {
 }
 window.sendChatMessage = sendChatMessage;
 
-// ── Unread tracking ──
+// ── Unread tracking (per-channel) ──
+let _chatUnreadMap = {};  // channel -> unread count
+
 async function _loadChatLastSeen() {
   if (!window.userData?.uid) return;
   try {
@@ -5323,11 +5382,14 @@ async function _loadChatLastSeen() {
       _chatLastSeen = snap.data() || {};
     }
   } catch (e) { /* ignore */ }
+
+  // Initial unread scan after loading lastSeen
+  await _scanAllUnread();
 }
 
 async function _markChannelRead(channelId) {
   _chatLastSeen[channelId] = Date.now();
-  _chatUnread = 0;
+  _chatUnreadMap[channelId] = 0;
   _updateUnreadBadge();
 
   if (!window.userData?.uid) return;
@@ -5336,20 +5398,84 @@ async function _markChannelRead(channelId) {
   } catch (e) { /* ignore */ }
 }
 
+function _getTotalUnread() {
+  return Object.values(_chatUnreadMap).reduce((sum, n) => sum + n, 0);
+}
+
 function _updateUnreadBadge() {
   const badge = document.getElementById('chatUnreadBadge');
   if (!badge) return;
-  if (_chatUnread > 0) {
-    badge.textContent = _chatUnread > 99 ? '99+' : _chatUnread;
+  const total = _getTotalUnread();
+  if (total > 0) {
+    badge.textContent = total > 99 ? '99+' : total;
     badge.style.display = 'flex';
   } else {
     badge.style.display = 'none';
   }
 }
 
-// Clean up listener on page unload
+// Scan all group channels + DMs for unread messages
+async function _scanAllUnread() {
+  if (!window.userData?.uid) return;
+
+  // 1) Check group channels
+  const channelIds = CHAT_CHANNELS
+    .filter(ch => ch.id !== 'managers' || isAdmin() || isManager())
+    .map(ch => ch.id);
+
+  for (const chId of channelIds) {
+    try {
+      const q = query(
+        collection(db, 'chatMessages'),
+        where('channel', '==', chId),
+        orderBy('createdAt', 'desc'),
+        limit(20)
+      );
+      const snap = await getDocs(q);
+      const lastSeen = _chatLastSeen[chId] || 0;
+      let count = 0;
+      snap.forEach(d => {
+        const data = d.data();
+        if (data.senderUid === window.userData.uid) return;
+        const msgTime = data.createdAt?.toMillis?.() || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0);
+        if (msgTime > lastSeen) count++;
+      });
+      _chatUnreadMap[chId] = count;
+    } catch (e) { /* index might not exist yet, ignore */ }
+  }
+
+  // 2) Check DMs sent to this user
+  try {
+    const dmQ = query(
+      collection(db, 'chatMessages'),
+      where('recipientUid', '==', window.userData.uid),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+    const dmSnap = await getDocs(dmQ);
+    const dmChannelCounts = {};
+    dmSnap.forEach(d => {
+      const data = d.data();
+      const ch = data.channel || '';
+      if (!ch.startsWith('dm_')) return;
+      const lastSeen = _chatLastSeen[ch] || 0;
+      const msgTime = data.createdAt?.toMillis?.() || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0);
+      if (msgTime > lastSeen) {
+        dmChannelCounts[ch] = (dmChannelCounts[ch] || 0) + 1;
+      }
+    });
+    Object.entries(dmChannelCounts).forEach(([ch, count]) => {
+      _chatUnreadMap[ch] = count;
+    });
+  } catch (e) { /* index might not exist yet for DM query, ignore */ }
+
+  _updateUnreadBadge();
+}
+
+// Clean up listener and presence on page unload
 window.addEventListener('beforeunload', () => {
   if (_chatUnsub) _chatUnsub();
+  if (_chatPresenceTimer) clearInterval(_chatPresenceTimer);
 });
 
 window.initChat = initChat;
