@@ -351,36 +351,41 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
 }
 .chat-drawer-close:hover { color: #fff; }
 
-.chat-channels {
-  display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--line);
-  background: #fafaf9; overflow-x: auto;
+.chat-nav-row {
+  display: flex; gap: 4px; padding: 8px 10px;
+  border-bottom: 1px solid var(--line); background: #fafaf9;
+  align-items: center;
 }
-.chat-ch-btn {
-  padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
-  cursor: pointer; border: 1px solid var(--line);
-  background: var(--chipBg); color: var(--text); white-space: nowrap;
-  transition: all .15s;
-}
-.chat-ch-btn.active { background: var(--chipOn); color: #fff; border-color: transparent; }
-.chat-ch-btn.dm-active { background: #7c3aed; color: #fff; border-color: transparent; }
-
-.chat-dm-row {
-  display: flex; padding: 0 12px 8px; background: #fafaf9;
-  border-bottom: 1px solid var(--line);
-}
-.chat-dm-select {
-  flex: 1; padding: 5px 10px; border-radius: 8px; font-size: 12px;
+.chat-nav-select {
+  flex: 1; padding: 6px 8px; border-radius: 8px; font-size: 11px;
   font-weight: 600; font-family: inherit;
   border: 1px solid var(--line); background: var(--card);
   color: var(--text); cursor: pointer; outline: none;
   appearance: none; -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 28px;
+  background-position: right 6px center;
+  padding-right: 22px;
+  min-width: 0;
 }
-.chat-dm-select:focus { border-color: #7c3aed; }
-.chat-dm-select option { font-weight: 500; }
+.chat-nav-select:focus { border-color: var(--accent); }
+
+.chat-inbox-btn {
+  padding: 6px 8px; border-radius: 8px; font-size: 11px;
+  font-weight: 700; font-family: inherit;
+  border: 1px solid var(--line); background: var(--card);
+  color: var(--text); cursor: pointer; white-space: nowrap;
+  display: flex; align-items: center; gap: 4px;
+  transition: all .15s;
+}
+.chat-inbox-btn:hover { border-color: var(--accent); background: #fef3c7; }
+.chat-inbox-btn.has-unread { border-color: #dc2626; color: #dc2626; background: #fef2f2; }
+.chat-inbox-count {
+  background: #dc2626; color: #fff; font-size: 10px; font-weight: 700;
+  min-width: 16px; height: 16px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px;
+}
 
 .chat-dm-header {
   display: flex; align-items: center; gap: 6px; padding: 6px 12px;
@@ -392,6 +397,41 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
   color: #7c3aed; padding: 0 4px;
 }
 .chat-dm-header button:hover { color: #5b21b6; }
+
+.chat-inbox-view {
+  flex: 1; overflow-y: auto; padding: 0; min-height: 200px;
+}
+.chat-inbox-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
+  cursor: pointer; transition: background .12s;
+}
+.chat-inbox-row:hover { background: #f5f3ff; }
+.chat-inbox-row .inbox-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #dc2626; flex-shrink: 0;
+}
+.chat-inbox-row .inbox-channel {
+  font-size: 12px; font-weight: 700; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 120px;
+}
+.chat-inbox-row .inbox-preview {
+  flex: 1; font-size: 11px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-inbox-row .inbox-count {
+  background: #dc2626; color: #fff; font-size: 10px; font-weight: 700;
+  min-width: 18px; height: 18px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 5px; flex-shrink: 0;
+}
+.chat-inbox-row .inbox-time {
+  font-size: 10px; color: var(--muted); white-space: nowrap; flex-shrink: 0;
+}
+.chat-inbox-empty {
+  text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px;
+}
 
 .chat-messages {
   flex: 1; overflow-y: auto; padding: 12px; min-height: 200px;
@@ -510,16 +550,23 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
       <button class="chat-drawer-close" onclick="toggleChat()">✕</button>
     </div>
   </div>
-  <div class="chat-channels" id="chatChannels"></div>
-  <div class="chat-dm-row" id="chatDmRow">
-    <select class="chat-dm-select" id="chatDmSelect" onchange="openDirectMessage(this.value)">
+  <div class="chat-nav-row" id="chatNavRow">
+    <select class="chat-nav-select" id="chatGroupSelect" onchange="switchChatChannel(this.value)">
+      <option value="">👥 Group Messages…</option>
+    </select>
+    <select class="chat-nav-select" id="chatDmSelect" onchange="openDirectMessage(this.value)">
       <option value="">✉ Direct Message…</option>
     </select>
+    <button class="chat-inbox-btn" id="chatInboxBtn" onclick="toggleChatInbox()">
+      📥 Unread <span class="chat-inbox-count" id="chatInboxCount" style="display:none;">0</span>
+    </button>
   </div>
+  <div class="chat-dm-header" id="chatDmHeader" style="display:none;"></div>
+  <div class="chat-inbox-view" id="chatInboxView" style="display:none;"></div>
   <div class="chat-messages" id="chatMessages">
-    <p style="color:var(--muted);text-align:center;font-size:13px;margin-top:40px;">Select a channel to start chatting</p>
+    <p style="color:var(--muted);text-align:center;font-size:13px;margin-top:40px;">Select a conversation to start chatting</p>
   </div>
-  <div class="chat-input-row">
+  <div class="chat-input-row" id="chatInputRow">
     <input type="text" class="chat-input" id="chatInput" placeholder="Type a message..."
       onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}">
     <button class="chat-send-btn" id="chatSendBtn" onclick="sendChatMessage()">Send</button>
@@ -5048,48 +5095,167 @@ function toggleChat() {
 }
 window.toggleChat = toggleChat;
 
-function _renderChatChannels() {
-  const container = document.getElementById('chatChannels');
-  if (!container) return;
+let _chatInboxOpen = false;
+let _chatInboxMessages = {};  // channel -> { lastMsg, lastMsgTime, senderName }
 
-  // Filter: managers-only channel
+function _renderChatChannels() {
+  const groupSelect = document.getElementById('chatGroupSelect');
+  if (!groupSelect) return;
+
   const channels = CHAT_CHANNELS.filter(ch => {
     if (ch.id === 'managers' && !isAdmin() && !isManager()) return false;
     return true;
   });
 
-  container.innerHTML = channels.map(ch => {
-    const active = (_chatMode === 'channel' && ch.id === _chatChannel) ? 'active' : '';
-    return `<button class="chat-ch-btn ${active}" onclick="switchChatChannel('${ch.id}')">${ch.label}</button>`;
-  }).join('');
+  let html = '<option value="">👥 Group Messages…</option>';
+  channels.forEach(ch => {
+    const unread = _chatUnreadMap[ch.id] || 0;
+    const badge = unread > 0 ? ` (${unread})` : '';
+    const selected = (_chatMode === 'channel' && ch.id === _chatChannel) ? 'selected' : '';
+    html += `<option value="${ch.id}" ${selected}>${ch.label}${badge}</option>`;
+  });
+  groupSelect.innerHTML = html;
 
   // Update DM select highlight
   const dmSelect = document.getElementById('chatDmSelect');
   if (dmSelect && _chatMode !== 'dm') dmSelect.value = '';
+  if (groupSelect && _chatMode !== 'channel') groupSelect.value = '';
 
   // Show/hide DM header bar
   _renderDmHeader();
+
+  // Update inbox button state
+  _updateInboxBtn();
 }
 
 function _renderDmHeader() {
-  // Remove existing header if present
-  let existing = document.getElementById('chatDmHeader');
-  if (existing) existing.remove();
+  const header = document.getElementById('chatDmHeader');
+  if (!header) return;
 
-  if (_chatMode !== 'dm' || !_chatDmTarget) return;
+  if (_chatMode !== 'dm' || !_chatDmTarget) {
+    header.style.display = 'none';
+    return;
+  }
 
-  const msgBox = document.getElementById('chatMessages');
-  if (!msgBox) return;
-
-  const header = document.createElement('div');
-  header.className = 'chat-dm-header';
-  header.id = 'chatDmHeader';
+  header.style.display = 'flex';
   header.innerHTML = `
-    <button onclick="exitDm()" title="Back to channels">←</button>
+    <button onclick="exitDm()" title="Back">←</button>
     <span>✉ ${_formatChatName(_chatDmTarget.name)}</span>
   `;
-  msgBox.parentNode.insertBefore(header, msgBox);
 }
+
+function _updateInboxBtn() {
+  const btn = document.getElementById('chatInboxBtn');
+  const countEl = document.getElementById('chatInboxCount');
+  if (!btn || !countEl) return;
+
+  const total = _getTotalUnread();
+  if (total > 0) {
+    countEl.textContent = total > 99 ? '99+' : total;
+    countEl.style.display = 'flex';
+    btn.classList.add('has-unread');
+  } else {
+    countEl.style.display = 'none';
+    btn.classList.remove('has-unread');
+  }
+}
+
+function toggleChatInbox() {
+  _chatInboxOpen = !_chatInboxOpen;
+  const inboxView = document.getElementById('chatInboxView');
+  const msgView = document.getElementById('chatMessages');
+  const inputRow = document.getElementById('chatInputRow');
+
+  if (_chatInboxOpen) {
+    _renderChatInbox();
+    if (inboxView) inboxView.style.display = 'block';
+    if (msgView) msgView.style.display = 'none';
+    if (inputRow) inputRow.style.display = 'none';
+  } else {
+    if (inboxView) inboxView.style.display = 'none';
+    if (msgView) msgView.style.display = 'flex';
+    if (inputRow) inputRow.style.display = 'flex';
+  }
+}
+window.toggleChatInbox = toggleChatInbox;
+
+function _closeChatInbox() {
+  _chatInboxOpen = false;
+  const inboxView = document.getElementById('chatInboxView');
+  const msgView = document.getElementById('chatMessages');
+  const inputRow = document.getElementById('chatInputRow');
+  if (inboxView) inboxView.style.display = 'none';
+  if (msgView) msgView.style.display = 'flex';
+  if (inputRow) inputRow.style.display = 'flex';
+}
+
+function _renderChatInbox() {
+  const container = document.getElementById('chatInboxView');
+  if (!container) return;
+
+  // Build list of channels with unread messages
+  const unreadChannels = Object.entries(_chatUnreadMap)
+    .filter(([ch, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1]); // most unread first
+
+  if (unreadChannels.length === 0) {
+    container.innerHTML = '<div class="chat-inbox-empty">✅ All caught up! No unread messages.</div>';
+    return;
+  }
+
+  let html = '';
+  unreadChannels.forEach(([channelId, count]) => {
+    // Determine display name
+    let channelLabel = channelId;
+    let icon = '💬';
+
+    if (channelId.startsWith('dm_')) {
+      // DM: find the other person's name
+      icon = '✉';
+      const parts = channelId.replace('dm_', '').split('_');
+      const otherUid = parts.find(p => p !== window.userData?.uid) || parts[0];
+      const user = _chatUsers.find(u => u.uid === otherUid);
+      channelLabel = user ? _formatChatName(user.name) : 'Direct Message';
+    } else {
+      const ch = CHAT_CHANNELS.find(c => c.id === channelId);
+      if (ch) { channelLabel = ch.label; }
+    }
+
+    // Get cached preview if we have it
+    const preview = _chatInboxMessages[channelId];
+    const previewText = preview ? `${_formatChatName(preview.senderName)}: ${preview.text}` : 'New messages';
+    const timeStr = preview?.time || '';
+
+    html += `
+      <div class="chat-inbox-row" onclick="openInboxChannel('${channelId}')">
+        <div class="inbox-dot"></div>
+        <div class="inbox-channel">${icon} ${channelLabel}</div>
+        <div class="inbox-preview">${_escapeHtml(previewText)}</div>
+        ${timeStr ? `<div class="inbox-time">${timeStr}</div>` : ''}
+        <div class="inbox-count">${count}</div>
+      </div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function _escapeHtml(text) {
+  return (text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function openInboxChannel(channelId) {
+  _closeChatInbox();
+
+  if (channelId.startsWith('dm_')) {
+    // Figure out the other user and open DM
+    const parts = channelId.replace('dm_', '').split('_');
+    const otherUid = parts.find(p => p !== window.userData?.uid) || parts[0];
+    openDirectMessage(otherUid);
+  } else {
+    switchChatChannel(channelId);
+  }
+}
+window.openInboxChannel = openInboxChannel;
 
 async function _loadChatUsers() {
   try {
@@ -5174,6 +5340,7 @@ function openDirectMessage(targetUid) {
   const target = _chatUsers.find(u => u.uid === targetUid);
   if (!target) return;
 
+  _closeChatInbox();
   _chatDmTarget = target;
   _chatMode = 'dm';
   _chatChannel = _getDmChannelId(window.userData.uid, targetUid);
@@ -5208,7 +5375,8 @@ function exitDm() {
 window.exitDm = exitDm;
 
 function switchChatChannel(channelId) {
-  // Switching to a channel exits DM mode
+  if (!channelId) return; // ignore placeholder selection
+  _closeChatInbox();
   _chatMode = 'channel';
   _chatDmTarget = null;
   _chatChannel = channelId;
@@ -5251,6 +5419,17 @@ function _subscribeChatChannel(channelId) {
     // Reverse so oldest is first (we queried desc for the limit)
     messages.reverse();
     _renderChatMessages(messages);
+
+    // Cache last message for inbox preview
+    if (messages.length > 0) {
+      const last = messages[messages.length - 1];
+      const ts = last.createdAt?.toDate?.() || (last.createdAt?.seconds ? new Date(last.createdAt.seconds * 1000) : new Date());
+      _chatInboxMessages[channelId] = {
+        senderName: last.senderName || 'Unknown',
+        text: (last.text || '').substring(0, 60),
+        time: ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      };
+    }
 
     // Update unread count for THIS channel if chat is closed or viewing a different channel
     if (!_chatOpen || _chatChannel !== channelId) {
@@ -5460,6 +5639,26 @@ function _updateUnreadBadge() {
   } else {
     badge.style.display = 'none';
   }
+  // Also update inbox button and group dropdown counts
+  _updateInboxBtn();
+  _refreshGroupDropdownCounts();
+}
+
+function _refreshGroupDropdownCounts() {
+  const groupSelect = document.getElementById('chatGroupSelect');
+  if (!groupSelect) return;
+  const channels = CHAT_CHANNELS.filter(ch => {
+    if (ch.id === 'managers' && !isAdmin() && !isManager()) return false;
+    return true;
+  });
+  let html = '<option value="">👥 Group Messages…</option>';
+  channels.forEach(ch => {
+    const unread = _chatUnreadMap[ch.id] || 0;
+    const badge = unread > 0 ? ` (${unread})` : '';
+    const selected = (_chatMode === 'channel' && ch.id === _chatChannel) ? 'selected' : '';
+    html += `<option value="${ch.id}" ${selected}>${ch.label}${badge}</option>`;
+  });
+  groupSelect.innerHTML = html;
 }
 
 // Scan all group channels + DMs for unread messages
