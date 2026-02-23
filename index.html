@@ -2775,6 +2775,23 @@ function closeActivityModal() {
   document.getElementById('activityModal').style.display = 'none';
 }
 
+function filterNotSignedIn(filter) {
+  const items = document.querySelectorAll('.nsi-item');
+  items.forEach(el => {
+    if (filter === 'all') { el.style.display = ''; return; }
+    el.style.display = el.classList.contains('nsi-' + filter) ? '' : 'none';
+  });
+  // Update button styles
+  ['All','Sales','Mgmt'].forEach(id => {
+    const btn = document.getElementById('nsiFilter' + id);
+    if (!btn) return;
+    const active = id.toLowerCase() === filter || (id === 'All' && filter === 'all');
+    btn.style.background = active ? '#991b1b' : '#fff';
+    btn.style.color = active ? '#fff' : '#991b1b';
+  });
+}
+window.filterNotSignedIn = filterNotSignedIn;
+
 function timeAgo(date) {
   if (!date) return { text: 'Never', status: 'never' };
   const now = new Date();
@@ -2946,18 +2963,25 @@ async function loadActivity() {
         </div>
       </div>
       ${notSignedIn.length > 0 ? `
-      <details style="margin-top:8px;margin-bottom:4px;">
+      <details style="margin-top:8px;margin-bottom:4px;" id="notSignedInDetails">
         <summary style="cursor:pointer;font-weight:700;font-size:12px;color:#991b1b;padding:6px 0;user-select:none;">
           🚫 Not Signed In Today <span style="background:#fecaca;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-left:6px;">${notSignedIn.length}</span>
         </summary>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0;">
+        <div style="display:flex;gap:6px;margin:8px 0 4px;">
+          <button onclick="filterNotSignedIn('all')" id="nsiFilterAll" style="padding:4px 12px;border-radius:6px;border:1px solid #fecaca;background:#991b1b;color:#fff;font-size:11px;font-weight:600;cursor:pointer;">All (${notSignedIn.length})</button>
+          <button onclick="filterNotSignedIn('sales')" id="nsiFilterSales" style="padding:4px 12px;border-radius:6px;border:1px solid #fecaca;background:#fff;color:#991b1b;font-size:11px;font-weight:600;cursor:pointer;">Sales Reps (${notSignedInSales.length})</button>
+          <button onclick="filterNotSignedIn('mgmt')" id="nsiFilterMgmt" style="padding:4px 12px;border-radius:6px;border:1px solid #fecaca;background:#fff;color:#991b1b;font-size:11px;font-weight:600;cursor:pointer;">Managers / Admin (${notSignedInMgmt.length})</button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0;" id="nsiList">
           ${notSignedIn.map(u => {
             const name = u.linkedName || u.email;
             const roleBadge = u.role === 'superadmin' ? ' 🙏' : u.role === 'admin' ? ' ⭐' : u.role === 'manager' ? ' 📋' : '';
             const lastStr = u.lastLogin ? timeAgo(u.lastLogin).text : 'Never';
-            return `<div style="background:#fff;border:1px solid #fecaca;border-radius:8px;padding:5px 10px;font-size:11px;" title="Last seen: ${lastStr}">
+            const roleClass = ['admin','superadmin','manager'].includes(u.role) ? 'mgmt' : 'sales';
+            return `<div class="nsi-item nsi-${roleClass}" style="background:#fff;border:1px solid #fecaca;border-radius:8px;padding:5px 10px;font-size:11px;" title="Last seen: ${lastStr}">
               <span style="font-weight:600;">${name}</span>${roleBadge} <span style="color:var(--muted);margin-left:4px;">${lastStr}</span>
             </div>`;
+          }).join('')}
           }).join('')}
         </div>
       </details>` : ''}`;
