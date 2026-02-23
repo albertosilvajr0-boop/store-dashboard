@@ -362,6 +362,36 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
   transition: all .15s;
 }
 .chat-ch-btn.active { background: var(--chipOn); color: #fff; border-color: transparent; }
+.chat-ch-btn.dm-active { background: #7c3aed; color: #fff; border-color: transparent; }
+
+.chat-dm-row {
+  display: flex; padding: 0 12px 8px; background: #fafaf9;
+  border-bottom: 1px solid var(--line);
+}
+.chat-dm-select {
+  flex: 1; padding: 5px 10px; border-radius: 8px; font-size: 12px;
+  font-weight: 600; font-family: inherit;
+  border: 1px solid var(--line); background: var(--card);
+  color: var(--text); cursor: pointer; outline: none;
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+.chat-dm-select:focus { border-color: #7c3aed; }
+.chat-dm-select option { font-weight: 500; }
+
+.chat-dm-header {
+  display: flex; align-items: center; gap: 6px; padding: 6px 12px;
+  background: #f5f3ff; border-bottom: 1px solid #e9e5ff;
+  font-size: 12px; font-weight: 600; color: #7c3aed;
+}
+.chat-dm-header button {
+  background: none; border: none; font-size: 14px; cursor: pointer;
+  color: #7c3aed; padding: 0 4px;
+}
+.chat-dm-header button:hover { color: #5b21b6; }
 
 .chat-messages {
   flex: 1; overflow-y: auto; padding: 12px; min-height: 200px;
@@ -481,6 +511,11 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
     </div>
   </div>
   <div class="chat-channels" id="chatChannels"></div>
+  <div class="chat-dm-row" id="chatDmRow">
+    <select class="chat-dm-select" id="chatDmSelect" onchange="openDirectMessage(this.value)">
+      <option value="">✉ Direct Message…</option>
+    </select>
+  </div>
   <div class="chat-messages" id="chatMessages">
     <p style="color:var(--muted);text-align:center;font-size:13px;margin-top:40px;">Select a channel to start chatting</p>
   </div>
@@ -4915,6 +4950,9 @@ let _chatUnsub = null;       // Firestore onSnapshot unsubscribe
 let _chatUnread = 0;
 let _chatLastSeen = {};      // channel -> timestamp of last seen message
 let _chatInitialized = false;
+let _chatUsers = [];         // all users for DM dropdown
+let _chatDmTarget = null;    // { uid, name } of current DM recipient
+let _chatMode = 'channel';   // 'channel' or 'dm'
 
 function initChat() {
   if (_chatInitialized) return;
@@ -4927,6 +4965,9 @@ function initChat() {
 
   // Load last-seen timestamps from Firestore
   _loadChatLastSeen();
+
+  // Load user list for DM dropdown
+  _loadChatUsers();
 
   // Render channel buttons
   _renderChatChannels();
@@ -4964,14 +5005,125 @@ function _renderChatChannels() {
   });
 
   container.innerHTML = channels.map(ch => {
-    const active = ch.id === _chatChannel ? 'active' : '';
+    const active = (_chatMode === 'channel' && ch.id === _chatChannel) ? 'active' : '';
     return `<button class="chat-ch-btn ${active}" onclick="switchChatChannel('${ch.id}')">${ch.label}</button>`;
   }).join('');
+
+  // Update DM select highlight
+  const dmSelect = document.getElementById('chatDmSelect');
+  if (dmSelect && _chatMode !== 'dm') dmSelect.value = '';
+
+  // Show/hide DM header bar
+  _renderDmHeader();
 }
 
+function _renderDmHeader() {
+  // Remove existing header if present
+  let existing = document.getElementById('chatDmHeader');
+  if (existing) existing.remove();
+
+  if (_chatMode !== 'dm' || !_chatDmTarget) return;
+
+  const msgBox = document.getElementById('chatMessages');
+  if (!msgBox) return;
+
+  const header = document.createElement('div');
+  header.className = 'chat-dm-header';
+  header.id = 'chatDmHeader';
+  header.innerHTML = `
+    <button onclick="exitDm()" title="Back to channels">←</button>
+    <span>✉ ${_formatChatName(_chatDmTarget.name)}</span>
+  `;
+  msgBox.parentNode.insertBefore(header, msgBox);
+}
+
+async function _loadChatUsers() {
+  try {
+    const snap = await getDocs(collection(db, 'users'));
+    _chatUsers = [];
+    snap.forEach(d => {
+      const data = d.data();
+      const name = data.linkedName || data.displayName || data.email || '';
+      if (!name) return;
+      // Don't include self
+      if (d.id === window.userData?.uid) return;
+      _chatUsers.push({ uid: d.id, name: name, email: data.email || '' });
+    });
+    // Sort alphabetically by name
+    _chatUsers.sort((a, b) => a.name.localeCompare(b.name));
+    _renderDmSelect();
+  } catch (e) {
+    console.warn('[Chat] Failed to load users for DM:', e);
+  }
+}
+
+function _renderDmSelect() {
+  const select = document.getElementById('chatDmSelect');
+  if (!select) return;
+
+  let html = '<option value="">✉ Direct Message…</option>';
+  _chatUsers.forEach(u => {
+    const display = _formatChatName(u.name);
+    html += `<option value="${u.uid}">${display}</option>`;
+  });
+  select.innerHTML = html;
+}
+
+function _getDmChannelId(uid1, uid2) {
+  // Consistent channel ID regardless of who initiates
+  return uid1 < uid2 ? `dm_${uid1}_${uid2}` : `dm_${uid2}_${uid1}`;
+}
+
+function openDirectMessage(targetUid) {
+  if (!targetUid) return;
+  const target = _chatUsers.find(u => u.uid === targetUid);
+  if (!target) return;
+
+  _chatDmTarget = target;
+  _chatMode = 'dm';
+  _chatChannel = _getDmChannelId(window.userData.uid, targetUid);
+
+  _renderChatChannels();
+  _subscribeChatChannel(_chatChannel);
+  _markChannelRead(_chatChannel);
+  _updateUnreadBadge();
+
+  // Focus input
+  setTimeout(() => {
+    const inp = document.getElementById('chatInput');
+    if (inp) { inp.placeholder = `Message ${_formatChatName(target.name)}...`; inp.focus(); }
+  }, 100);
+}
+window.openDirectMessage = openDirectMessage;
+
+function exitDm() {
+  _chatDmTarget = null;
+  _chatMode = 'channel';
+  _chatChannel = 'general';
+
+  const inp = document.getElementById('chatInput');
+  if (inp) inp.placeholder = 'Type a message...';
+
+  const dmSelect = document.getElementById('chatDmSelect');
+  if (dmSelect) dmSelect.value = '';
+
+  _renderChatChannels();
+  _subscribeChatChannel(_chatChannel);
+}
+window.exitDm = exitDm;
+
 function switchChatChannel(channelId) {
-  if (_chatChannel === channelId) return;
+  // Switching to a channel exits DM mode
+  _chatMode = 'channel';
+  _chatDmTarget = null;
   _chatChannel = channelId;
+
+  const inp = document.getElementById('chatInput');
+  if (inp) inp.placeholder = 'Type a message...';
+
+  const dmSelect = document.getElementById('chatDmSelect');
+  if (dmSelect) dmSelect.value = '';
+
   _renderChatChannels();
   _subscribeChatChannel(channelId);
   _markChannelRead(channelId);
@@ -5097,13 +5249,23 @@ async function sendChatMessage() {
   input.value = '';
 
   try {
-    await addDoc(collection(db, 'chatMessages'), {
+    const msgData = {
       text: text,
       senderUid: window.userData.uid,
       senderName: window.userData.linkedName || window.userData.email || 'Unknown',
       channel: _chatChannel,
       createdAt: serverTimestamp()
-    });
+    };
+
+    // Add DM-specific fields
+    if (_chatMode === 'dm' && _chatDmTarget) {
+      msgData.isDm = true;
+      msgData.recipientUid = _chatDmTarget.uid;
+      msgData.recipientName = _chatDmTarget.name;
+      msgData.participants = [window.userData.uid, _chatDmTarget.uid].sort();
+    }
+
+    await addDoc(collection(db, 'chatMessages'), msgData);
   } catch (err) {
     console.error('[Chat] Send error:', err);
     // Put the text back so they don't lose it
