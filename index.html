@@ -4979,6 +4979,7 @@ const CHAT_CHANNELS = [
 let _chatChannel = 'general';
 let _chatOpen = false;
 let _chatUnsub = null;       // Firestore onSnapshot unsubscribe
+let _chatDmUnsub = null;     // Persistent DM inbox listener
 let _chatLastSeen = {};      // channel -> timestamp of last seen message
 let _chatInitialized = false;
 let _chatUsers = [];         // all users for DM dropdown
@@ -5013,6 +5014,9 @@ function initChat() {
 
   // Subscribe to default channel
   _subscribeChatChannel(_chatChannel);
+
+  // Subscribe to incoming DMs (real-time, persists across channel switches)
+  _subscribeDmInbox();
 }
 
 let _chatPresenceTimer = null;
@@ -5277,6 +5281,50 @@ function _subscribeChatChannel(channelId) {
   });
 }
 
+// ── Persistent DM inbox listener (always-on, separate from channel listener) ──
+function _subscribeDmInbox() {
+  if (_chatDmUnsub) { _chatDmUnsub(); _chatDmUnsub = null; }
+  if (!window.userData?.uid) return;
+
+  const q = query(
+    collection(db, 'chatMessages'),
+    where('recipientUid', '==', window.userData.uid),
+    orderBy('createdAt', 'desc'),
+    limit(50)
+  );
+
+  _chatDmUnsub = onSnapshot(q, (snapshot) => {
+    // Group by DM channel and count unread
+    const dmCounts = {};
+    snapshot.forEach(d => {
+      const data = d.data();
+      const ch = data.channel || '';
+      if (!ch.startsWith('dm_')) return;
+      const lastSeen = _chatLastSeen[ch] || 0;
+      const msgTime = data.createdAt?.toMillis?.() || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0);
+      if (msgTime > lastSeen) {
+        dmCounts[ch] = (dmCounts[ch] || 0) + 1;
+      }
+    });
+
+    // If currently viewing a DM channel, don't count it as unread
+    if (_chatOpen && _chatMode === 'dm' && _chatChannel) {
+      delete dmCounts[_chatChannel];
+    }
+
+    // Clear old DM counts, set new ones
+    Object.keys(_chatUnreadMap).forEach(k => {
+      if (k.startsWith('dm_')) delete _chatUnreadMap[k];
+    });
+    Object.entries(dmCounts).forEach(([ch, count]) => {
+      _chatUnreadMap[ch] = count;
+    });
+    _updateUnreadBadge();
+  }, (err) => {
+    console.warn('[Chat] DM inbox listener error (index may need creating):', err.message);
+  });
+}
+
 function _renderChatMessages(messages) {
   const msgBox = document.getElementById('chatMessages');
   if (!msgBox) return;
@@ -5444,37 +5492,13 @@ async function _scanAllUnread() {
     } catch (e) { /* index might not exist yet, ignore */ }
   }
 
-  // 2) Check DMs sent to this user
-  try {
-    const dmQ = query(
-      collection(db, 'chatMessages'),
-      where('recipientUid', '==', window.userData.uid),
-      orderBy('createdAt', 'desc'),
-      limit(50)
-    );
-    const dmSnap = await getDocs(dmQ);
-    const dmChannelCounts = {};
-    dmSnap.forEach(d => {
-      const data = d.data();
-      const ch = data.channel || '';
-      if (!ch.startsWith('dm_')) return;
-      const lastSeen = _chatLastSeen[ch] || 0;
-      const msgTime = data.createdAt?.toMillis?.() || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0);
-      if (msgTime > lastSeen) {
-        dmChannelCounts[ch] = (dmChannelCounts[ch] || 0) + 1;
-      }
-    });
-    Object.entries(dmChannelCounts).forEach(([ch, count]) => {
-      _chatUnreadMap[ch] = count;
-    });
-  } catch (e) { /* index might not exist yet for DM query, ignore */ }
-
   _updateUnreadBadge();
 }
 
-// Clean up listener and presence on page unload
+// Clean up listeners and presence on page unload
 window.addEventListener('beforeunload', () => {
   if (_chatUnsub) _chatUnsub();
+  if (_chatDmUnsub) _chatDmUnsub();
   if (_chatPresenceTimer) clearInterval(_chatPresenceTimer);
 });
 
