@@ -1850,7 +1850,7 @@ function trendingSales(currentSales) {
 
   // Count non-Sunday days elapsed (1 through today)
   let elapsedWork = 0;
-  for (let d = 1; d <= today; d++) {
+  for (let d = 1; d < today; d++) {
     if (new Date(year, month, d).getDay() !== 0) elapsedWork++;
   }
   // Count total non-Sunday days in the month
