@@ -1208,6 +1208,7 @@ const BDC_COL_DEFS = {
 };
 const SALES_COL_DEFS = {
   sales:     { key: 'sales',     label: 'Sales', primary: true },
+  trending:  { key: 'trending',  label: 'Trending' },
   closeRate: { key: 'closeRate', label: 'Close %' },
   pctShown:  { key: 'pctShown',  label: '% Shown' },
   shown:     { key: 'shown',     label: 'Appts Shown' },
@@ -1218,7 +1219,7 @@ const SALES_COL_DEFS = {
 };
 // Mutable order arrays (user can rearrange via drag)
 let bdcColOrder   = ['shown','pctShown','due','created','calls','texts'];
-let salesColOrder = ['sales','closeRate','pctShown','shown','due','created','calls','texts'];
+let salesColOrder = ['sales','trending','closeRate','pctShown','shown','due','created','calls','texts'];
 
 let _dragPanel = null, _dragColKey = null;
 
@@ -1264,6 +1265,10 @@ function sortRows(rows, sortState, type) {
       const visB = safeNum(b.visits) || 1;
       va = safeNum(a.sales) / visA;
       vb = safeNum(b.sales) / visB;
+    }
+    else if (col === 'trending') {
+      va = trendingSales(safeNum(a.sales));
+      vb = trendingSales(safeNum(b.sales));
     }
     else if (col === 'pctShown') {
       const dueA = safeNum(a.due ?? a.due_count ?? a.created ?? 0) || 1;
@@ -1835,6 +1840,29 @@ function renderDashboard() {
     </tr>`;
   }
 
+/* ── Sales Trending Projection (off Sundays only) ── */
+function trendingSales(currentSales) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = now.getDate();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Count non-Sunday days elapsed (1 through today)
+  let elapsedWork = 0;
+  for (let d = 1; d <= today; d++) {
+    if (new Date(year, month, d).getDay() !== 0) elapsedWork++;
+  }
+  // Count total non-Sunday days in the month
+  let totalWork = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    if (new Date(year, month, d).getDay() !== 0) totalWork++;
+  }
+
+  if (elapsedWork <= 0) return currentSales;
+  return Math.round((currentSales / elapsedWork) * totalWork);
+}
+  
   /* ── Sales cell renderer ── */
   function salesCellData(r) {
     const salesV  = safeNum(r.sales);
@@ -1851,8 +1879,10 @@ function renderDashboard() {
     const createdK = kpiClass(created, WEEKLY_TARGETS.created);
     const dueK     = kpiClass(due, WEEKLY_TARGETS.due);
     const shownK   = kpiClass(shown, WEEKLY_TARGETS.shown);
+    const trend = trendingSales(salesV);
     return {
       sales:     `<td class="sales-primary">${salesV}</td>`,
+      trending:  `<td style="font-weight:600;color:#58a6ff;">${trend}</td>`,
       closeRate: `<td style="font-weight:600;">${closeRate}</td>`,
       pctShown:  `<td>${pct}</td>`,
       shown:     `<td class="${shownK}">${shown}</td>`,
