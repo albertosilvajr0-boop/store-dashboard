@@ -532,6 +532,64 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
 .chat-send-btn:hover { filter: brightness(1.1); }
 .chat-send-btn:disabled { opacity: .5; cursor: default; }
 
+/* Emoji & GIF pickers */
+.chat-toolbar { display:flex; gap:4px; align-items:center; }
+.chat-toolbar-btn {
+  background:none; border:none; font-size:18px; cursor:pointer; padding:4px 6px;
+  border-radius:6px; transition:background .15s; line-height:1;
+}
+.chat-toolbar-btn:hover { background:#e7e5e4; }
+.chat-toolbar-btn.active { background:#d6d3d1; }
+.chat-picker-popup {
+  position:absolute; bottom:54px; left:8px; right:8px;
+  background:#fff; border:1px solid var(--line); border-radius:12px;
+  box-shadow:0 4px 20px rgba(0,0,0,.15); z-index:300; display:none;
+  max-height:320px; overflow:hidden; flex-direction:column;
+}
+.chat-picker-popup.show { display:flex; }
+.emoji-tabs {
+  display:flex; gap:2px; padding:6px 8px; border-bottom:1px solid var(--line);
+  overflow-x:auto; flex-shrink:0;
+}
+.emoji-tab {
+  background:none; border:none; font-size:16px; padding:4px 8px; cursor:pointer;
+  border-radius:6px; opacity:.6; transition:all .15s;
+}
+.emoji-tab:hover, .emoji-tab.active { opacity:1; background:#f5f5f4; }
+.emoji-grid {
+  display:grid; grid-template-columns:repeat(8,1fr); gap:2px; padding:8px;
+  overflow-y:auto; flex:1;
+}
+.emoji-cell {
+  font-size:22px; text-align:center; cursor:pointer; padding:6px 2px;
+  border-radius:6px; transition:background .1s; line-height:1.2;
+}
+.emoji-cell:hover { background:#f5f5f4; }
+.gif-search-wrap {
+  padding:8px; border-bottom:1px solid var(--line); flex-shrink:0;
+}
+.gif-search-input {
+  width:100%; padding:8px 12px; border:1px solid var(--line); border-radius:8px;
+  font-size:13px; outline:none; font-family:inherit; box-sizing:border-box;
+}
+.gif-search-input:focus { border-color:var(--accent); }
+.gif-grid {
+  display:grid; grid-template-columns:repeat(2,1fr); gap:6px; padding:8px;
+  overflow-y:auto; flex:1; max-height:240px;
+}
+.gif-cell {
+  cursor:pointer; border-radius:8px; overflow:hidden; aspect-ratio:16/10;
+  transition:transform .1s;
+}
+.gif-cell:hover { transform:scale(1.03); }
+.gif-cell img { width:100%; height:100%; object-fit:cover; display:block; }
+.gif-powered {
+  text-align:center; padding:4px; font-size:10px; color:#a8a29e;
+  border-top:1px solid var(--line); flex-shrink:0;
+}
+.chat-gif-msg { max-width:200px; border-radius:10px; margin-top:4px; }
+
+
 @media (max-width: 480px) {
   .chat-drawer { right: 8px; left: 8px; width: auto; bottom: 82px; max-height: 65vh; }
   .chat-fab { bottom: 16px; right: 16px; width: 50px; height: 50px; font-size: 20px; }
@@ -549,17 +607,22 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
       <h2>User Management</h2>
       <button class="modal-close" onclick="closeUserModal()">&times;</button>
     </div>
-    <div class="form-group">
-      <h3 style="margin:0 0 6px;">Add New User</h3>
+    <div class="form-group" id="userFormSection">
+      <h3 style="margin:0 0 6px;" id="userFormTitle">Add New User</h3>
+      <input type="hidden" id="editUserUid" value="">
       <input type="email" id="newUserEmail" placeholder="Email address">
       <input type="password" id="newUserPassword" placeholder="Password" style="margin-top:8px;">
+      <input type="text" id="newUserDisplayName" placeholder='Display Name (e.g., "John Smith")' style="margin-top:8px;">
       <input type="text" id="newUserLinked" placeholder='Linked Sheet Name (e.g., "JASMINE VASQUEZ")' style="margin-top:8px;">
       <select id="newUserRole" style="width:100%;padding:12px;margin-top:8px;border:1px solid #ddd;border-radius:8px;">
         <option value="user">User</option>
         <option value="manager">Manager</option>
         <option value="admin">Admin</option>
       </select>
-      <button class="btn" style="margin-top:10px;" onclick="addUser()">Add User</button>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn" style="flex:1;" onclick="addUser()" id="userFormBtn">Add User</button>
+        <button class="btn" style="flex:0;background:#78716c;display:none;" onclick="cancelEditUser()" id="userFormCancelBtn">Cancel</button>
+      </div>
     </div>
     <div class="user-list" id="userList">
       <h3>Existing Users</h3>
@@ -613,7 +676,24 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
   </div>
   <div style="position:relative;">
     <div class="chat-mention-popup" id="chatMentionPopup"></div>
+    <div class="chat-picker-popup" id="emojiPicker">
+      <div class="emoji-tabs" id="emojiTabs"></div>
+      <div class="emoji-grid" id="emojiGrid"></div>
+    </div>
+    <div class="chat-picker-popup" id="gifPicker">
+      <div class="gif-search-wrap">
+        <input type="text" class="gif-search-input" id="gifSearchInput" placeholder="Search GIFs..." oninput="_debounceGifSearch()">
+      </div>
+      <div class="gif-grid" id="gifGrid">
+        <p style="color:var(--muted);text-align:center;grid-column:1/-1;font-size:12px;margin-top:20px;">Search for a GIF above</p>
+      </div>
+      <div class="gif-powered">Powered by GIPHY</div>
+    </div>
     <div class="chat-input-row" id="chatInputRow">
+    <div class="chat-toolbar">
+      <button class="chat-toolbar-btn" id="emojiToggleBtn" onclick="toggleEmojiPicker()" title="Emoji">😊</button>
+      <button class="chat-toolbar-btn" id="gifToggleBtn" onclick="toggleGifPicker()" title="GIF">GIF</button>
+    </div>
     <input type="text" class="chat-input" id="chatInput" placeholder="Type a message..."
       onkeydown="handleChatKeydown(event)">
     <button class="chat-send-btn" id="chatSendBtn" onclick="sendChatMessage()">Send</button>
@@ -1014,8 +1094,8 @@ onAuthStateChanged(auth, async (user) => {
     await setDoc(userRef, { ...data, role }, { merge: true });
   }
 
-  window.userData = { email: user.email, uid: user.uid, role, linkedName: data.linkedName || '' };
-  const sessionName = window.userData.linkedName || window.userData.email;
+  window.userData = { email: user.email, uid: user.uid, role, linkedName: data.linkedName || '', displayName: data.displayName || '' };
+  const sessionName = window.userData.linkedName || window.userData.displayName || window.userData.email;
   window.sessionToken = makeSessionToken({ name: sessionName, role });
 
   // Record last login timestamp
@@ -1773,7 +1853,7 @@ function renderDashboard() {
     const shownK   = kpiClass(shown, WEEKLY_TARGETS.shown);
     return {
       sales:     `<td class="sales-primary">${salesV}</td>`,
-      closeRate: `<td style="font-weight:600;${visits > 0 && salesV > 0 ? 'color:#16a34a;' : ''}">${closeRate}</td>`,
+      closeRate: `<td style="font-weight:600;">${closeRate}</td>`,
       pctShown:  `<td>${pct}</td>`,
       shown:     `<td class="${shownK}">${shown}</td>`,
       due:       `<td class="${dueK}">${due}</td>`,
@@ -2184,19 +2264,29 @@ async function loadUsers() {
     let html = '';
     usersSnapshot.forEach((docu) => {
       const u = docu.data();
-      if (u.deleted) return; // Skip deleted users
+      if (u.deleted) return;
       const email = u.email || '';
       const role = u.role || 'user';
       const linked = u.linkedName || '';
+      const displayName = u.displayName || '';
       const isSelf = email === window.userData.email;
       const canDelete = isAdmin() && !isSelf && role !== 'admin' && role !== 'superadmin' && email !== SUPERADMIN_EMAIL;
+      const canEdit = isAdmin();
+      const infoLine = [
+        `Role: <strong>${role}</strong>${role === 'superadmin' ? ' 👑' : ''}`,
+        displayName ? `Display: ${displayName}` : '',
+        linked ? `Linked: ${linked}` : ''
+      ].filter(Boolean).join(' • ');
       html += `
         <div class="user-item">
-          <div>
-            <div>${email}</div>
-            <small>Role: <strong>${role}</strong>${role === 'superadmin' ? ' 👑' : ''} ${linked ? `• Linked: ${linked}` : ''}</small>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;">${email}</div>
+            <small>${infoLine}</small>
           </div>
-          ${canDelete ? `<button class="delete-btn" onclick="deleteUser('${docu.id}','${email}','${role}')">Delete</button>` : ''}
+          <div style="display:flex;gap:6px;align-items:center;">
+            ${canEdit ? `<button class="btn" style="padding:4px 10px;font-size:11px;background:#2563eb;" onclick="startEditUser('${docu.id}','${email.replace(/'/g,"\\'")}','${role}','${(linked).replace(/'/g,"\\'")}','${(displayName).replace(/'/g,"\\'")}')">Edit</button>` : ''}
+            ${canDelete ? `<button class="delete-btn" onclick="deleteUser('${docu.id}','${email}','${role}')">Delete</button>` : ''}
+          </div>
         </div>`;
     });
     document.getElementById('userListContent').innerHTML = html || '<p style="color:var(--muted);">No users found.</p>';
@@ -2205,25 +2295,73 @@ async function loadUsers() {
   }
 }
 
+function startEditUser(uid, email, role, linked, displayName) {
+  document.getElementById('editUserUid').value = uid;
+  document.getElementById('newUserEmail').value = email;
+  document.getElementById('newUserEmail').disabled = true;
+  document.getElementById('newUserPassword').value = '';
+  document.getElementById('newUserPassword').placeholder = 'Leave blank to keep current';
+  document.getElementById('newUserDisplayName').value = displayName || '';
+  document.getElementById('newUserLinked').value = linked || '';
+  document.getElementById('newUserRole').value = role;
+  document.getElementById('userFormTitle').textContent = 'Edit User';
+  document.getElementById('userFormBtn').textContent = 'Save Changes';
+  document.getElementById('userFormCancelBtn').style.display = '';
+  document.getElementById('userFormSection').style.background = '#eff6ff';
+  document.getElementById('userFormSection').style.borderRadius = '10px';
+  document.getElementById('userFormSection').style.padding = '14px';
+  document.getElementById('userFormSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelEditUser() {
+  document.getElementById('editUserUid').value = '';
+  document.getElementById('newUserEmail').value = '';
+  document.getElementById('newUserEmail').disabled = false;
+  document.getElementById('newUserPassword').value = '';
+  document.getElementById('newUserPassword').placeholder = 'Password';
+  document.getElementById('newUserDisplayName').value = '';
+  document.getElementById('newUserLinked').value = '';
+  document.getElementById('newUserRole').value = 'user';
+  document.getElementById('userFormTitle').textContent = 'Add New User';
+  document.getElementById('userFormBtn').textContent = 'Add User';
+  document.getElementById('userFormCancelBtn').style.display = 'none';
+  document.getElementById('userFormSection').style.background = '';
+  document.getElementById('userFormSection').style.padding = '';
+}
+
 async function addUser() {
+  const editUid = document.getElementById('editUserUid')?.value?.trim();
   const email = document.getElementById('newUserEmail')?.value?.trim();
   const password = document.getElementById('newUserPassword')?.value?.trim();
+  const displayName = document.getElementById('newUserDisplayName')?.value?.trim() || '';
   const linked = document.getElementById('newUserLinked')?.value?.trim() || '';
   const role = document.getElementById('newUserRole')?.value || 'user';
+
+  // ── EDIT MODE ──
+  if (editUid) {
+    try {
+      const updates = { role, linkedName: linked, displayName };
+      await setDoc(doc(db, 'users', editUid), updates, { merge: true });
+      alert('User updated!');
+      cancelEditUser();
+      loadUsers();
+    } catch (e) { alert('Error: ' + e.message); }
+    return;
+  }
+
+  // ── CREATE MODE ──
   if (!email || !password) { alert('Enter email and password.'); return; }
   if (password.length < 6) { alert('Password must be at least 6 characters.'); return; }
 
   try {
     const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
     await setDoc(doc(db, 'users', cred.user.uid), {
-      email, role, linkedName: linked, createdAt: new Date()
+      email, role, linkedName: linked, displayName, createdAt: new Date()
     });
     await secondaryAuth.signOut();
     alert('User created!');
+    cancelEditUser();
     loadUsers();
-    document.getElementById('newUserEmail').value = '';
-    document.getElementById('newUserPassword').value = '';
-    document.getElementById('newUserLinked').value = '';
   } catch (e) {
     alert('Error: ' + e.message);
   }
@@ -5315,7 +5453,8 @@ function _renderChatInbox() {
 
     // Get cached preview if we have it
     const preview = _chatInboxMessages[channelId];
-    const previewText = preview ? `${_formatChatName(preview.senderName)}: ${preview.text}` : 'New messages';
+    const previewContent = preview ? (preview.gifUrl ? '🎬 GIF' : preview.text) : '';
+    const previewText = preview ? `${_formatChatName(preview.senderName)}: ${previewContent}` : 'New messages';
     const timeStr = preview?.time || '';
 
     html += `
@@ -5519,6 +5658,7 @@ function _subscribeChatChannel(channelId) {
       _chatInboxMessages[channelId] = {
         senderName: last.senderName || 'Unknown',
         text: (last.text || '').substring(0, 60),
+        gifUrl: last.gifUrl || '',
         time: ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
       };
     }
@@ -5625,13 +5765,20 @@ function _renderChatMessages(messages) {
 
     const timeStr = ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     const senderDisplay = _formatChatName(msg.senderName || 'Unknown');
-    const escapedText = (msg.text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')
-      .replace(/@(\w+\s\w\.)/g, '<span class="chat-mention-tag">@$1</span>');
+    const isGif = msg.gifUrl && msg.gifUrl.startsWith('http');
+    let contentHtml;
+    if (isGif) {
+      contentHtml = `<img src="${msg.gifUrl}" alt="GIF" class="chat-gif-msg" loading="lazy">`;
+    } else {
+      const escapedText = (msg.text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')
+        .replace(/@(\w+\s\w\.)/g, '<span class="chat-mention-tag">@$1</span>');
+      contentHtml = escapedText;
+    }
 
     html += `
       <div class="chat-msg ${isMine ? 'mine' : 'other'}">
         ${!isMine ? `<div class="chat-sender">${senderDisplay}</div>` : ''}
-        <div>${escapedText}</div>
+        <div>${contentHtml}</div>
         <div class="chat-time">${timeStr}</div>
       </div>`;
   });
@@ -5670,7 +5817,7 @@ async function sendChatMessage() {
     const msgData = {
       text: text,
       senderUid: window.userData.uid,
-      senderName: window.userData.linkedName || window.userData.email || 'Unknown',
+      senderName: window.userData.linkedName || window.userData.displayName || window.userData.email || 'Unknown',
       channel: _chatChannel,
       createdAt: serverTimestamp()
     };
@@ -5699,6 +5846,149 @@ async function sendChatMessage() {
   input.focus();
 }
 window.sendChatMessage = sendChatMessage;
+
+/* ── Emoji Picker ── */
+const EMOJI_DATA = {
+  '😊': ['😊','😂','🤣','😍','🥰','😘','😎','🤩','🥳','🤗','😇','🙃','😜','🤔','🫡','😤','😭','🥺','😱','🤯','🫠','💀','👻','🔥','❤️','💯','👏','🙏','💪','👍','👎','✅','❌','⭐','🎉','🏆','🚀','💰','📈','📉','🎯','💎','🛎️','📞','📱','💻'],
+  '🚗': ['🚗','🚙','🚕','🏎️','🚘','🏁','⛽','🔑','🅿️','🛞','💨','🔧','🪛','📋','📊','💼','🤝','📝','🗓️','⏰','🕐','📌','🎯','💡','📢','🏷️','🛒'],
+  '👤': ['👤','👥','🧑‍💼','👨‍💼','👩‍💼','🤵','💁','🙋','🤷','🙅','💃','🕺','👋','✌️','🤞','🫶','👊','🤜','🤛','👆','👇','👈','👉'],
+  '🎭': ['😈','🤡','💩','🐐','🦁','🐻','🦅','🐍','🦈','🐘','🦄','🌟','🌈','☀️','🌙','⚡','🌊','🍕','🍔','🍺','🥂','🎵','🎶','🎤','🎬','🎮']
+};
+const EMOJI_TAB_LABELS = {'😊':'Smileys','🚗':'Auto','👤':'People','🎭':'Fun'};
+
+function _initEmojiPicker() {
+  const tabs = document.getElementById('emojiTabs');
+  const grid = document.getElementById('emojiGrid');
+  if (!tabs || !grid) return;
+  const cats = Object.keys(EMOJI_DATA);
+  tabs.innerHTML = cats.map((k,i) => `<button class="emoji-tab${i===0?' active':''}" onclick="_switchEmojiTab('${k}')" title="${EMOJI_TAB_LABELS[k]||''}">${k}</button>`).join('');
+  _switchEmojiTab(cats[0]);
+}
+
+function _switchEmojiTab(cat) {
+  const grid = document.getElementById('emojiGrid');
+  const tabs = document.querySelectorAll('.emoji-tab');
+  tabs.forEach(t => t.classList.toggle('active', t.textContent.trim() === cat));
+  grid.innerHTML = (EMOJI_DATA[cat]||[]).map(e => `<div class="emoji-cell" onclick="_insertEmoji('${e}')">${e}</div>`).join('');
+}
+
+function _insertEmoji(emoji) {
+  const inp = document.getElementById('chatInput');
+  if (!inp) return;
+  const start = inp.selectionStart || inp.value.length;
+  inp.value = inp.value.slice(0, start) + emoji + inp.value.slice(start);
+  inp.focus();
+  inp.setSelectionRange(start + emoji.length, start + emoji.length);
+}
+
+function toggleEmojiPicker() {
+  const picker = document.getElementById('emojiPicker');
+  const gifPicker = document.getElementById('gifPicker');
+  const btn = document.getElementById('emojiToggleBtn');
+  if (gifPicker?.classList.contains('show')) { gifPicker.classList.remove('show'); document.getElementById('gifToggleBtn')?.classList.remove('active'); }
+  picker.classList.toggle('show');
+  btn.classList.toggle('active');
+  if (picker.classList.contains('show') && !picker.dataset.init) { _initEmojiPicker(); picker.dataset.init = '1'; }
+}
+window.toggleEmojiPicker = toggleEmojiPicker;
+window._switchEmojiTab = _switchEmojiTab;
+window._insertEmoji = _insertEmoji;
+
+/* ── GIF Search (GIPHY) ── */
+const GIPHY_API_KEY = 'CdRKiCMbTnt9CkZTZ0lGukSczk6iT4Z6'; // Free GIPHY API key
+let _gifSearchTimer = null;
+
+function toggleGifPicker() {
+  const picker = document.getElementById('gifPicker');
+  const emojiPicker = document.getElementById('emojiPicker');
+  const btn = document.getElementById('gifToggleBtn');
+  if (emojiPicker?.classList.contains('show')) { emojiPicker.classList.remove('show'); document.getElementById('emojiToggleBtn')?.classList.remove('active'); }
+  picker.classList.toggle('show');
+  btn.classList.toggle('active');
+  if (picker.classList.contains('show')) { document.getElementById('gifSearchInput')?.focus(); _loadTrendingGifs(); }
+}
+window.toggleGifPicker = toggleGifPicker;
+
+function _debounceGifSearch() {
+  clearTimeout(_gifSearchTimer);
+  _gifSearchTimer = setTimeout(() => {
+    const q = document.getElementById('gifSearchInput')?.value?.trim();
+    if (q) _searchGifs(q); else _loadTrendingGifs();
+  }, 400);
+}
+window._debounceGifSearch = _debounceGifSearch;
+
+async function _loadTrendingGifs() {
+  const grid = document.getElementById('gifGrid');
+  if (!grid) return;
+  grid.innerHTML = '<p style="color:var(--muted);text-align:center;grid-column:1/-1;font-size:12px;">Loading trending...</p>';
+  try {
+    const res = await fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=pg`);
+    const data = await res.json();
+    _renderGifs(data.data || []);
+  } catch (e) { grid.innerHTML = '<p style="color:#dc2626;text-align:center;grid-column:1/-1;font-size:12px;">Failed to load GIFs</p>'; }
+}
+
+async function _searchGifs(query) {
+  const grid = document.getElementById('gifGrid');
+  if (!grid) return;
+  grid.innerHTML = '<p style="color:var(--muted);text-align:center;grid-column:1/-1;font-size:12px;">Searching...</p>';
+  try {
+    const res = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=20&rating=pg`);
+    const data = await res.json();
+    _renderGifs(data.data || []);
+  } catch (e) { grid.innerHTML = '<p style="color:#dc2626;text-align:center;grid-column:1/-1;font-size:12px;">Search failed</p>'; }
+}
+
+function _renderGifs(gifs) {
+  const grid = document.getElementById('gifGrid');
+  if (!gifs.length) { grid.innerHTML = '<p style="color:var(--muted);text-align:center;grid-column:1/-1;font-size:12px;">No GIFs found</p>'; return; }
+  grid.innerHTML = gifs.map(g => {
+    const url = g.images?.fixed_width?.url || g.images?.original?.url || '';
+    const fullUrl = g.images?.original?.url || url;
+    return url ? `<div class="gif-cell" onclick="_sendGif('${fullUrl.replace(/'/g,"\\'")}')"><img src="${url}" alt="GIF" loading="lazy"></div>` : '';
+  }).join('');
+}
+
+async function _sendGif(gifUrl) {
+  if (!window.userData?.uid || !_chatChannel) return;
+  // Close picker
+  document.getElementById('gifPicker')?.classList.remove('show');
+  document.getElementById('gifToggleBtn')?.classList.remove('active');
+
+  try {
+    const msgData = {
+      text: '',
+      gifUrl: gifUrl,
+      senderUid: window.userData.uid,
+      senderName: window.userData.linkedName || window.userData.displayName || window.userData.email || 'Unknown',
+      channel: _chatChannel,
+      createdAt: serverTimestamp()
+    };
+    if (_chatMode === 'dm' && _chatDmTarget) {
+      msgData.isDm = true;
+      msgData.recipientUid = _chatDmTarget.uid;
+      msgData.recipientName = _chatDmTarget.name;
+      msgData.participants = [window.userData.uid, _chatDmTarget.uid].sort();
+    }
+    await addDoc(collection(db, 'chatMessages'), msgData);
+  } catch (err) { console.error('[Chat] GIF send error:', err); }
+}
+window._sendGif = _sendGif;
+
+// Close pickers when clicking outside
+document.addEventListener('click', function(e) {
+  const emojiPicker = document.getElementById('emojiPicker');
+  const gifPicker = document.getElementById('gifPicker');
+  const emojiBtn = document.getElementById('emojiToggleBtn');
+  const gifBtn = document.getElementById('gifToggleBtn');
+  if (emojiPicker?.classList.contains('show') && !emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+    emojiPicker.classList.remove('show'); emojiBtn?.classList.remove('active');
+  }
+  if (gifPicker?.classList.contains('show') && !gifPicker.contains(e.target) && e.target !== gifBtn) {
+    gifPicker.classList.remove('show'); gifBtn?.classList.remove('active');
+  }
+});
 
 // ── Unread tracking (per-channel) ──
 let _chatUnreadMap = {};  // channel -> unread count
