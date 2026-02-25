@@ -1247,6 +1247,29 @@ window.onColDragEnd = onColDragEnd;
 window.onColDragOver = onColDragOver;
 window.onColDrop = onColDrop;
 
+/* ── Sales Trending Projection (off Sundays only) ── */
+function trendingSales(currentSales) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = now.getDate();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Count non-Sunday days elapsed (1 through today)
+  let elapsedWork = 0;
+  for (let d = 1; d < today; d++) {
+    if (new Date(year, month, d).getDay() !== 0) elapsedWork++;
+  }
+  // Count total non-Sunday days in the month
+  let totalWork = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    if (new Date(year, month, d).getDay() !== 0) totalWork++;
+  }
+
+  if (elapsedWork <= 0) return currentSales;
+  return Math.round((currentSales / elapsedWork) * totalWork);
+}
+  
 /* ── Sort ── */
 function sortRows(rows, sortState, type) {
   const { col, dir } = sortState;
@@ -1842,29 +1865,6 @@ function renderDashboard() {
       ${bdcColOrder.map(k => cells[k]).join('')}
     </tr>`;
   }
-
-/* ── Sales Trending Projection (off Sundays only) ── */
-function trendingSales(currentSales) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const today = now.getDate();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  // Count non-Sunday days elapsed (1 through today)
-  let elapsedWork = 0;
-  for (let d = 1; d < today; d++) {
-    if (new Date(year, month, d).getDay() !== 0) elapsedWork++;
-  }
-  // Count total non-Sunday days in the month
-  let totalWork = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    if (new Date(year, month, d).getDay() !== 0) totalWork++;
-  }
-
-  if (elapsedWork <= 0) return currentSales;
-  return Math.round((currentSales / elapsedWork) * totalWork);
-}
   
   /* ── Sales cell renderer ── */
   function salesCellData(r) {
