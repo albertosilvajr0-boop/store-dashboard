@@ -614,6 +614,7 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
       <input type="password" id="newUserPassword" placeholder="Password" style="margin-top:8px;">
       <input type="text" id="newUserDisplayName" placeholder='Display Name (e.g., "John Smith")' style="margin-top:8px;">
       <input type="text" id="newUserLinked" placeholder='Linked Sheet Name (e.g., "JASMINE VASQUEZ")' style="margin-top:8px;">
+      <input type="tel" id="newUserPhone" placeholder='Phone Number (e.g., "210-555-1234")' style="margin-top:8px;">
       <select id="newUserRole" style="width:100%;padding:12px;margin-top:8px;border:1px solid #ddd;border-radius:8px;">
         <option value="user">User</option>
         <option value="manager">Manager</option>
@@ -2306,13 +2307,15 @@ async function loadUsers() {
       const role = u.role || 'user';
       const linked = u.linkedName || '';
       const displayName = u.displayName || '';
+      const phone = u.phone || '';
       const isSelf = email === window.userData.email;
       const canDelete = isAdmin() && !isSelf && role !== 'admin' && role !== 'superadmin' && email !== SUPERADMIN_EMAIL;
       const canEdit = isAdmin();
       const infoLine = [
         `Role: <strong>${role}</strong>${role === 'superadmin' ? ' 👑' : ''}`,
         displayName ? `Display: ${displayName}` : '',
-        linked ? `Linked: ${linked}` : ''
+        linked ? `Linked: ${linked}` : '',
+        phone ? `📞 ${phone}` : ''
       ].filter(Boolean).join(' • ');
       html += `
         <div class="user-item">
@@ -2321,7 +2324,7 @@ async function loadUsers() {
             <small>${infoLine}</small>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
-            ${canEdit ? `<button class="btn" style="padding:4px 10px;font-size:11px;background:#2563eb;" onclick="startEditUser('${docu.id}','${email.replace(/'/g,"\\'")}','${role}','${(linked).replace(/'/g,"\\'")}','${(displayName).replace(/'/g,"\\'")}')">Edit</button>` : ''}
+            ${canEdit ? `<button class="btn" style="padding:4px 10px;font-size:11px;background:#2563eb;" onclick="startEditUser('${docu.id}','${email.replace(/'/g,"\\'")}','${role}','${(linked).replace(/'/g,"\\'")}','${(displayName).replace(/'/g,"\\'")}','${(phone).replace(/'/g,"\\'")}')">Edit</button>` : ''}
             ${canDelete ? `<button class="delete-btn" onclick="deleteUser('${docu.id}','${email}','${role}')">Delete</button>` : ''}
           </div>
         </div>`;
@@ -2332,7 +2335,7 @@ async function loadUsers() {
   }
 }
 
-function startEditUser(uid, email, role, linked, displayName) {
+function startEditUser(uid, email, role, linked, displayName, phone) {
   document.getElementById('editUserUid').value = uid;
   document.getElementById('newUserEmail').value = email;
   document.getElementById('newUserEmail').disabled = true;
@@ -2340,6 +2343,7 @@ function startEditUser(uid, email, role, linked, displayName) {
   document.getElementById('newUserPassword').placeholder = 'Leave blank to keep current';
   document.getElementById('newUserDisplayName').value = displayName || '';
   document.getElementById('newUserLinked').value = linked || '';
+  document.getElementById('newUserPhone').value = phone || '';
   document.getElementById('newUserRole').value = role;
   document.getElementById('userFormTitle').textContent = 'Edit User';
   document.getElementById('userFormBtn').textContent = 'Save Changes';
@@ -2358,6 +2362,7 @@ function cancelEditUser() {
   document.getElementById('newUserPassword').placeholder = 'Password';
   document.getElementById('newUserDisplayName').value = '';
   document.getElementById('newUserLinked').value = '';
+  document.getElementById('newUserPhone').value = '';
   document.getElementById('newUserRole').value = 'user';
   document.getElementById('userFormTitle').textContent = 'Add New User';
   document.getElementById('userFormBtn').textContent = 'Add User';
@@ -2372,12 +2377,13 @@ async function addUser() {
   const password = document.getElementById('newUserPassword')?.value?.trim();
   const displayName = document.getElementById('newUserDisplayName')?.value?.trim() || '';
   const linked = document.getElementById('newUserLinked')?.value?.trim() || '';
+  const phone = document.getElementById('newUserPhone')?.value?.trim() || '';
   const role = document.getElementById('newUserRole')?.value || 'user';
 
   // ── EDIT MODE ──
   if (editUid) {
     try {
-      const updates = { role, linkedName: linked, displayName };
+      const updates = { role, linkedName: linked, displayName, phone };
       await setDoc(doc(db, 'users', editUid), updates, { merge: true });
       alert('User updated!');
       cancelEditUser();
@@ -2393,7 +2399,7 @@ async function addUser() {
   try {
     const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
     await setDoc(doc(db, 'users', cred.user.uid), {
-      email, role, linkedName: linked, displayName, createdAt: new Date()
+      email, role, linkedName: linked, displayName, phone, createdAt: new Date()
     });
     await secondaryAuth.signOut();
     alert('User created!');
