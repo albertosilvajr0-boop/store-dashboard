@@ -1200,6 +1200,7 @@ function salesStats(rows) {
 /* ── Column definitions (draggable order) ── */
 const BDC_COL_DEFS = {
   shown:    { key: 'shown',    label: 'Appts Shown', primary: true },
+  trending: { key: 'trending', label: 'Trending' },
   pctShown: { key: 'pctShown', label: '% Shown' },
   due:      { key: 'due',      label: 'Appts Due' },
   created:  { key: 'created',  label: 'Appts Created' },
@@ -1218,7 +1219,7 @@ const SALES_COL_DEFS = {
   texts:     { key: 'texts',     label: 'Texts' },
 };
 // Mutable order arrays (user can rearrange via drag)
-let bdcColOrder   = ['shown','pctShown','due','created','calls','texts'];
+let bdcColOrder   = ['shown','trending','pctShown','due','created','calls','texts'];
 let salesColOrder = ['sales','trending','closeRate','pctShown','shown','due','created','calls','texts'];
 
 let _dragPanel = null, _dragColKey = null;
@@ -1267,8 +1268,8 @@ function sortRows(rows, sortState, type) {
       vb = safeNum(b.sales) / visB;
     }
     else if (col === 'trending') {
-      va = trendingSales(safeNum(a.sales));
-      vb = trendingSales(safeNum(b.sales));
+      va = trendingSales(type === 'bdc' ? safeNum(shownVal(a)) : safeNum(a.sales));
+      vb = trendingSales(type === 'bdc' ? safeNum(shownVal(b)) : safeNum(b.sales));
     }
     else if (col === 'pctShown') {
       const dueA = safeNum(a.due ?? a.due_count ?? a.created ?? 0) || 1;
@@ -1816,8 +1817,10 @@ function renderDashboard() {
     const textsS   = kpiColumnGradient(texts, bdcRanges.texts.min, bdcRanges.texts.max);
     const createdS = kpiColumnGradient(created, bdcRanges.created.min, bdcRanges.created.max);
     const dueS     = kpiColumnGradient(due, bdcRanges.due.min, bdcRanges.due.max);
+    const trendShown = trendingSales(shown);
     return {
       shown:    `<td><strong>${shown}</strong></td>`,
+      trending: `<td style="font-weight:600;color:#a371f7;">${trendShown}</td>`,
       pctShown: `<td>${pct}</td>`,
       due:      `<td style="${dueS}">${due}</td>`,
       created:  `<td style="${createdS}">${created}</td>`,
@@ -1880,9 +1883,13 @@ function trendingSales(currentSales) {
     const dueK     = kpiClass(due, WEEKLY_TARGETS.due);
     const shownK   = kpiClass(shown, WEEKLY_TARGETS.shown);
     const trend = trendingSales(salesV);
+    const trendStyle = trend >= 20 ? 'background:#bbf7d0;color:#166534;font-weight:700;'
+                     : trend >= 12 ? 'background:#dcfce7;color:#16a34a;font-weight:700;'
+                     : trend >= 10 ? 'background:#fef9c3;color:#ca8a04;font-weight:700;'
+                     :               'background:#f4f4f5;color:#a1a1aa;font-weight:600;';
     return {
       sales:     `<td class="sales-primary">${salesV}</td>`,
-      trending:  `<td style="font-weight:600;color:#58a6ff;">${trend}</td>`,
+      trending:  `<td style="${trendStyle}">${trend}</td>`,
       closeRate: `<td style="font-weight:600;">${closeRate}</td>`,
       pctShown:  `<td>${pct}</td>`,
       shown:     `<td class="${shownK}">${shown}</td>`,
