@@ -610,11 +610,11 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
     <div class="form-group" id="userFormSection">
       <h3 style="margin:0 0 6px;" id="userFormTitle">Add New User</h3>
       <input type="hidden" id="editUserUid" value="">
-      <input type="email" id="newUserEmail" placeholder="Email address">
-      <input type="password" id="newUserPassword" placeholder="Password" style="margin-top:8px;">
-      <input type="text" id="newUserDisplayName" placeholder='Display Name (e.g., "John Smith")' style="margin-top:8px;">
-      <input type="text" id="newUserLinked" placeholder='Linked Sheet Name (e.g., "JASMINE VASQUEZ")' style="margin-top:8px;">
-      <input type="tel" id="newUserPhone" placeholder='Phone Number (e.g., "210-555-1234")' style="margin-top:8px;">
+      <input type="email" id="newUserEmail" placeholder="Email address" autocomplete="off">
+      <input type="password" id="newUserPassword" placeholder="Password" style="margin-top:8px;" autocomplete="new-password">
+      <input type="text" id="newUserDisplayName" placeholder='Display Name (e.g., "John Smith")' style="margin-top:8px;" autocomplete="off">
+      <input type="text" id="newUserLinked" placeholder='Linked Sheet Name (e.g., "JASMINE VASQUEZ")' style="margin-top:8px;" autocomplete="off">
+      <input type="tel" id="newUserPhone" placeholder='Phone Number (e.g., "210-555-1234")' style="margin-top:8px;" autocomplete="off">
       <select id="newUserRole" style="width:100%;padding:12px;margin-top:8px;border:1px solid #ddd;border-radius:8px;">
         <option value="user">User</option>
         <option value="manager">Manager</option>
@@ -2296,6 +2296,7 @@ async function viewCallSheets(name) {
 /* ══════════════════════════════════════════
    USER MANAGEMENT
    ══════════════════════════════════════════ */
+const _userCache = {};
 async function loadUsers() {
   try {
     const usersSnapshot = await getDocs(collection(db, 'users'));
@@ -2303,11 +2304,13 @@ async function loadUsers() {
     usersSnapshot.forEach((docu) => {
       const u = docu.data();
       if (u.deleted) return;
+      const uid = docu.id;
       const email = u.email || '';
       const role = u.role || 'user';
       const linked = u.linkedName || '';
       const displayName = u.displayName || '';
       const phone = u.phone || '';
+      _userCache[uid] = { email, role, linked, displayName, phone };
       const isSelf = email === window.userData.email;
       const canDelete = isAdmin() && !isSelf && role !== 'admin' && role !== 'superadmin' && email !== SUPERADMIN_EMAIL;
       const canEdit = isAdmin();
@@ -2324,8 +2327,8 @@ async function loadUsers() {
             <small>${infoLine}</small>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
-            ${canEdit ? `<button class="btn" style="padding:4px 10px;font-size:11px;background:#2563eb;" onclick="startEditUser('${docu.id}','${email.replace(/'/g,"\\'")}','${role}','${(linked).replace(/'/g,"\\'")}','${(displayName).replace(/'/g,"\\'")}','${(phone).replace(/'/g,"\\'")}')">Edit</button>` : ''}
-            ${canDelete ? `<button class="delete-btn" onclick="deleteUser('${docu.id}','${email}','${role}')">Delete</button>` : ''}
+            ${canEdit ? `<button class="btn" style="padding:4px 10px;font-size:11px;background:#2563eb;" onclick="startEditUser('${uid}')">Edit</button>` : ''}
+            ${canDelete ? `<button class="delete-btn" onclick="deleteUser('${uid}','${email.replace(/'/g,"\\'")}','${role}')">Delete</button>` : ''}
           </div>
         </div>`;
     });
@@ -2335,16 +2338,18 @@ async function loadUsers() {
   }
 }
 
-function startEditUser(uid, email, role, linked, displayName, phone) {
+function startEditUser(uid) {
+  const u = _userCache[uid];
+  if (!u) { alert('User data not found. Please refresh and try again.'); return; }
   document.getElementById('editUserUid').value = uid;
-  document.getElementById('newUserEmail').value = email;
+  document.getElementById('newUserEmail').value = u.email;
   document.getElementById('newUserEmail').disabled = true;
   document.getElementById('newUserPassword').value = '';
   document.getElementById('newUserPassword').placeholder = 'Leave blank to keep current';
-  document.getElementById('newUserDisplayName').value = displayName || '';
-  document.getElementById('newUserLinked').value = linked || '';
-  document.getElementById('newUserPhone').value = phone || '';
-  document.getElementById('newUserRole').value = role;
+  document.getElementById('newUserDisplayName').value = u.displayName || '';
+  document.getElementById('newUserLinked').value = u.linked || '';
+  document.getElementById('newUserPhone').value = u.phone || '';
+  document.getElementById('newUserRole').value = u.role;
   document.getElementById('userFormTitle').textContent = 'Edit User';
   document.getElementById('userFormBtn').textContent = 'Save Changes';
   document.getElementById('userFormCancelBtn').style.display = '';
