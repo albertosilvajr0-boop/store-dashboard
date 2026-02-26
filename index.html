@@ -1327,7 +1327,7 @@ function kpiClass(value, target) {
 /* Computes min/max per metric across all BDC rows, then colors each cell
    on a red → yellow → green scale based on where it falls in that range. */
 function bdcColumnRanges(rows) {
-  const metrics = ['calls','texts','created','due'];
+  const metrics = ['calls','texts','created','due','trending'];
   const ranges = {};
   metrics.forEach(m => {
     let min = Infinity, max = -Infinity;
@@ -1337,6 +1337,7 @@ function bdcColumnRanges(rows) {
       else if (m === 'texts') v = safeNum(r.texts);
       else if (m === 'created') v = safeNum(r.created ?? r.created_count ?? 0);
       else if (m === 'due') v = safeNum(r.due ?? r.due_count ?? 0);
+      else if (m === 'trending') v = trendingSales(safeNum(shownVal(r)));
       else v = 0;
       if (v < min) min = v;
       if (v > max) max = v;
@@ -1367,6 +1368,31 @@ function kpiColumnGradient(value, min, max) {
     // amber (#fef3c7) → green (#dcfce7)
     r = Math.round(254 - t * (254 - 220)); g = Math.round(243 + t * (252 - 243)); b = Math.round(199 - t * (199 - 231));
     tr = Math.round(180 - t * (180 - 22)); tg = Math.round(83 + t * (163 - 83)); tb = Math.round(9 + t * (74 - 9));
+  }
+  return `background:rgb(${r},${g},${b});color:rgb(${tr},${tg},${tb});font-weight:700;`;
+}
+
+/* Green (high) → Yellow (mid) → Light-yellow (low) gradient for BDC Trending */
+function trendingGradient(value, min, max) {
+  if (max === min) {
+    if (value <= 0) return 'background:#f4f4f5;color:#a1a1aa;font-weight:600;';
+    return 'background:#dcfce7;color:#166534;font-weight:700;';
+  }
+  if (value <= 0) return 'background:#f4f4f5;color:#a1a1aa;font-weight:600;';
+
+  const pct = (value - min) / (max - min); // 0 = lowest, 1 = highest
+
+  let r, g, b, tr, tg, tb;
+  if (pct < 0.5) {
+    const t = pct / 0.5;
+    // light yellow (#fefce8) → yellow (#fef9c3)
+    r = 254; g = Math.round(252 - t * (252 - 249)); b = Math.round(232 - t * (232 - 195));
+    tr = Math.round(161 - t * (161 - 161)); tg = Math.round(128 + t * (138 - 128)); tb = Math.round(0 + t * (4 - 0));
+  } else {
+    const t = (pct - 0.5) / 0.5;
+    // yellow (#fef9c3) → green (#dcfce7)
+    r = Math.round(254 - t * (254 - 220)); g = Math.round(249 + t * (252 - 249)); b = Math.round(195 + t * (231 - 195));
+    tr = Math.round(161 - t * (161 - 22)); tg = Math.round(138 + t * (163 - 138)); tb = Math.round(4 + t * (74 - 4));
   }
   return `background:rgb(${r},${g},${b});color:rgb(${tr},${tg},${tb});font-weight:700;`;
 }
@@ -1840,9 +1866,10 @@ function renderDashboard() {
     const createdS = kpiColumnGradient(created, bdcRanges.created.min, bdcRanges.created.max);
     const dueS     = kpiColumnGradient(due, bdcRanges.due.min, bdcRanges.due.max);
     const trendShown = trendingSales(shown);
+    const trendS = trendingGradient(trendShown, bdcRanges.trending.min, bdcRanges.trending.max);
     return {
       shown:    `<td><strong>${shown}</strong></td>`,
-      trending: `<td style="font-weight:600;color:#a371f7;">${trendShown}</td>`,
+      trending: `<td style="${trendS}">${trendShown}</td>`,
       pctShown: `<td>${pct}</td>`,
       due:      `<td style="${dueS}">${due}</td>`,
       created:  `<td style="${createdS}">${created}</td>`,
