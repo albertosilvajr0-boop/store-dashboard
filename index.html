@@ -608,8 +608,7 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
       <button class="modal-close" onclick="closeUserModal()">&times;</button>
     </div>
     <div class="form-group" id="userFormSection">
-      <h3 style="margin:0 0 6px;" id="userFormTitle">Add New User</h3>
-      <input type="hidden" id="editUserUid" value="">
+      <h3 style="margin:0 0 6px;">Add New User</h3>
       <input type="email" id="newUserEmail" placeholder="Email address" autocomplete="off">
       <input type="password" id="newUserPassword" placeholder="Password" style="margin-top:8px;" autocomplete="new-password">
       <input type="text" id="newUserDisplayName" placeholder='Display Name (e.g., "John Smith")' style="margin-top:8px;" autocomplete="off">
@@ -621,8 +620,7 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
         <option value="admin">Admin</option>
       </select>
       <div style="display:flex;gap:8px;margin-top:10px;">
-        <button class="btn" style="flex:1;" onclick="addUser()" id="userFormBtn">Add User</button>
-        <button class="btn" style="flex:0;background:#78716c;display:none;" onclick="cancelEditUser()" id="userFormCancelBtn">Cancel</button>
+        <button class="btn" style="flex:1;" onclick="addUser()">Add User</button>
       </div>
     </div>
     <div class="user-list" id="userList">
@@ -2321,15 +2319,18 @@ async function loadUsers() {
         phone ? `📞 ${phone}` : ''
       ].filter(Boolean).join(' • ');
       html += `
-        <div class="user-item">
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:600;">${email}</div>
-            <small>${infoLine}</small>
+        <div class="user-item-wrapper" id="userWrapper_${uid}">
+          <div class="user-item">
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;">${email}</div>
+              <small>${infoLine}</small>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              ${canEdit ? `<button class="btn" style="padding:4px 10px;font-size:11px;background:#2563eb;" id="editBtn_${uid}" onclick="startEditUser('${uid}')">Edit</button>` : ''}
+              ${canDelete ? `<button class="delete-btn" onclick="deleteUser('${uid}','${email.replace(/'/g,"\\'")}','${role}')">Delete</button>` : ''}
+            </div>
           </div>
-          <div style="display:flex;gap:6px;align-items:center;">
-            ${canEdit ? `<button class="btn" style="padding:4px 10px;font-size:11px;background:#2563eb;" onclick="startEditUser('${uid}')">Edit</button>` : ''}
-            ${canDelete ? `<button class="delete-btn" onclick="deleteUser('${uid}','${email.replace(/'/g,"\\'")}','${role}')">Delete</button>` : ''}
-          </div>
+          <div class="inline-edit-form" id="editForm_${uid}" style="display:none;"></div>
         </div>`;
     });
     document.getElementById('userListContent').innerHTML = html || '<p style="color:var(--muted);">No users found.</p>';
@@ -2341,43 +2342,61 @@ async function loadUsers() {
 function startEditUser(uid) {
   const u = _userCache[uid];
   if (!u) { alert('User data not found. Please refresh and try again.'); return; }
-  document.getElementById('editUserUid').value = uid;
-  document.getElementById('newUserEmail').value = u.email;
-  document.getElementById('newUserEmail').disabled = true;
-  document.getElementById('newUserPassword').value = '';
-  document.getElementById('newUserPassword').placeholder = 'Leave blank to keep current';
-  document.getElementById('newUserDisplayName').value = u.displayName || '';
-  document.getElementById('newUserLinked').value = u.linked || '';
-  document.getElementById('newUserPhone').value = u.phone || '';
-  document.getElementById('newUserRole').value = u.role;
-  document.getElementById('userFormTitle').textContent = 'Edit User';
-  document.getElementById('userFormBtn').textContent = 'Save Changes';
-  document.getElementById('userFormCancelBtn').style.display = '';
-  document.getElementById('userFormSection').style.background = '#eff6ff';
-  document.getElementById('userFormSection').style.borderRadius = '10px';
-  document.getElementById('userFormSection').style.padding = '14px';
-  document.getElementById('userFormSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Close any other open inline edit forms
+  document.querySelectorAll('.inline-edit-form').forEach(f => { f.style.display = 'none'; f.innerHTML = ''; });
+
+  const formContainer = document.getElementById('editForm_' + uid);
+  if (!formContainer) return;
+
+  formContainer.innerHTML = `
+    <div style="background:#eff6ff;border-radius:10px;padding:14px;margin-top:6px;">
+      <h3 style="margin:0 0 6px;font-size:14px;">Edit User</h3>
+      <input type="email" id="inlineEmail_${uid}" value="${u.email}" disabled style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;background:#f3f4f6;color:#6b7280;">
+      <input type="password" id="inlinePassword_${uid}" placeholder="Leave blank to keep current" style="width:100%;padding:10px;margin-top:8px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;" autocomplete="new-password">
+      <input type="text" id="inlineDisplayName_${uid}" value="${(u.displayName || '').replace(/"/g,'&quot;')}" placeholder='Display Name (e.g., "John Smith")' style="width:100%;padding:10px;margin-top:8px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+      <input type="text" id="inlineLinked_${uid}" value="${(u.linked || '').replace(/"/g,'&quot;')}" placeholder='Linked Sheet Name (e.g., "JASMINE VASQUEZ")' style="width:100%;padding:10px;margin-top:8px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+      <input type="tel" id="inlinePhone_${uid}" value="${(u.phone || '').replace(/"/g,'&quot;')}" placeholder='Phone Number (e.g., "210-555-1234")' style="width:100%;padding:10px;margin-top:8px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+      <select id="inlineRole_${uid}" style="width:100%;padding:10px;margin-top:8px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+        <option value="user"${u.role === 'user' ? ' selected' : ''}>User</option>
+        <option value="manager"${u.role === 'manager' ? ' selected' : ''}>Manager</option>
+        <option value="admin"${u.role === 'admin' ? ' selected' : ''}>Admin</option>
+      </select>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn" style="flex:1;" onclick="saveEditUser('${uid}')">Save Changes</button>
+        <button class="btn" style="flex:0;background:#78716c;" onclick="cancelEditUser('${uid}')">Cancel</button>
+      </div>
+    </div>`;
+  formContainer.style.display = 'block';
+  formContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function cancelEditUser() {
-  document.getElementById('editUserUid').value = '';
-  document.getElementById('newUserEmail').value = '';
-  document.getElementById('newUserEmail').disabled = false;
-  document.getElementById('newUserPassword').value = '';
-  document.getElementById('newUserPassword').placeholder = 'Password';
-  document.getElementById('newUserDisplayName').value = '';
-  document.getElementById('newUserLinked').value = '';
-  document.getElementById('newUserPhone').value = '';
-  document.getElementById('newUserRole').value = 'user';
-  document.getElementById('userFormTitle').textContent = 'Add New User';
-  document.getElementById('userFormBtn').textContent = 'Add User';
-  document.getElementById('userFormCancelBtn').style.display = 'none';
-  document.getElementById('userFormSection').style.background = '';
-  document.getElementById('userFormSection').style.padding = '';
+function cancelEditUser(uid) {
+  if (uid) {
+    const formContainer = document.getElementById('editForm_' + uid);
+    if (formContainer) { formContainer.style.display = 'none'; formContainer.innerHTML = ''; }
+  } else {
+    // Close all inline edit forms
+    document.querySelectorAll('.inline-edit-form').forEach(f => { f.style.display = 'none'; f.innerHTML = ''; });
+  }
+}
+
+async function saveEditUser(uid) {
+  const displayName = document.getElementById('inlineDisplayName_' + uid)?.value?.trim() || '';
+  const linked = document.getElementById('inlineLinked_' + uid)?.value?.trim() || '';
+  const phone = document.getElementById('inlinePhone_' + uid)?.value?.trim() || '';
+  const role = document.getElementById('inlineRole_' + uid)?.value || 'user';
+
+  try {
+    const updates = { role, linkedName: linked, displayName, phone };
+    await setDoc(doc(db, 'users', uid), updates, { merge: true });
+    alert('User updated!');
+    cancelEditUser(uid);
+    loadUsers();
+  } catch (e) { alert('Error: ' + e.message); }
 }
 
 async function addUser() {
-  const editUid = document.getElementById('editUserUid')?.value?.trim();
   const email = document.getElementById('newUserEmail')?.value?.trim();
   const password = document.getElementById('newUserPassword')?.value?.trim();
   const displayName = document.getElementById('newUserDisplayName')?.value?.trim() || '';
@@ -2385,19 +2404,6 @@ async function addUser() {
   const phone = document.getElementById('newUserPhone')?.value?.trim() || '';
   const role = document.getElementById('newUserRole')?.value || 'user';
 
-  // ── EDIT MODE ──
-  if (editUid) {
-    try {
-      const updates = { role, linkedName: linked, displayName, phone };
-      await setDoc(doc(db, 'users', editUid), updates, { merge: true });
-      alert('User updated!');
-      cancelEditUser();
-      loadUsers();
-    } catch (e) { alert('Error: ' + e.message); }
-    return;
-  }
-
-  // ── CREATE MODE ──
   if (!email || !password) { alert('Enter email and password.'); return; }
   if (password.length < 6) { alert('Password must be at least 6 characters.'); return; }
 
@@ -2408,7 +2414,12 @@ async function addUser() {
     });
     await secondaryAuth.signOut();
     alert('User created!');
-    cancelEditUser();
+    document.getElementById('newUserEmail').value = '';
+    document.getElementById('newUserPassword').value = '';
+    document.getElementById('newUserDisplayName').value = '';
+    document.getElementById('newUserLinked').value = '';
+    document.getElementById('newUserPhone').value = '';
+    document.getElementById('newUserRole').value = 'user';
     loadUsers();
   } catch (e) {
     alert('Error: ' + e.message);
@@ -3530,6 +3541,7 @@ window.showUserModal = showUserModal;
 window.closeUserModal = closeUserModal;
 window.startEditUser = startEditUser;
 window.cancelEditUser = cancelEditUser;
+window.saveEditUser = saveEditUser;
 window.addUser = addUser;
 window.deleteUser = deleteUser;
 window.showActivityModal = showActivityModal;
@@ -5291,6 +5303,9 @@ window.showAddLinkForm = showAddLinkForm;
 window.hideAddLinkForm = hideAddLinkForm;
 window.saveCustomLink = saveCustomLink;
 window.removeCustomLink = removeCustomLink;
+window.startEditUser = startEditUser;
+window.cancelEditUser = cancelEditUser;
+window.saveEditUser = saveEditUser;
 window.addUser = addUser;
 window.deleteUser = deleteUser;
 window.toggleSort = toggleSort;
