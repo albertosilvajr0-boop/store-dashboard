@@ -764,6 +764,9 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
         <option value="manager">Manager</option>
         <option value="admin">Admin</option>
       </select>
+      <select id="newUserManager" style="width:100%;padding:12px;margin-top:8px;border:1px solid #ddd;border-radius:8px;">
+        <option value="">— No Assigned Manager —</option>
+      </select>
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="btn" style="flex:1;" onclick="addUser()">Add User</button>
       </div>
@@ -1309,6 +1312,7 @@ async function showDashboard() {
     updateLoginStreak().catch(e => console.warn('Streak error:', e));
     checkPersonalBests(dashboardData.sales, dashboardData.bdc).catch(e => console.warn('PB error:', e));
     try { showMorningBriefing(dashboardData.sales, dashboardData.bdc); } catch(e) { console.warn('Briefing error:', e); }
+    try { if (isAdmin() || isManager()) showManagerBriefing(dashboardData.sales, dashboardData.bdc); } catch(e) { console.warn('Manager briefing error:', e); }
     try { initKudos(); } catch(e) { console.warn('Kudos error:', e); }
     try { if (hasDismissedMorningBriefing()) { setTimeout(() => checkMilestones(), 1000); } } catch(e) { console.warn('Milestone error:', e); }
   } catch (err) {
@@ -2155,6 +2159,7 @@ function renderDashboard() {
             ${isAdmin() ? '<a href="#" onclick="event.preventDefault();closeReportsMenu();showEngagement();" class="res-link">📈 Engagement</a>' : ''}
           </div>
         </div>` : ''}
+        ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showTeamDashboard()" style="min-width:90px;">👔 My Team</button>' : ''}
         ${isAdmin() ? '<button class="topbar-btn manage" onclick="showUserModal()">👤 Manage Users</button>' : ''}
         <button class="topbar-btn logout" onclick="logout()">Logout</button>
       </div>
@@ -2507,15 +2512,18 @@ async function loadUsers() {
       const linked = u.linkedName || '';
       const displayName = u.displayName || '';
       const phone = u.phone || '';
-      _userCache[uid] = { email, role, linked, displayName, phone };
+      const managerId = u.managerId || '';
+      _userCache[uid] = { email, role, linked, displayName, phone, managerId };
       const isSelf = email === window.userData.email;
       const canDelete = isAdmin() && !isSelf && role !== 'admin' && role !== 'superadmin' && email !== SUPERADMIN_EMAIL;
       const canEdit = isAdmin();
+      const managerLabel = managerId && _userCache[managerId] ? (_userCache[managerId].displayName || _userCache[managerId].email) : '';
       const infoLine = [
         `Role: <strong>${role}</strong>${role === 'superadmin' ? ' 👑' : ''}`,
         displayName ? `Display: ${displayName}` : '',
         linked ? `Linked: ${linked}` : '',
-        phone ? `📞 ${phone}` : ''
+        phone ? `📞 ${phone}` : '',
+        managerLabel ? `👔 Manager: ${managerLabel}` : ''
       ].filter(Boolean).join(' • ');
       html += `
         <div class="user-item-wrapper" id="userWrapper_${uid}">
@@ -2533,9 +2541,29 @@ async function loadUsers() {
         </div>`;
     });
     document.getElementById('userListContent').innerHTML = html || '<p style="color:var(--muted);">No users found.</p>';
+    // Populate manager dropdowns (Add User form)
+    populateManagerDropdown(document.getElementById('newUserManager'), '');
   } catch (e) {
     document.getElementById('userListContent').innerHTML = `<p style="color:#dc2626;">Error: ${e.message}</p>`;
   }
+}
+
+function getManagerOptions() {
+  // Return list of users with role manager, admin, or superadmin
+  return Object.entries(_userCache)
+    .filter(([, u]) => u.role === 'manager' || u.role === 'admin' || u.role === 'superadmin')
+    .map(([uid, u]) => ({ uid, label: u.displayName || u.email }))
+    .sort((a, b) => a.label.toLowerCase().localeCompare(b.label.toLowerCase()));
+}
+
+function populateManagerDropdown(selectEl, currentManagerId) {
+  if (!selectEl) return;
+  const managers = getManagerOptions();
+  let opts = '<option value="">— No Assigned Manager —</option>';
+  managers.forEach(m => {
+    opts += `<option value="${m.uid}"${m.uid === currentManagerId ? ' selected' : ''}>${m.label}</option>`;
+  });
+  selectEl.innerHTML = opts;
 }
 
 function startEditUser(uid) {
@@ -2561,12 +2589,17 @@ function startEditUser(uid) {
         <option value="manager"${u.role === 'manager' ? ' selected' : ''}>Manager</option>
         <option value="admin"${u.role === 'admin' ? ' selected' : ''}>Admin</option>
       </select>
+      <select id="inlineManager_${uid}" style="width:100%;padding:10px;margin-top:8px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box;">
+        <option value="">— No Assigned Manager —</option>
+      </select>
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="btn" style="flex:1;" onclick="saveEditUser('${uid}')">Save Changes</button>
         <button class="btn" style="flex:0;background:#78716c;" onclick="cancelEditUser('${uid}')">Cancel</button>
       </div>
     </div>`;
   formContainer.style.display = 'block';
+  // Populate manager dropdown with current selection
+  populateManagerDropdown(document.getElementById('inlineManager_' + uid), u.managerId || '');
   formContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -2585,9 +2618,10 @@ async function saveEditUser(uid) {
   const linked = document.getElementById('inlineLinked_' + uid)?.value?.trim() || '';
   const phone = document.getElementById('inlinePhone_' + uid)?.value?.trim() || '';
   const role = document.getElementById('inlineRole_' + uid)?.value || 'user';
+  const managerId = document.getElementById('inlineManager_' + uid)?.value || '';
 
   try {
-    const updates = { role, linkedName: linked, displayName, phone };
+    const updates = { role, linkedName: linked, displayName, phone, managerId };
     await setDoc(doc(db, 'users', uid), updates, { merge: true });
     alert('User updated!');
     cancelEditUser(uid);
@@ -2602,6 +2636,7 @@ async function addUser() {
   const linked = document.getElementById('newUserLinked')?.value?.trim() || '';
   const phone = document.getElementById('newUserPhone')?.value?.trim() || '';
   const role = document.getElementById('newUserRole')?.value || 'user';
+  const managerId = document.getElementById('newUserManager')?.value || '';
 
   if (!email || !password) { alert('Enter email and password.'); return; }
   if (password.length < 6) { alert('Password must be at least 6 characters.'); return; }
@@ -2609,7 +2644,7 @@ async function addUser() {
   try {
     const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
     await setDoc(doc(db, 'users', cred.user.uid), {
-      email, role, linkedName: linked, displayName, phone, createdAt: new Date()
+      email, role, linkedName: linked, displayName, phone, managerId, createdAt: new Date()
     });
     await secondaryAuth.signOut();
     alert('User created!');
@@ -2619,6 +2654,7 @@ async function addUser() {
     document.getElementById('newUserLinked').value = '';
     document.getElementById('newUserPhone').value = '';
     document.getElementById('newUserRole').value = 'user';
+    document.getElementById('newUserManager').value = '';
     loadUsers();
   } catch (e) {
     alert('Error: ' + e.message);
@@ -4933,6 +4969,8 @@ window.toggleAllNewsGroups = toggleAllNewsGroups;
 /* ══════════════════════════════════════════
    📋 ROSTER PAGE
    ══════════════════════════════════════════ */
+let _rosterViewMode = 'all'; // 'all' or 'teams'
+
 async function showRoster() {
   trackClick();
   logPageView('Roster');
@@ -4944,7 +4982,10 @@ async function showRoster() {
           <h2 style="margin:0;font-size:20px;">📋 Roster</h2>
           <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Team directory with phone numbers</p>
         </div>
-        <button class="topbar-btn manage" onclick="showDashboard()">← Back</button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="topbar-btn manage" id="rosterToggleBtn" onclick="toggleRosterView()" style="font-size:12px;padding:6px 14px;">👥 View by Teams</button>
+          <button class="topbar-btn manage" onclick="showDashboard()">← Back</button>
+        </div>
       </div>
       <div id="rosterContent"><div class="loading-wrap"><div class="spinner"></div></div></div>
     </div>`;
@@ -4952,15 +4993,18 @@ async function showRoster() {
   try {
     const usersSnapshot = await getDocs(collection(db, 'users'));
     const users = [];
+    window._rosterUsers = []; // cache for toggling views
     usersSnapshot.forEach((docu) => {
       const u = docu.data();
       if (u.deleted) return;
       users.push({
+        uid: docu.id,
         displayName: u.displayName || '',
         email: u.email || '',
         phone: u.phone || '',
         role: u.role || 'user',
-        linkedName: u.linkedName || ''
+        linkedName: u.linkedName || '',
+        managerId: u.managerId || ''
       });
     });
 
@@ -4971,38 +5015,329 @@ async function showRoster() {
       return nameA.localeCompare(nameB);
     });
 
+    window._rosterUsers = users;
+
     if (users.length === 0) {
       document.getElementById('rosterContent').innerHTML = '<p style="color:var(--muted);">No users found.</p>';
       return;
     }
 
-    let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
-    users.forEach(u => {
-      const name = u.displayName || u.email;
-      const roleBadge = u.role === 'superadmin' ? ' 👑' : '';
-      const roleColor = u.role === 'admin' || u.role === 'superadmin' ? '#dc2626' : u.role === 'manager' ? '#2563eb' : '#78716c';
-      html += `
-        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-          <div style="min-width:0;">
-            <div style="font-weight:700;font-size:15px;">${name}${roleBadge}</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:2px;">
-              <span style="color:${roleColor};font-weight:600;text-transform:uppercase;font-size:11px;">${u.role}</span>
-              ${u.linkedName ? ` · ${u.linkedName}` : ''}
-              ${u.email && u.displayName ? ` · ${u.email}` : ''}
-            </div>
-          </div>
-          <div style="font-size:15px;font-weight:600;white-space:nowrap;">
-            ${u.phone ? `<a href="tel:${u.phone.replace(/[^+0-9]/g, '')}" style="color:var(--accent);text-decoration:none;">📞 ${u.phone}</a>` : '<span style="color:var(--muted);font-size:12px;font-weight:400;">No phone</span>'}
-          </div>
-        </div>`;
-    });
-    html += '</div>';
-    document.getElementById('rosterContent').innerHTML = html;
+    renderRosterView();
   } catch (e) {
     document.getElementById('rosterContent').innerHTML = `<p style="color:#dc2626;">Error loading roster: ${e.message}</p>`;
   }
 }
+
+function toggleRosterView() {
+  _rosterViewMode = _rosterViewMode === 'all' ? 'teams' : 'all';
+  const btn = document.getElementById('rosterToggleBtn');
+  if (btn) btn.textContent = _rosterViewMode === 'all' ? '👥 View by Teams' : '📋 View All';
+  renderRosterView();
+}
+window.toggleRosterView = toggleRosterView;
+
+function renderRosterCard(u) {
+  const name = u.displayName || u.email;
+  const roleBadge = u.role === 'superadmin' ? ' 👑' : '';
+  const roleColor = u.role === 'admin' || u.role === 'superadmin' ? '#dc2626' : u.role === 'manager' ? '#2563eb' : '#78716c';
+  return `
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div style="min-width:0;">
+        <div style="font-weight:700;font-size:15px;">${name}${roleBadge}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+          <span style="color:${roleColor};font-weight:600;text-transform:uppercase;font-size:11px;">${u.role}</span>
+          ${u.linkedName ? ` · ${u.linkedName}` : ''}
+          ${u.email && u.displayName ? ` · ${u.email}` : ''}
+        </div>
+      </div>
+      <div style="font-size:15px;font-weight:600;white-space:nowrap;">
+        ${u.phone ? `<a href="tel:${u.phone.replace(/[^+0-9]/g, '')}" style="color:var(--accent);text-decoration:none;">📞 ${u.phone}</a>` : '<span style="color:var(--muted);font-size:12px;font-weight:400;">No phone</span>'}
+      </div>
+    </div>`;
+}
+
+function renderRosterView() {
+  const users = window._rosterUsers || [];
+  const container = document.getElementById('rosterContent');
+  if (!container) return;
+
+  if (_rosterViewMode === 'all') {
+    let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+    users.forEach(u => { html += renderRosterCard(u); });
+    html += '</div>';
+    container.innerHTML = html;
+    return;
+  }
+
+  // Team view — group by assigned manager
+  const teams = {}; // managerId -> { manager, members }
+  const unassigned = [];
+  const managerMap = {};
+  users.forEach(u => { managerMap[u.uid] = u; });
+
+  users.forEach(u => {
+    if (u.role === 'manager' || u.role === 'admin' || u.role === 'superadmin') return; // managers shown as headers
+    if (u.managerId && managerMap[u.managerId]) {
+      if (!teams[u.managerId]) teams[u.managerId] = { manager: managerMap[u.managerId], members: [] };
+      teams[u.managerId].members.push(u);
+    } else {
+      unassigned.push(u);
+    }
+  });
+
+  let html = '';
+
+  // Sort teams by manager name
+  const sortedTeams = Object.values(teams).sort((a, b) => {
+    const nameA = (a.manager.displayName || a.manager.email).toLowerCase();
+    const nameB = (b.manager.displayName || b.manager.email).toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+
+  sortedTeams.forEach(team => {
+    const mgrName = team.manager.displayName || team.manager.email;
+    const memberCount = team.members.length;
+    html += `
+      <div style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:10px 14px;background:linear-gradient(135deg,#1e293b,#334155);border-radius:10px;color:#fff;">
+          <span style="font-size:18px;">👔</span>
+          <div>
+            <div style="font-weight:700;font-size:15px;">${mgrName}'s Team</div>
+            <div style="font-size:11px;color:#94a3b8;">${memberCount} member${memberCount !== 1 ? 's' : ''}</div>
+          </div>
+          ${(isAdmin() || isManager()) ? `<button class="topbar-btn manage" style="margin-left:auto;font-size:11px;padding:4px 12px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);" onclick="showTeamDashboard('${team.manager.uid}')">📊 Team Dashboard</button>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;padding-left:12px;border-left:3px solid var(--line);">
+          ${team.members.map(m => renderRosterCard(m)).join('')}
+        </div>
+      </div>`;
+  });
+
+  // Show managers/admins who have no team members assigned to them
+  const managersWithoutTeams = users.filter(u =>
+    (u.role === 'manager' || u.role === 'admin' || u.role === 'superadmin') && !teams[u.uid]
+  );
+  if (managersWithoutTeams.length > 0) {
+    html += `
+      <div style="margin-bottom:20px;">
+        <div style="font-weight:700;font-size:14px;color:var(--muted);margin-bottom:8px;padding:6px 0;">Managers / Admins</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${managersWithoutTeams.map(u => renderRosterCard(u)).join('')}
+        </div>
+      </div>`;
+  }
+
+  if (unassigned.length > 0) {
+    html += `
+      <div style="margin-bottom:20px;">
+        <div style="font-weight:700;font-size:14px;color:var(--muted);margin-bottom:8px;padding:6px 0;">Unassigned</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${unassigned.map(u => renderRosterCard(u)).join('')}
+        </div>
+      </div>`;
+  }
+
+  if (!html) html = '<p style="color:var(--muted);">No teams found. Assign managers to users via User Management.</p>';
+  container.innerHTML = html;
+}
+
 window.showRoster = showRoster;
+
+/* ══════════════════════════════════════════
+   👔 MANAGER TEAM DASHBOARD
+   ══════════════════════════════════════════ */
+async function showTeamDashboard(managerUid) {
+  trackClick();
+  logPageView('Team Dashboard');
+
+  // If no uid passed, use current user's uid (for "My Team" shortcut)
+  if (!managerUid) managerUid = auth.currentUser?.uid || '';
+
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="max-width:1100px;margin:0 auto;padding:18px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h2 style="margin:0;font-size:20px;" id="teamDashTitle">👔 Team Dashboard</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Team performance at a glance</p>
+        </div>
+        <button class="topbar-btn manage" onclick="showDashboard()">← Back</button>
+      </div>
+      <div id="teamDashContent"><div class="loading-wrap"><div class="spinner"></div></div></div>
+    </div>`;
+
+  try {
+    // Fetch all users to find team members
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const allUsers = {};
+    let managerData = null;
+    usersSnapshot.forEach((docu) => {
+      const u = docu.data();
+      if (u.deleted) return;
+      allUsers[docu.id] = { uid: docu.id, ...u };
+      if (docu.id === managerUid) managerData = { uid: docu.id, ...u };
+    });
+
+    if (!managerData) {
+      document.getElementById('teamDashContent').innerHTML = '<p style="color:#dc2626;">Manager not found.</p>';
+      return;
+    }
+
+    const mgrName = managerData.displayName || managerData.email;
+    document.getElementById('teamDashTitle').textContent = `👔 ${mgrName}'s Team`;
+
+    // Find team members assigned to this manager
+    const teamMembers = Object.values(allUsers).filter(u => u.managerId === managerUid);
+
+    if (teamMembers.length === 0) {
+      document.getElementById('teamDashContent').innerHTML = '<p style="color:var(--muted);">No team members assigned yet. Assign team members via User Management.</p>';
+      return;
+    }
+
+    // Get dashboard leaderboard data
+    const sales = dashboardData.sales || [];
+    const bdc = dashboardData.bdc || [];
+    const salesByUnits = [...sales].sort((a, b) => safeNum(b.sales) - safeNum(a.sales));
+    const bdcByShown = [...bdc].sort((a, b) => safeNum(shownVal(b)) - safeNum(shownVal(a)));
+
+    // Build team summary cards
+    let teamHtml = '';
+    let totalUnits = 0, totalCalls = 0, totalTexts = 0, totalShown = 0, totalCreated = 0;
+    let memberCards = [];
+
+    teamMembers.sort((a, b) => (a.displayName || a.email).toLowerCase().localeCompare((b.displayName || b.email).toLowerCase()));
+
+    teamMembers.forEach(member => {
+      const memberName = (member.linkedName || '').trim().toUpperCase();
+      const displayName = member.displayName || member.email;
+      if (!memberName) {
+        memberCards.push({ displayName, html: buildTeamMemberCardNoData(displayName) });
+        return;
+      }
+
+      // Check Sales leaderboard
+      const salesIdx = salesByUnits.findIndex(r => (r.name || '').toUpperCase() === memberName);
+      // Check BDC leaderboard
+      const bdcIdx = bdcByShown.findIndex(r => (r.name || '').toUpperCase() === memberName);
+
+      if (salesIdx >= 0) {
+        const r = salesByUnits[salesIdx];
+        const rank = salesIdx + 1;
+        const units = safeNum(r.sales);
+        const calls = safeNum(r.calls);
+        const texts = safeNum(r.texts);
+        const shown = safeNum(shownVal(r));
+        const created = safeNum(r.created ?? r.created_count ?? 0);
+        const trend = trendingSales(units);
+        totalUnits += units;
+        totalCalls += calls;
+        totalTexts += texts;
+        totalShown += shown;
+        totalCreated += created;
+
+        const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '#' + rank;
+        const callsK = kpiClass(calls, WEEKLY_TARGETS.calls);
+        const textsK = kpiClass(texts, WEEKLY_TARGETS.texts);
+        const shownK = kpiClass(shown, WEEKLY_TARGETS.shown);
+        const createdK = kpiClass(created, WEEKLY_TARGETS.created);
+
+        memberCards.push({ displayName, rank, html: `
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;" onclick="showPersonDetails('${(r.name || '').replace(/'/g, "\\'")}', 'Sales')">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+              <div style="font-weight:700;font-size:15px;">${displayName}</div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">Sales</span>
+                <span style="font-weight:800;color:var(--accent);font-size:14px;">${rankEmoji}</span>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px;text-align:center;">
+              <div><div style="font-size:20px;font-weight:800;">${units}</div><div style="font-size:10px;color:var(--muted);">Units</div></div>
+              <div><div style="font-size:20px;font-weight:800;">${trend}</div><div style="font-size:10px;color:var(--muted);">Trending</div></div>
+              <div class="${callsK}"><div style="font-size:16px;font-weight:700;">${calls}</div><div style="font-size:10px;color:var(--muted);">Calls</div></div>
+              <div class="${textsK}"><div style="font-size:16px;font-weight:700;">${texts}</div><div style="font-size:10px;color:var(--muted);">Texts</div></div>
+              <div class="${createdK}"><div style="font-size:16px;font-weight:700;">${created}</div><div style="font-size:10px;color:var(--muted);">Created</div></div>
+              <div class="${shownK}"><div style="font-size:16px;font-weight:700;">${shown}</div><div style="font-size:10px;color:var(--muted);">Shown</div></div>
+            </div>
+          </div>` });
+      } else if (bdcIdx >= 0) {
+        const r = bdcByShown[bdcIdx];
+        const rank = bdcIdx + 1;
+        const shown = safeNum(shownVal(r));
+        const calls = safeNum(r.calls);
+        const texts = safeNum(r.texts);
+        const created = safeNum(r.created ?? r.created_count ?? 0);
+        const due = safeNum(r.due ?? r.due_count ?? 0);
+        const pct = due > 0 ? ((shown / due) * 100).toFixed(1) + '%' : (created > 0 ? ((shown / created) * 100).toFixed(1) + '%' : '–');
+        const trend = trendingSales(shown);
+        totalCalls += calls;
+        totalTexts += texts;
+        totalShown += shown;
+        totalCreated += created;
+
+        const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '#' + rank;
+        const callsK = kpiClass(calls, WEEKLY_TARGETS.calls);
+        const textsK = kpiClass(texts, WEEKLY_TARGETS.texts);
+        const shownK = kpiClass(shown, WEEKLY_TARGETS.shown);
+        const createdK = kpiClass(created, WEEKLY_TARGETS.created);
+
+        memberCards.push({ displayName, rank, html: `
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;" onclick="showPersonDetails('${(r.name || '').replace(/'/g, "\\'")}', 'BDC')">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+              <div style="font-weight:700;font-size:15px;">${displayName}</div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <span style="background:#eff6ff;color:#2563eb;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">BDC</span>
+                <span style="font-weight:800;color:var(--accent);font-size:14px;">${rankEmoji}</span>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px;text-align:center;">
+              <div><div style="font-size:20px;font-weight:800;">${shown}</div><div style="font-size:10px;color:var(--muted);">Shown</div></div>
+              <div><div style="font-size:20px;font-weight:800;">${trend}</div><div style="font-size:10px;color:var(--muted);">Trending</div></div>
+              <div><div style="font-size:16px;font-weight:700;">${pct}</div><div style="font-size:10px;color:var(--muted);">Show Rate</div></div>
+              <div class="${callsK}"><div style="font-size:16px;font-weight:700;">${calls}</div><div style="font-size:10px;color:var(--muted);">Calls</div></div>
+              <div class="${textsK}"><div style="font-size:16px;font-weight:700;">${texts}</div><div style="font-size:10px;color:var(--muted);">Texts</div></div>
+              <div class="${createdK}"><div style="font-size:16px;font-weight:700;">${created}</div><div style="font-size:10px;color:var(--muted);">Created</div></div>
+            </div>
+          </div>` });
+      } else {
+        memberCards.push({ displayName, html: buildTeamMemberCardNoData(displayName) });
+      }
+    });
+
+    // Team summary banner
+    const memberCount = teamMembers.length;
+    teamHtml += `
+      <div style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:12px;">${mgrName}'s Team — ${memberCount} member${memberCount !== 1 ? 's' : ''}</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;text-align:center;">
+          ${totalUnits > 0 ? `<div style="flex:1;min-width:80px;"><div style="font-size:24px;font-weight:800;">${totalUnits}</div><div style="font-size:11px;color:#94a3b8;">Total Units</div></div>` : ''}
+          <div style="flex:1;min-width:80px;"><div style="font-size:24px;font-weight:800;">${totalCalls}</div><div style="font-size:11px;color:#94a3b8;">Total Calls</div></div>
+          <div style="flex:1;min-width:80px;"><div style="font-size:24px;font-weight:800;">${totalTexts}</div><div style="font-size:11px;color:#94a3b8;">Total Texts</div></div>
+          <div style="flex:1;min-width:80px;"><div style="font-size:24px;font-weight:800;">${totalCreated}</div><div style="font-size:11px;color:#94a3b8;">Total Created</div></div>
+          <div style="flex:1;min-width:80px;"><div style="font-size:24px;font-weight:800;">${totalShown}</div><div style="font-size:11px;color:#94a3b8;">Total Shown</div></div>
+        </div>
+      </div>`;
+
+    // Individual member cards
+    teamHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;">';
+    memberCards.forEach(mc => { teamHtml += mc.html; });
+    teamHtml += '</div>';
+
+    document.getElementById('teamDashContent').innerHTML = teamHtml;
+
+  } catch (e) {
+    document.getElementById('teamDashContent').innerHTML = `<p style="color:#dc2626;">Error loading team dashboard: ${e.message}</p>`;
+  }
+}
+
+function buildTeamMemberCardNoData(displayName) {
+  return `
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;opacity:0.7;">
+      <div style="font-weight:700;font-size:15px;margin-bottom:6px;">${displayName}</div>
+      <div style="color:var(--muted);font-size:13px;">No leaderboard data — check Linked Sheet Name in User Management</div>
+    </div>`;
+}
+
+window.showTeamDashboard = showTeamDashboard;
 
 /* ══════════════════════════════════════════
    🔔 RECALL & TSB LOOKUP (NHTSA)
@@ -6868,6 +7203,121 @@ function dismissMorningBriefing() {
   try { setTimeout(function() { checkMilestones(); }, 500); } catch(e) {}
 }
 window.dismissMorningBriefing = dismissMorningBriefing;
+
+/* ══════════════════════════════════════════════════════════
+   MANAGER MORNING BRIEFING — Team snapshot overlay
+   ══════════════════════════════════════════════════════════ */
+async function showManagerBriefing(sales, bdc) {
+  const mgrBriefKey = 'mgrBriefDismissed';
+  try { if (localStorage.getItem(mgrBriefKey) === getTodayKey()) return; } catch(e) {}
+
+  const myUid = auth.currentUser?.uid;
+  if (!myUid) return;
+
+  // Fetch team members
+  let teamMembers;
+  try {
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    teamMembers = [];
+    usersSnapshot.forEach(docu => {
+      const u = docu.data();
+      if (!u.deleted && u.managerId === myUid) teamMembers.push(u);
+    });
+  } catch(e) { return; }
+
+  if (teamMembers.length === 0) return;
+
+  const salesByUnits = [...sales].sort((a,b) => safeNum(b.sales) - safeNum(a.sales));
+  const bdcByShown = [...bdc].sort((a,b) => safeNum(shownVal(b)) - safeNum(shownVal(a)));
+
+  let memberRows = '';
+  let totalUnits = 0, totalCalls = 0, totalShown = 0;
+
+  teamMembers.forEach(member => {
+    const memberName = (member.linkedName || '').trim().toUpperCase();
+    const display = member.displayName || member.email || memberName || '?';
+    if (!memberName) {
+      memberRows += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08);"><span style="flex:1;font-size:13px;opacity:.6;">${display}</span><span style="font-size:11px;color:#94a3b8;">Not linked</span></div>`;
+      return;
+    }
+
+    const sIdx = salesByUnits.findIndex(r => (r.name||'').toUpperCase() === memberName);
+    const bIdx = bdcByShown.findIndex(r => (r.name||'').toUpperCase() === memberName);
+
+    if (sIdx >= 0) {
+      const r = salesByUnits[sIdx];
+      const rank = sIdx + 1;
+      const units = safeNum(r.sales);
+      const calls = safeNum(r.calls);
+      totalUnits += units;
+      totalCalls += calls;
+      const emoji = rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : '#' + rank;
+      memberRows += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:13px;">
+        <span style="min-width:30px;font-weight:700;">${emoji}</span>
+        <span style="flex:1;font-weight:600;">${display}</span>
+        <span style="min-width:50px;text-align:right;font-weight:800;">${units} units</span>
+        <span style="min-width:50px;text-align:right;color:#94a3b8;">${calls} calls</span>
+      </div>`;
+    } else if (bIdx >= 0) {
+      const r = bdcByShown[bIdx];
+      const rank = bIdx + 1;
+      const shown = safeNum(shownVal(r));
+      const calls = safeNum(r.calls);
+      totalShown += shown;
+      totalCalls += calls;
+      const emoji = rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : '#' + rank;
+      memberRows += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:13px;">
+        <span style="min-width:30px;font-weight:700;">${emoji}</span>
+        <span style="flex:1;font-weight:600;">${display}</span>
+        <span style="min-width:50px;text-align:right;font-weight:800;">${shown} shown</span>
+        <span style="min-width:50px;text-align:right;color:#94a3b8;">${calls} calls</span>
+      </div>`;
+    } else {
+      memberRows += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:13px;"><span style="min-width:30px;"></span><span style="flex:1;opacity:.6;">${display}</span><span style="color:#94a3b8;font-size:11px;">No data yet</span></div>`;
+    }
+  });
+
+  const firstName = (window.userData?.displayName || window.userData?.email || 'Coach').split(' ')[0];
+  const curHour = new Date().getHours();
+  const greeting = curHour < 12 ? 'Good Morning' : curHour < 17 ? 'Good Afternoon' : 'Good Evening';
+
+  // Wait for personal briefing to be dismissed first (or not shown)
+  const waitForPersonalBriefing = () => new Promise(resolve => {
+    const check = () => {
+      if (!document.getElementById('morningBriefing')) resolve();
+      else setTimeout(check, 500);
+    };
+    check();
+  });
+  await waitForPersonalBriefing();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'morning-briefing-overlay';
+  overlay.id = 'managerBriefing';
+  overlay.innerHTML = `
+    <div class="morning-briefing-card" style="max-width:520px;">
+      <h2>${greeting}, ${firstName}!</h2>
+      <div class="subtitle">Here's how your team is doing today</div>
+      <div style="display:flex;gap:16px;justify-content:center;margin:14px 0;flex-wrap:wrap;">
+        ${totalUnits > 0 ? `<div style="text-align:center;"><div style="font-size:24px;font-weight:800;">${totalUnits}</div><div style="font-size:11px;color:#94a3b8;">Team Units</div></div>` : ''}
+        ${totalShown > 0 ? `<div style="text-align:center;"><div style="font-size:24px;font-weight:800;">${totalShown}</div><div style="font-size:11px;color:#94a3b8;">Team Shown</div></div>` : ''}
+        <div style="text-align:center;"><div style="font-size:24px;font-weight:800;">${totalCalls}</div><div style="font-size:11px;color:#94a3b8;">Team Calls</div></div>
+        <div style="text-align:center;"><div style="font-size:24px;font-weight:800;">${teamMembers.length}</div><div style="font-size:11px;color:#94a3b8;">Members</div></div>
+      </div>
+      <div style="text-align:left;max-height:220px;overflow-y:auto;margin:8px 0;">${memberRows}</div>
+      <button class="brief-go-btn" onclick="dismissManagerBriefing()">Let's Go</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) dismissManagerBriefing(); });
+  setTimeout(function() { if (document.getElementById('managerBriefing')) dismissManagerBriefing(); }, 45000);
+}
+
+function dismissManagerBriefing() {
+  try { localStorage.setItem('mgrBriefDismissed', getTodayKey()); } catch(e) {}
+  const el = document.getElementById('managerBriefing');
+  if (el) { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(function() { try { el.remove(); } catch(e) {} }, 300); }
+}
+window.dismissManagerBriefing = dismissManagerBriefing;
 
 /* ══════════════════════════════════════════════════════════
    FEATURE 2: Streaks + Personal Bests
