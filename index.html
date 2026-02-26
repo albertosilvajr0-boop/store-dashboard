@@ -1303,15 +1303,14 @@ async function showDashboard() {
     initChat();
     initPushNotifications();
 
-    // ── New features ──
-    saveTodaySnapshot(dashboardData.sales, dashboardData.bdc);
-    saveMetricHistory(dashboardData.sales, dashboardData.bdc);
-    await updateLoginStreak();
-    await checkPersonalBests(dashboardData.sales, dashboardData.bdc);
-    showMorningBriefing(dashboardData.sales, dashboardData.bdc);
-    initKudos();
-    // Milestones fire after morning briefing is dismissed (or immediately if already dismissed)
-    if (hasDismissedMorningBriefing()) { setTimeout(() => checkMilestones(), 1000); }
+    // ── New features (non-blocking — errors here must not kill the dashboard) ──
+    try { saveTodaySnapshot(dashboardData.sales, dashboardData.bdc); } catch(e) { console.warn('Snapshot save error:', e); }
+    try { saveMetricHistory(dashboardData.sales, dashboardData.bdc); } catch(e) { console.warn('Metric history error:', e); }
+    updateLoginStreak().catch(e => console.warn('Streak error:', e));
+    checkPersonalBests(dashboardData.sales, dashboardData.bdc).catch(e => console.warn('PB error:', e));
+    try { showMorningBriefing(dashboardData.sales, dashboardData.bdc); } catch(e) { console.warn('Briefing error:', e); }
+    try { initKudos(); } catch(e) { console.warn('Kudos error:', e); }
+    try { if (hasDismissedMorningBriefing()) { setTimeout(() => checkMilestones(), 1000); } } catch(e) { console.warn('Milestone error:', e); }
   } catch (err) {
     console.error('Dashboard error:', err);
     document.getElementById('app').innerHTML = `
@@ -1658,10 +1657,11 @@ function buildPersonalSection(sales, bdc) {
 
   const teamLabel = inSales ? 'Sales' : 'BDC';
   const firstName = myName.split(' ')[0] || myName;
-  const streakHtml = getStreakBadgeHtml();
-  const pbAlertHtml = getPBAlertHtml();
-  const gainingHtml = buildGainingTicker(sales, bdc);
-  const sparklineHtml = buildSparklines();
+  let streakHtml = '', pbAlertHtml = '', gainingHtml = '', sparklineHtml = '';
+  try { streakHtml = getStreakBadgeHtml(); } catch(e) { console.warn('Streak badge error:', e); }
+  try { pbAlertHtml = getPBAlertHtml(); } catch(e) { console.warn('PB alert error:', e); }
+  try { gainingHtml = buildGainingTicker(sales, bdc); } catch(e) { console.warn('Gaining ticker error:', e); }
+  try { sparklineHtml = buildSparklines(); } catch(e) { console.warn('Sparkline error:', e); }
 
   return `
     <div style="max-width:1400px;margin:0 auto 12px;padding:0 12px;">
@@ -6735,7 +6735,7 @@ function hasDismissedMorningBriefing() {
 }
 
 function getYesterdaySnapshot() {
-  try { return JSON.parse(localStorage.getItem('briefSnapshot_prev') || 'null'); } catch { return null; }
+  try { return JSON.parse(localStorage.getItem('briefSnapshot_prev') || 'null'); } catch(e) { return null; }
 }
 
 function saveTodaySnapshot(sales, bdc) {
@@ -6852,14 +6852,18 @@ function showMorningBriefing(sales, bdc) {
       <button class="brief-go-btn" onclick="dismissMorningBriefing()">Let's Go</button>
     </div>`;
   document.body.appendChild(overlay);
+  // Safety net: click anywhere on overlay to dismiss (in case button doesn't render)
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) dismissMorningBriefing(); });
+  // Safety net: auto-dismiss after 30 seconds in case user can't interact
+  setTimeout(function() { if (document.getElementById('morningBriefing')) dismissMorningBriefing(); }, 30000);
 }
 
 function dismissMorningBriefing() {
-  localStorage.setItem('briefDismissed', getTodayKey());
+  try { localStorage.setItem('briefDismissed', getTodayKey()); } catch(e) {}
   const el = document.getElementById('morningBriefing');
-  if (el) { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }
+  if (el) { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(function() { try { el.remove(); } catch(e) {} }, 300); }
   // Trigger milestone check after briefing dismissed
-  setTimeout(() => checkMilestones(), 500);
+  try { setTimeout(function() { checkMilestones(); }, 500); } catch(e) {}
 }
 window.dismissMorningBriefing = dismissMorningBriefing;
 
@@ -7214,7 +7218,7 @@ function saveMetricHistory(sales, bdc) {
   if (!me) return;
   const today = getTodayKey();
   let history = {};
-  try { history = JSON.parse(localStorage.getItem('metricHistory') || '{}'); } catch {}
+  try { history = JSON.parse(localStorage.getItem('metricHistory') || '{}'); } catch(e) {}
 
   const salesByUnits = [...sales].sort((a,b) => safeNum(b.sales) - safeNum(a.sales));
   const bdcByShown = [...bdc].sort((a,b) => safeNum(shownVal(b)) - safeNum(shownVal(a)));
@@ -7242,7 +7246,7 @@ function saveMetricHistory(sales, bdc) {
 
 function buildSparklines() {
   let history = {};
-  try { history = JSON.parse(localStorage.getItem('metricHistory') || '{}'); } catch {}
+  try { history = JSON.parse(localStorage.getItem('metricHistory') || '{}'); } catch(e) {}
   const keys = Object.keys(history).sort();
   if (keys.length < 2) return '';
 
