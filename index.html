@@ -1940,6 +1940,7 @@ function renderDashboard() {
             <a href="#" onclick="event.preventDefault();closeResourcesMenu();showAutoNews();" class="res-link">📰 News (Last 48 hrs)</a>
             <a href="#" onclick="event.preventDefault();closeResourcesMenu();showRecallLookup();" class="res-link">🔔 Recall & TSB Lookup</a>
             ${(isAdmin() || isManager()) ? '<a href="#" onclick="event.preventDefault();closeResourcesMenu();showCompetitiveAnalysis();" class="res-link">🏆 Competitive Analysis</a>' : ''}
+            <a href="#" onclick="event.preventDefault();closeResourcesMenu();showRoster();" class="res-link">📋 Roster</a>
             <div id="customLinksSection"></div>
             <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
             <div id="addLinkForm" style="padding:6px 12px;">
@@ -4730,6 +4731,80 @@ window.compSort = compSort;
 window.compExpandAll = compExpandAll;
 window.compCollapseAll = compCollapseAll;
 window.toggleAllNewsGroups = toggleAllNewsGroups;
+
+/* ══════════════════════════════════════════
+   📋 ROSTER PAGE
+   ══════════════════════════════════════════ */
+async function showRoster() {
+  trackClick();
+  logPageView('Roster');
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="max-width:900px;margin:0 auto;padding:18px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h2 style="margin:0;font-size:20px;">📋 Roster</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Team directory with phone numbers</p>
+        </div>
+        <button class="topbar-btn manage" onclick="showDashboard()">← Back</button>
+      </div>
+      <div id="rosterContent"><div class="loading-wrap"><div class="spinner"></div></div></div>
+    </div>`;
+
+  try {
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const users = [];
+    usersSnapshot.forEach((docu) => {
+      const u = docu.data();
+      if (u.deleted) return;
+      users.push({
+        displayName: u.displayName || '',
+        email: u.email || '',
+        phone: u.phone || '',
+        role: u.role || 'user',
+        linkedName: u.linkedName || ''
+      });
+    });
+
+    // Sort alphabetically by display name, then email
+    users.sort((a, b) => {
+      const nameA = (a.displayName || a.email).toLowerCase();
+      const nameB = (b.displayName || b.email).toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    if (users.length === 0) {
+      document.getElementById('rosterContent').innerHTML = '<p style="color:var(--muted);">No users found.</p>';
+      return;
+    }
+
+    let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+    users.forEach(u => {
+      const name = u.displayName || u.email;
+      const roleBadge = u.role === 'superadmin' ? ' 👑' : '';
+      const roleColor = u.role === 'admin' || u.role === 'superadmin' ? '#dc2626' : u.role === 'manager' ? '#2563eb' : '#78716c';
+      html += `
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div style="min-width:0;">
+            <div style="font-weight:700;font-size:15px;">${name}${roleBadge}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+              <span style="color:${roleColor};font-weight:600;text-transform:uppercase;font-size:11px;">${u.role}</span>
+              ${u.linkedName ? ` · ${u.linkedName}` : ''}
+              ${u.email && u.displayName ? ` · ${u.email}` : ''}
+            </div>
+          </div>
+          <div style="font-size:15px;font-weight:600;white-space:nowrap;">
+            ${u.phone ? `<a href="tel:${u.phone.replace(/[^+0-9]/g, '')}" style="color:var(--accent);text-decoration:none;">📞 ${u.phone}</a>` : '<span style="color:var(--muted);font-size:12px;font-weight:400;">No phone</span>'}
+          </div>
+        </div>`;
+    });
+    html += '</div>';
+    document.getElementById('rosterContent').innerHTML = html;
+  } catch (e) {
+    document.getElementById('rosterContent').innerHTML = `<p style="color:#dc2626;">Error loading roster: ${e.message}</p>`;
+  }
+}
+window.showRoster = showRoster;
 
 /* ══════════════════════════════════════════
    🔔 RECALL & TSB LOOKUP (NHTSA)
