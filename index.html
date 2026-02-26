@@ -6839,12 +6839,14 @@ function showMorningBriefing(sales, bdc) {
 
   const quote = BRIEF_QUOTES[Math.floor(Math.random() * BRIEF_QUOTES.length)];
   const firstName = (window.userData?.displayName || window.userData?.linkedName || 'there').split(' ')[0];
+  const curHour = new Date().getHours();
+  const greeting = curHour < 12 ? 'Good Morning' : curHour < 17 ? 'Good Afternoon' : 'Good Evening';
   const overlay = document.createElement('div');
   overlay.className = 'morning-briefing-overlay';
   overlay.id = 'morningBriefing';
   overlay.innerHTML = `
     <div class="morning-briefing-card">
-      <h2>Good Morning, ${firstName}!</h2>
+      <h2>${greeting}, ${firstName}!</h2>
       <div class="subtitle">Your numbers are in — here's today's snapshot</div>
       <div class="brief-stats">${statsHtml}</div>
       ${moversHtml}
