@@ -594,6 +594,151 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
   .chat-drawer { right: 8px; left: 8px; width: auto; bottom: 82px; max-height: 65vh; }
   .chat-fab { bottom: 16px; right: 16px; width: 50px; height: 50px; font-size: 20px; }
 }
+
+/* ── Morning Briefing ── */
+.morning-briefing-overlay {
+  position:fixed; inset:0; z-index:9999;
+  background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#334155 100%);
+  display:flex; align-items:center; justify-content:center;
+  animation: briefFadeIn .4s ease-out;
+}
+@keyframes briefFadeIn { from{opacity:0;transform:scale(1.05)} to{opacity:1;transform:scale(1)} }
+.morning-briefing-card {
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+  border-radius:20px; padding:32px 28px; max-width:480px; width:90%;
+  color:#f1f5f9; text-align:center;
+}
+.morning-briefing-card h2 { margin:0 0 4px; font-size:22px; }
+.morning-briefing-card .subtitle { color:#94a3b8; font-size:13px; margin-bottom:20px; }
+.brief-stats { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:18px; }
+.brief-stat {
+  background:rgba(255,255,255,.08); border-radius:12px; padding:12px 14px;
+  min-width:90px; flex:1;
+}
+.brief-stat .val { font-size:22px; font-weight:800; }
+.brief-stat .lbl { font-size:10px; color:#94a3b8; margin-top:2px; }
+.brief-delta { font-size:11px; margin-top:3px; font-weight:600; }
+.brief-delta.up { color:#4ade80; }
+.brief-delta.down { color:#f87171; }
+.brief-delta.flat { color:#94a3b8; }
+.brief-movers { text-align:left; margin:16px 0; padding:12px 16px; background:rgba(255,255,255,.05); border-radius:12px; }
+.brief-movers h4 { margin:0 0 8px; font-size:13px; color:#94a3b8; font-weight:600; }
+.brief-mover { display:flex; align-items:center; gap:8px; padding:4px 0; font-size:13px; }
+.brief-mover .rank-change { font-weight:700; color:#4ade80; }
+.brief-quote { font-style:italic; color:#94a3b8; font-size:12px; margin:16px 0; padding:0 12px; }
+.brief-go-btn {
+  background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; border:none;
+  padding:12px 40px; border-radius:12px; font-size:15px; font-weight:700;
+  cursor:pointer; margin-top:8px; transition:transform .15s;
+}
+.brief-go-btn:hover { transform:scale(1.04); }
+
+/* ── Streaks ── */
+.streak-badge {
+  display:inline-flex; align-items:center; gap:4px;
+  background:linear-gradient(135deg,#f97316,#ef4444); color:#fff;
+  padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700;
+}
+.pb-badge {
+  display:inline-block; background:#3b82f6; color:#fff;
+  font-size:9px; font-weight:700; padding:1px 5px; border-radius:4px;
+  margin-left:4px; vertical-align:middle;
+}
+.pb-alert {
+  background:linear-gradient(135deg,#1e40af,#3b82f6); color:#fff;
+  padding:10px 16px; border-radius:10px; margin-bottom:10px;
+  font-size:13px; font-weight:600; text-align:center;
+  animation: briefFadeIn .3s ease-out;
+}
+
+/* ── Kudos ── */
+.kudos-section {
+  max-width:1400px; margin:0 auto 12px; padding:0 12px;
+}
+.kudos-card {
+  background:var(--card); border:1px solid var(--line); border-radius:14px;
+  padding:14px 18px; overflow:hidden;
+}
+.kudos-card h3 { margin:0 0 10px; font-size:14px; display:flex; align-items:center; gap:6px; }
+.kudos-item {
+  display:flex; align-items:flex-start; gap:10px; padding:8px 0;
+  border-bottom:1px solid var(--line); font-size:13px;
+}
+.kudos-item:last-child { border-bottom:none; }
+.kudos-avatar {
+  width:32px; height:32px; border-radius:50%;
+  background:var(--accent); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:13px; flex-shrink:0;
+}
+.kudos-body { flex:1; }
+.kudos-body strong { color:var(--accent); }
+.kudos-time { font-size:10px; color:var(--muted); }
+.kudos-pinned { background:#fef9c3; border-left:3px solid #eab308; padding-left:10px; }
+.kudos-give-btn {
+  background:var(--accent); color:#fff; border:none; padding:5px 14px;
+  border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;
+}
+.kudos-modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:10000;
+  display:flex; align-items:center; justify-content:center;
+}
+.kudos-modal {
+  background:var(--card); border-radius:14px; padding:20px; width:90%; max-width:400px;
+}
+.kudos-modal h3 { margin:0 0 12px; font-size:16px; }
+.kudos-modal select, .kudos-modal textarea {
+  width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px;
+  font-size:13px; font-family:inherit; box-sizing:border-box;
+}
+.kudos-modal textarea { min-height:60px; resize:vertical; margin-top:8px; }
+.kudos-modal .actions { display:flex; gap:8px; margin-top:12px; }
+.kudos-modal .actions button { flex:1; padding:8px; border:none; border-radius:8px; font-weight:600; cursor:pointer; font-size:13px; }
+
+/* ── Gaining Ticker ── */
+.gaining-ticker {
+  margin-top:10px; padding:8px 12px;
+  background:rgba(255,255,255,.08); border-radius:10px; font-size:12px;
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+}
+.gaining-ticker .item { display:flex; align-items:center; gap:4px; }
+.gaining-ticker .behind-you { color:#f87171; }
+.gaining-ticker .ahead { color:#4ade80; }
+
+/* ── Milestones / Confetti ── */
+.milestone-toast {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  z-index:99999; background:linear-gradient(135deg,#1e293b,#334155);
+  color:#fff; padding:30px 40px; border-radius:20px; text-align:center;
+  animation: briefFadeIn .4s ease-out;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+}
+.milestone-toast h2 { margin:0 0 4px; font-size:28px; }
+.milestone-toast p { margin:0; color:#94a3b8; font-size:14px; }
+.confetti-piece {
+  position:fixed; top:-10px; z-index:99998;
+  width:8px; height:8px; border-radius:2px;
+  animation: confettiFall linear forwards;
+}
+@keyframes confettiFall {
+  0% { transform:translateY(0) rotate(0deg); opacity:1; }
+  100% { transform:translateY(100vh) rotate(720deg); opacity:0; }
+}
+
+/* ── Sparklines ── */
+.sparkline-row {
+  display:flex; gap:16px; margin-top:10px; flex-wrap:wrap; align-items:center;
+}
+.sparkline-item { display:flex; align-items:center; gap:6px; }
+.sparkline-item .spark-label { font-size:10px; color:#94a3b8; }
+.sparkline-item svg { display:block; }
+.pace-indicator {
+  font-size:11px; font-weight:600; padding:2px 8px; border-radius:6px;
+  display:inline-block; margin-top:6px;
+}
+.pace-up { background:rgba(74,222,128,.15); color:#4ade80; }
+.pace-flat { background:rgba(148,163,184,.15); color:#94a3b8; }
+.pace-down { background:rgba(248,113,113,.15); color:#f87171; }
 </style>
 </head>
 
@@ -1157,6 +1302,16 @@ async function showDashboard() {
     loadCallPatterns();
     initChat();
     initPushNotifications();
+
+    // ── New features ──
+    saveTodaySnapshot(dashboardData.sales, dashboardData.bdc);
+    saveMetricHistory(dashboardData.sales, dashboardData.bdc);
+    await updateLoginStreak();
+    await checkPersonalBests(dashboardData.sales, dashboardData.bdc);
+    showMorningBriefing(dashboardData.sales, dashboardData.bdc);
+    initKudos();
+    // Milestones fire after morning briefing is dismissed (or immediately if already dismissed)
+    if (hasDismissedMorningBriefing()) { setTimeout(() => checkMilestones(), 1000); }
   } catch (err) {
     console.error('Dashboard error:', err);
     document.getElementById('app').innerHTML = `
@@ -1503,15 +1658,22 @@ function buildPersonalSection(sales, bdc) {
 
   const teamLabel = inSales ? 'Sales' : 'BDC';
   const firstName = myName.split(' ')[0] || myName;
+  const streakHtml = getStreakBadgeHtml();
+  const pbAlertHtml = getPBAlertHtml();
+  const gainingHtml = buildGainingTicker(sales, bdc);
+  const sparklineHtml = buildSparklines();
 
   return `
     <div style="max-width:1400px;margin:0 auto 12px;padding:0 12px;">
       <div id="personalCard" style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:14px;padding:16px 20px;color:#fff;">
+        ${pbAlertHtml}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
-          <div style="font-size:15px;font-weight:700;">👋 Hey ${firstName} — here's your ${teamLabel} snapshot</div>
+          <div style="font-size:15px;font-weight:700;">👋 Hey ${firstName} — here's your ${teamLabel} snapshot ${streakHtml}</div>
           <div style="font-size:11px;color:#94a3b8;">MTD Performance</div>
         </div>
         ${cards}
+        ${sparklineHtml}
+        ${gainingHtml}
         <div id="leadsAtRiskBanner"></div>
       </div>
     </div>`;
@@ -2000,6 +2162,15 @@ function renderDashboard() {
 
     <!-- Two Panels -->
     ${buildPersonalSection(sales, bdc)}
+
+    <!-- Kudos Feed -->
+    <div class="kudos-section">
+      <div class="kudos-card">
+        <h3><span>Shoutouts</span> <button class="kudos-give-btn" onclick="openKudosModal()">+ Give a Shoutout</button></h3>
+        <div id="kudosFeed"><div style="text-align:center;color:var(--muted);padding:12px;font-size:13px;">Loading shoutouts...</div></div>
+      </div>
+    </div>
+
     <div class="panels">
 
       <!-- ═══ BDC Panel ═══ -->
@@ -6539,6 +6710,585 @@ async function initPushNotifications() {
   await registerServiceWorker();
   await requestNotificationPermission();
   setupForegroundMessages();
+}
+
+/* ══════════════════════════════════════════════════════════
+   FEATURE 1: Morning Briefing / "The Drop"
+   ══════════════════════════════════════════════════════════ */
+const BRIEF_QUOTES = [
+  "The difference between ordinary and extraordinary is that little extra.",
+  "Success is the sum of small efforts repeated day in and day out.",
+  "Every sale begins with a conversation.",
+  "Hustle beats talent when talent doesn't hustle.",
+  "Be so good they can't ignore you.",
+  "The best time to plant a tree was 20 years ago. The second best time is now.",
+  "Winners are not people who never fail, but people who never quit.",
+  "Your only limit is you.",
+  "Don't watch the clock — do what it does. Keep going.",
+  "Champions keep playing until they get it right."
+];
+
+function getTodayKey() { return new Date().toISOString().slice(0,10); }
+
+function hasDismissedMorningBriefing() {
+  return localStorage.getItem('briefDismissed') === getTodayKey();
+}
+
+function getYesterdaySnapshot() {
+  try { return JSON.parse(localStorage.getItem('briefSnapshot_prev') || 'null'); } catch { return null; }
+}
+
+function saveTodaySnapshot(sales, bdc) {
+  const today = getTodayKey();
+  const prev = localStorage.getItem('briefSnapshot_today_date');
+  if (prev && prev !== today) {
+    const todayData = localStorage.getItem('briefSnapshot_today');
+    if (todayData) localStorage.setItem('briefSnapshot_prev', todayData);
+    localStorage.setItem('briefSnapshot_prev_date', prev);
+  }
+  const salesByUnits = [...sales].sort((a,b) => safeNum(b.sales) - safeNum(a.sales));
+  const bdcByShown = [...bdc].sort((a,b) => safeNum(shownVal(b)) - safeNum(shownVal(a)));
+  const snapshot = {
+    date: today,
+    sales: salesByUnits.map((r,i) => ({ name:(r.name||'').toUpperCase(), rank:i+1, units:safeNum(r.sales), calls:safeNum(r.calls), shown:safeNum(shownVal(r)) })),
+    bdc: bdcByShown.map((r,i) => ({ name:(r.name||'').toUpperCase(), rank:i+1, shown:safeNum(shownVal(r)), calls:safeNum(r.calls) }))
+  };
+  localStorage.setItem('briefSnapshot_today', JSON.stringify(snapshot));
+  localStorage.setItem('briefSnapshot_today_date', today);
+}
+
+function showMorningBriefing(sales, bdc) {
+  if (hasDismissedMorningBriefing()) return;
+  const me = (window.userData?.linkedName || '').trim().toUpperCase();
+  if (!me) return;
+
+  const salesByUnits = [...sales].sort((a,b) => safeNum(b.sales) - safeNum(a.sales));
+  const bdcByShown = [...bdc].sort((a,b) => safeNum(shownVal(b)) - safeNum(shownVal(a)));
+  const salesIdx = salesByUnits.findIndex(r => (r.name||'').toUpperCase() === me);
+  const bdcIdx = bdcByShown.findIndex(r => (r.name||'').toUpperCase() === me);
+  const inSales = salesIdx >= 0;
+  const inBDC = bdcIdx >= 0;
+  if (!inSales && !inBDC) return;
+
+  const yesterday = getYesterdaySnapshot();
+  let statsHtml = '';
+  let moversHtml = '';
+
+  if (inSales) {
+    const r = salesByUnits[salesIdx];
+    const rank = salesIdx + 1;
+    const units = safeNum(r.sales);
+    const calls = safeNum(r.calls);
+    const shown = safeNum(shownVal(r));
+    let rankDelta = '', unitsDelta = '', callsDelta = '';
+    if (yesterday?.sales) {
+      const yMe = yesterday.sales.find(x => x.name === me);
+      if (yMe) {
+        const rd = yMe.rank - rank;
+        rankDelta = rd > 0 ? `<div class="brief-delta up">+${rd} rank</div>` : rd < 0 ? `<div class="brief-delta down">${rd} rank</div>` : `<div class="brief-delta flat">same</div>`;
+        const ud = units - yMe.units;
+        unitsDelta = ud > 0 ? `<div class="brief-delta up">+${ud}</div>` : `<div class="brief-delta flat">—</div>`;
+        const cd = calls - yMe.calls;
+        callsDelta = cd > 0 ? `<div class="brief-delta up">+${cd}</div>` : `<div class="brief-delta flat">—</div>`;
+      }
+    }
+    statsHtml = `
+      <div class="brief-stat"><div class="val">#${rank}</div><div class="lbl">Rank</div>${rankDelta}</div>
+      <div class="brief-stat"><div class="val">${units}</div><div class="lbl">Units</div>${unitsDelta}</div>
+      <div class="brief-stat"><div class="val">${calls}</div><div class="lbl">Calls</div>${callsDelta}</div>
+      <div class="brief-stat"><div class="val">${shown}</div><div class="lbl">Shown</div></div>`;
+    // Biggest movers
+    if (yesterday?.sales) {
+      const movers = salesByUnits.map((r2,i2) => {
+        const yR = yesterday.sales.find(x => x.name === (r2.name||'').toUpperCase());
+        return yR ? { name: r2.name, change: yR.rank - (i2+1) } : null;
+      }).filter(x => x && x.change > 0).sort((a,b) => b.change - a.change).slice(0,3);
+      if (movers.length) {
+        moversHtml = `<div class="brief-movers"><h4>Biggest Movers</h4>${movers.map(m => `<div class="brief-mover"><span class="rank-change">+${m.change}</span> ${m.name}</div>`).join('')}</div>`;
+      }
+    }
+  } else if (inBDC) {
+    const r = bdcByShown[bdcIdx];
+    const rank = bdcIdx + 1;
+    const shown = safeNum(shownVal(r));
+    const calls = safeNum(r.calls);
+    let rankDelta = '', shownDelta = '';
+    if (yesterday?.bdc) {
+      const yMe = yesterday.bdc.find(x => x.name === me);
+      if (yMe) {
+        const rd = yMe.rank - rank;
+        rankDelta = rd > 0 ? `<div class="brief-delta up">+${rd} rank</div>` : rd < 0 ? `<div class="brief-delta down">${rd} rank</div>` : `<div class="brief-delta flat">same</div>`;
+        const sd = shown - yMe.shown;
+        shownDelta = sd > 0 ? `<div class="brief-delta up">+${sd}</div>` : `<div class="brief-delta flat">—</div>`;
+      }
+    }
+    statsHtml = `
+      <div class="brief-stat"><div class="val">#${rank}</div><div class="lbl">Rank</div>${rankDelta}</div>
+      <div class="brief-stat"><div class="val">${shown}</div><div class="lbl">Shown</div>${shownDelta}</div>
+      <div class="brief-stat"><div class="val">${calls}</div><div class="lbl">Calls</div></div>`;
+    if (yesterday?.bdc) {
+      const movers = bdcByShown.map((r2,i2) => {
+        const yR = yesterday.bdc.find(x => x.name === (r2.name||'').toUpperCase());
+        return yR ? { name: r2.name, change: yR.rank - (i2+1) } : null;
+      }).filter(x => x && x.change > 0).sort((a,b) => b.change - a.change).slice(0,3);
+      if (movers.length) {
+        moversHtml = `<div class="brief-movers"><h4>Biggest Movers</h4>${movers.map(m => `<div class="brief-mover"><span class="rank-change">+${m.change}</span> ${m.name}</div>`).join('')}</div>`;
+      }
+    }
+  }
+
+  const quote = BRIEF_QUOTES[Math.floor(Math.random() * BRIEF_QUOTES.length)];
+  const firstName = (window.userData?.displayName || window.userData?.linkedName || 'there').split(' ')[0];
+  const overlay = document.createElement('div');
+  overlay.className = 'morning-briefing-overlay';
+  overlay.id = 'morningBriefing';
+  overlay.innerHTML = `
+    <div class="morning-briefing-card">
+      <h2>Good Morning, ${firstName}!</h2>
+      <div class="subtitle">Your numbers are in — here's today's snapshot</div>
+      <div class="brief-stats">${statsHtml}</div>
+      ${moversHtml}
+      <div class="brief-quote">"${quote}"</div>
+      <button class="brief-go-btn" onclick="dismissMorningBriefing()">Let's Go</button>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function dismissMorningBriefing() {
+  localStorage.setItem('briefDismissed', getTodayKey());
+  const el = document.getElementById('morningBriefing');
+  if (el) { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }
+  // Trigger milestone check after briefing dismissed
+  setTimeout(() => checkMilestones(), 500);
+}
+window.dismissMorningBriefing = dismissMorningBriefing;
+
+/* ══════════════════════════════════════════════════════════
+   FEATURE 2: Streaks + Personal Bests
+   ══════════════════════════════════════════════════════════ */
+async function updateLoginStreak() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  const ref = doc(db, 'users', uid);
+  try {
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const today = getTodayKey();
+    const lastDate = data.streakLastDate || '';
+    let streak = data.loginStreak || 0;
+    if (lastDate === today) return; // already counted today
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yKey = yesterday.toISOString().slice(0,10);
+    if (lastDate === yKey) {
+      streak += 1;
+    } else {
+      streak = 1; // reset
+    }
+    await updateDoc(ref, { loginStreak: streak, streakLastDate: today });
+    window._loginStreak = streak;
+  } catch(e) { console.warn('Streak update failed:', e.message); }
+}
+
+function getStreakBadgeHtml() {
+  const streak = window._loginStreak || 0;
+  if (streak < 2) return '';
+  let flames = '🔥';
+  if (streak >= 30) flames = '🔥🔥🔥';
+  else if (streak >= 14) flames = '🔥🔥';
+  return `<span class="streak-badge">${flames} ${streak}-day streak</span>`;
+}
+
+async function checkPersonalBests(sales, bdc) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  const me = (window.userData?.linkedName || '').trim().toUpperCase();
+  if (!me) return;
+
+  const salesByUnits = [...sales].sort((a,b) => safeNum(b.sales) - safeNum(a.sales));
+  const bdcByShown = [...bdc].sort((a,b) => safeNum(shownVal(b)) - safeNum(shownVal(a)));
+  const sIdx = salesByUnits.findIndex(r => (r.name||'').toUpperCase() === me);
+  const bIdx = bdcByShown.findIndex(r => (r.name||'').toUpperCase() === me);
+
+  let metrics = {};
+  if (sIdx >= 0) {
+    const r = salesByUnits[sIdx];
+    metrics = { units: safeNum(r.sales), calls: safeNum(r.calls), shown: safeNum(shownVal(r)) };
+  } else if (bIdx >= 0) {
+    const r = bdcByShown[bIdx];
+    metrics = { shown: safeNum(shownVal(r)), calls: safeNum(r.calls) };
+  } else return;
+
+  try {
+    const ref = doc(db, 'users', uid);
+    const snap = await getDoc(ref);
+    const pbs = snap.data()?.personalBests || {};
+    let newPBs = {};
+    let anyNew = false;
+    for (const [key, val] of Object.entries(metrics)) {
+      if (val > (pbs[key] || 0)) {
+        newPBs[key] = val;
+        anyNew = true;
+      }
+    }
+    if (anyNew) {
+      const merged = { ...pbs, ...newPBs };
+      await updateDoc(ref, { personalBests: merged });
+      window._personalBests = merged;
+      window._newPBs = newPBs;
+    } else {
+      window._personalBests = pbs;
+      window._newPBs = {};
+    }
+  } catch(e) { console.warn('PB check failed:', e.message); }
+}
+
+function getPBBadge(metricKey) {
+  if (window._newPBs && window._newPBs[metricKey]) {
+    return '<span class="pb-badge">NEW PB!</span>';
+  }
+  return '';
+}
+
+function getPBAlertHtml() {
+  if (!window._newPBs || Object.keys(window._newPBs).length === 0) return '';
+  const names = Object.entries(window._newPBs).map(([k,v]) => `${k}: ${v}`).join(', ');
+  return `<div class="pb-alert">New Personal Best! ${names}</div>`;
+}
+
+/* ══════════════════════════════════════════════════════════
+   FEATURE 3: Peer Kudos / Shoutouts
+   ══════════════════════════════════════════════════════════ */
+let _kudosUnsub = null;
+let _kudosItems = [];
+
+function initKudos() {
+  if (_kudosUnsub) return;
+  try {
+    const q = query(collection(db, 'kudos'), orderBy('createdAt', 'desc'), limit(20));
+    _kudosUnsub = onSnapshot(q, snap => {
+      _kudosItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderKudosFeed();
+    }, err => {
+      console.warn('Kudos listener failed (index may not exist yet):', err.message);
+    });
+  } catch(e) { console.warn('Kudos init failed:', e.message); }
+}
+
+function renderKudosFeed() {
+  const el = document.getElementById('kudosFeed');
+  if (!el) return;
+  if (_kudosItems.length === 0) {
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:12px;font-size:13px;">No shoutouts yet — be the first!</div>';
+    return;
+  }
+  el.innerHTML = _kudosItems.slice(0, 5).map(k => {
+    const initials = (k.fromName || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    const time = k.createdAt?.toDate ? timeAgo(k.createdAt.toDate()) : '';
+    const pinned = k.pinned ? ' kudos-pinned' : '';
+    return `<div class="kudos-item${pinned}">
+      <div class="kudos-avatar">${initials}</div>
+      <div class="kudos-body">
+        <strong>${k.fromName || 'Someone'}</strong> → ${k.toName || 'Team'}
+        <div>${k.message || ''}</div>
+        <div class="kudos-time">${time}${k.pinned ? ' · ⭐ Pinned' : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function timeAgo(date) {
+  const mins = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+function openKudosModal() {
+  // Build user list from dashboard data
+  const names = new Set();
+  (dashboardData.sales || []).forEach(r => { if (r.name) names.add(r.name); });
+  (dashboardData.bdc || []).forEach(r => { if (r.name) names.add(r.name); });
+  const sorted = [...names].sort();
+  const options = sorted.map(n => `<option value="${n}">${n}</option>`).join('');
+
+  const modal = document.createElement('div');
+  modal.className = 'kudos-modal-overlay';
+  modal.id = 'kudosModal';
+  modal.innerHTML = `
+    <div class="kudos-modal">
+      <h3>Give a Shoutout</h3>
+      <select id="kudosRecipient"><option value="">Choose teammate...</option>${options}</select>
+      <textarea id="kudosMessage" placeholder="Nice work on..."></textarea>
+      <div class="actions">
+        <button onclick="sendKudos()" style="background:var(--accent);color:#fff;">Send</button>
+        <button onclick="closeKudosModal()" style="background:var(--line);color:var(--text);">Cancel</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function sendKudos() {
+  const to = document.getElementById('kudosRecipient')?.value;
+  const msg = document.getElementById('kudosMessage')?.value?.trim();
+  if (!to) { alert('Please select a teammate'); return; }
+  if (!msg) { alert('Please write a message'); return; }
+  const me = window.userData;
+  try {
+    await addDoc(collection(db, 'kudos'), {
+      fromUid: auth.currentUser.uid,
+      fromName: me?.displayName || me?.email || 'Someone',
+      toName: to,
+      message: msg,
+      pinned: false,
+      createdAt: serverTimestamp()
+    });
+    closeKudosModal();
+  } catch(e) { alert('Failed to send: ' + e.message); }
+}
+
+function closeKudosModal() {
+  document.getElementById('kudosModal')?.remove();
+}
+
+async function toggleKudosPin(kudosId) {
+  if (!isAdmin() && !isManager()) return;
+  const item = _kudosItems.find(k => k.id === kudosId);
+  if (!item) return;
+  try {
+    await updateDoc(doc(db, 'kudos', kudosId), { pinned: !item.pinned });
+  } catch(e) { console.warn('Pin toggle failed:', e.message); }
+}
+
+window.openKudosModal = openKudosModal;
+window.sendKudos = sendKudos;
+window.closeKudosModal = closeKudosModal;
+window.toggleKudosPin = toggleKudosPin;
+
+/* ══════════════════════════════════════════════════════════
+   FEATURE 4: "Who's Gaining on You" Ticker
+   ══════════════════════════════════════════════════════════ */
+function buildGainingTicker(sales, bdc) {
+  const me = (window.userData?.linkedName || '').trim().toUpperCase();
+  if (!me) return '';
+
+  const salesByUnits = [...sales].sort((a,b) => safeNum(b.sales) - safeNum(a.sales));
+  const bdcByShown = [...bdc].sort((a,b) => safeNum(shownVal(b)) - safeNum(shownVal(a)));
+
+  let html = '';
+
+  const sIdx = salesByUnits.findIndex(r => (r.name||'').toUpperCase() === me);
+  if (sIdx >= 0) {
+    const myVal = safeNum(salesByUnits[sIdx].sales);
+    // Who's behind
+    if (sIdx < salesByUnits.length - 1) {
+      const behind = salesByUnits[sIdx + 1];
+      const gap = myVal - safeNum(behind.sales);
+      if (gap <= 3) {
+        html += `<span class="item behind-you">⚠️ ${behind.name} is ${gap} unit${gap !== 1 ? 's' : ''} behind you</span>`;
+      }
+    }
+    // Who's ahead
+    if (sIdx > 0) {
+      const ahead = salesByUnits[sIdx - 1];
+      const gap = safeNum(ahead.sales) - myVal;
+      if (gap <= 3) {
+        html += `<span class="item ahead">🎯 You're ${gap} unit${gap !== 1 ? 's' : ''} behind ${ahead.name} for #${sIdx}</span>`;
+      }
+    }
+  }
+
+  const bIdx = bdcByShown.findIndex(r => (r.name||'').toUpperCase() === me);
+  if (bIdx >= 0) {
+    const myVal = safeNum(shownVal(bdcByShown[bIdx]));
+    if (bIdx < bdcByShown.length - 1) {
+      const behind = bdcByShown[bIdx + 1];
+      const gap = myVal - safeNum(shownVal(behind));
+      if (gap <= 3) {
+        html += `<span class="item behind-you">⚠️ ${behind.name} is ${gap} shown behind you</span>`;
+      }
+    }
+    if (bIdx > 0) {
+      const ahead = bdcByShown[bIdx - 1];
+      const gap = safeNum(shownVal(ahead)) - myVal;
+      if (gap <= 3) {
+        html += `<span class="item ahead">🎯 You're ${gap} shown behind ${ahead.name} for #${bIdx}</span>`;
+      }
+    }
+  }
+
+  if (!html) return '';
+  return `<div class="gaining-ticker"><span style="font-size:14px;">🏃</span>${html}</div>`;
+}
+
+/* ══════════════════════════════════════════════════════════
+   FEATURE 5: Morning Milestone Celebrations
+   ══════════════════════════════════════════════════════════ */
+const MILESTONE_THRESHOLDS = [5, 10, 15, 20, 25, 30, 40, 50];
+
+function checkMilestones() {
+  const today = getTodayKey();
+  if (localStorage.getItem('milestoneChecked') === today) return;
+  localStorage.setItem('milestoneChecked', today);
+
+  const me = (window.userData?.linkedName || '').trim().toUpperCase();
+  if (!me) return;
+
+  const sales = dashboardData.sales || [];
+  const bdc = dashboardData.bdc || [];
+  const salesByUnits = [...sales].sort((a,b) => safeNum(b.sales) - safeNum(a.sales));
+  const bdcByShown = [...bdc].sort((a,b) => safeNum(shownVal(b)) - safeNum(shownVal(a)));
+  const yesterday = getYesterdaySnapshot();
+
+  const sIdx = salesByUnits.findIndex(r => (r.name||'').toUpperCase() === me);
+  if (sIdx >= 0) {
+    const units = safeNum(salesByUnits[sIdx].sales);
+    const yUnits = yesterday?.sales?.find(x => x.name === me)?.units || 0;
+    for (const t of MILESTONE_THRESHOLDS) {
+      if (units >= t && yUnits < t) {
+        fireMilestone(`${t} Units!`, `You just crossed ${t} units this month`);
+        return;
+      }
+    }
+    if (sIdx === 0) {
+      const yRank = yesterday?.sales?.find(x => x.name === me)?.rank;
+      if (yRank && yRank > 1) {
+        fireMilestone('#1 Sales!', 'You just took the top spot');
+        return;
+      }
+    }
+  }
+
+  const bIdx = bdcByShown.findIndex(r => (r.name||'').toUpperCase() === me);
+  if (bIdx >= 0) {
+    const shown = safeNum(shownVal(bdcByShown[bIdx]));
+    const yShown = yesterday?.bdc?.find(x => x.name === me)?.shown || 0;
+    for (const t of MILESTONE_THRESHOLDS) {
+      if (shown >= t && yShown < t) {
+        fireMilestone(`${t} Shown!`, `You just hit ${t} shown appointments`);
+        return;
+      }
+    }
+    if (bIdx === 0) {
+      const yRank = yesterday?.bdc?.find(x => x.name === me)?.rank;
+      if (yRank && yRank > 1) {
+        fireMilestone('#1 BDC!', 'You just took the top spot');
+        return;
+      }
+    }
+  }
+}
+
+function fireMilestone(title, subtitle) {
+  // Confetti
+  const colors = ['#f97316','#ef4444','#eab308','#22c55e','#3b82f6','#a855f7','#ec4899'];
+  for (let i = 0; i < 80; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = Math.random() * 100 + 'vw';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.animationDuration = (2 + Math.random() * 2) + 's';
+    piece.style.animationDelay = Math.random() * 0.5 + 's';
+    piece.style.width = (6 + Math.random() * 6) + 'px';
+    piece.style.height = (6 + Math.random() * 6) + 'px';
+    document.body.appendChild(piece);
+    setTimeout(() => piece.remove(), 4500);
+  }
+  // Toast
+  const toast = document.createElement('div');
+  toast.className = 'milestone-toast';
+  toast.innerHTML = `<div style="font-size:40px;margin-bottom:8px;">🎉</div><h2>${title}</h2><p>${subtitle}</p>`;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity .5s'; setTimeout(() => toast.remove(), 500); }, 3500);
+}
+
+/* ══════════════════════════════════════════════════════════
+   FEATURE 6: Trend Lines / Sparklines
+   ══════════════════════════════════════════════════════════ */
+function saveMetricHistory(sales, bdc) {
+  const me = (window.userData?.linkedName || '').trim().toUpperCase();
+  if (!me) return;
+  const today = getTodayKey();
+  let history = {};
+  try { history = JSON.parse(localStorage.getItem('metricHistory') || '{}'); } catch {}
+
+  const salesByUnits = [...sales].sort((a,b) => safeNum(b.sales) - safeNum(a.sales));
+  const bdcByShown = [...bdc].sort((a,b) => safeNum(shownVal(b)) - safeNum(shownVal(a)));
+  const sIdx = salesByUnits.findIndex(r => (r.name||'').toUpperCase() === me);
+  const bIdx = bdcByShown.findIndex(r => (r.name||'').toUpperCase() === me);
+
+  let entry = { date: today };
+  if (sIdx >= 0) {
+    entry.primary = safeNum(salesByUnits[sIdx].sales);
+    entry.calls = safeNum(salesByUnits[sIdx].calls);
+    entry.type = 'sales';
+  } else if (bIdx >= 0) {
+    entry.primary = safeNum(shownVal(bdcByShown[bIdx]));
+    entry.calls = safeNum(bdcByShown[bIdx].calls);
+    entry.type = 'bdc';
+  } else return;
+
+  history[today] = entry;
+  // Keep only last 31 days
+  const keys = Object.keys(history).sort().slice(-31);
+  const trimmed = {};
+  keys.forEach(k => trimmed[k] = history[k]);
+  localStorage.setItem('metricHistory', JSON.stringify(trimmed));
+}
+
+function buildSparklines() {
+  let history = {};
+  try { history = JSON.parse(localStorage.getItem('metricHistory') || '{}'); } catch {}
+  const keys = Object.keys(history).sort();
+  if (keys.length < 2) return '';
+
+  const primaryVals = keys.map(k => history[k].primary || 0);
+  const callsVals = keys.map(k => history[k].calls || 0);
+  const type = history[keys[keys.length - 1]]?.type === 'bdc' ? 'Shown' : 'Units';
+
+  function makeSvg(vals, color) {
+    const w = 120, h = 30;
+    const max = Math.max(...vals, 1);
+    const min = Math.min(...vals);
+    const range = max - min || 1;
+    const points = vals.map((v, i) => {
+      const x = (i / (vals.length - 1)) * w;
+      const y = h - ((v - min) / range) * (h - 4) - 2;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    const areaPoints = points.join(' ') + ` ${w},${h} 0,${h}`;
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+      <polygon points="${areaPoints}" fill="${color}" opacity="0.15"/>
+      <polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
+  // Pace: compare last 3 days trend
+  let pace = 'flat';
+  if (primaryVals.length >= 3) {
+    const last3 = primaryVals.slice(-3);
+    if (last3[2] > last3[1] && last3[1] > last3[0]) pace = 'up';
+    else if (last3[2] < last3[1] && last3[1] < last3[0]) pace = 'down';
+  }
+  const paceLabel = pace === 'up' ? 'Accelerating' : pace === 'down' ? 'Slowing down' : 'Steady pace';
+  const paceClass = pace === 'up' ? 'pace-up' : pace === 'down' ? 'pace-down' : 'pace-flat';
+
+  return `
+    <div class="sparkline-row">
+      <div class="sparkline-item">
+        <span class="spark-label">${type}</span>
+        ${makeSvg(primaryVals, '#f97316')}
+      </div>
+      <div class="sparkline-item">
+        <span class="spark-label">Calls</span>
+        ${makeSvg(callsVals, '#3b82f6')}
+      </div>
+      <span class="pace-indicator ${paceClass}">${paceLabel}</span>
+    </div>`;
 }
 
 /* Boot */
