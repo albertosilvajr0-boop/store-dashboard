@@ -2291,6 +2291,7 @@ function renderDashboard() {
             <a href="#" onclick="event.preventDefault();closeReportsMenu();showReassignments();" class="res-link">🔄 Reassignments</a>
             <a href="#" onclick="event.preventDefault();closeReportsMenu();showActivityModal();" class="res-link">🕐 Activity Log</a>
             <a href="#" onclick="event.preventDefault();closeReportsMenu();showVehicleDemand();" class="res-link">🚗 Vehicle Demand</a>
+            <a href="#" onclick="event.preventDefault();closeReportsMenu();showManagerLeaderboard();" class="res-link">🏆 Manager Leaderboard</a>
             ${isAdmin() ? '<div style="border-top:1px solid var(--line);margin:4px 0;"></div><a href="#" onclick="event.preventDefault();closeReportsMenu();showLeadFunnel();" class="res-link">🔬 Lead Funnel</a>' : ''}
             ${isAdmin() ? '<a href="#" onclick="event.preventDefault();closeReportsMenu();showEngagement();" class="res-link">📈 Engagement</a>' : ''}
           </div>
@@ -4000,6 +4001,13 @@ if (typeof showVehicleDemand === 'function') {
   window.showVehicleDemand = showVehicleDemand;
 }
 
+const _origShowMgrLb = showManagerLeaderboard;
+showManagerLeaderboard = async function() {
+  navPush({ view: 'mgr-leaderboard' });
+  return _origShowMgrLb();
+};
+window.showManagerLeaderboard = showManagerLeaderboard;
+
 // Handle browser back/forward buttons
 window.addEventListener('popstate', (e) => {
   const state = e.state;
@@ -4018,6 +4026,8 @@ window.addEventListener('popstate', (e) => {
     _origShowFunnel();
   } else if (state.view === 'vehicle' && typeof _origShowVeh !== 'undefined') {
     _origShowVeh();
+  } else if (state.view === 'mgr-leaderboard') {
+    _origShowMgrLb();
   } else {
     _origShowDashboard();
   }
@@ -4393,6 +4403,195 @@ function showVehLeads(makeName, modelName, filter) {
 }
 
 window.showVehLeads = showVehLeads;
+
+/* ══════════════════════════════════════════
+   SALES MANAGER LEADERBOARD (Managers+)
+   ══════════════════════════════════════════ */
+let _mgrLbSort = { col: 'calls', dir: 'desc' };
+
+async function showManagerLeaderboard() {
+  if (!isAdmin() && !isManager()) { alert('Only managers and admins can view this report.'); return; }
+  trackClick();
+  logPageView('Manager Leaderboard');
+
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="max-width:1200px;margin:0 auto;padding:18px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h2 style="margin:0;font-size:20px;">🏆 Sales Manager Leaderboard</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Individual manager activity — Calls, Texts, Emails &amp; Appointments</p>
+        </div>
+        <button class="topbar-btn manage" onclick="showDashboard()">← Back to Dashboard</button>
+      </div>
+      <div class="loading-wrap"><div class="spinner"></div></div>
+    </div>`;
+
+  try {
+    // Ensure user data is loaded
+    const usersData = _lbUsersCache || await loadLeaderboardUsers();
+    if (!usersData) throw new Error('Could not load user data');
+
+    // Ensure dashboard data is loaded
+    if (!dashboardData.sales.length && !dashboardData.bdc.length) {
+      const lbDoc = await getDoc(doc(db, 'dashboardSnapshots', 'leaderboards'));
+      if (lbDoc.exists()) {
+        const payload = JSON.parse(lbDoc.data().jsonData);
+        dashboardData.sales = Array.isArray(payload?.sales) ? payload.sales : [];
+        dashboardData.bdc = Array.isArray(payload?.bdc) ? payload.bdc : [];
+        dashboardData.bdc = dashboardData.bdc.map(x => ({ calls: 0, texts: 0, ...x }));
+      }
+    }
+
+    renderManagerLeaderboard();
+  } catch (err) {
+    console.error('Manager Leaderboard error:', err);
+    app.innerHTML = `
+      <div style="max-width:800px;margin:40px auto;padding:20px;">
+        <div class="detail-card" style="color:#dc2626;text-align:center;">
+          <h2>Error Loading Manager Leaderboard</h2>
+          <p>${err.message}</p>
+          <button class="btn" onclick="showDashboard()" style="margin-top:14px;">← Back</button>
+        </div>
+      </div>`;
+  }
+}
+
+function getManagerRows() {
+  if (!_lbUsersCache) return [];
+  const { nameMap, managers } = _lbUsersCache;
+
+  const salesLookup = {};
+  (dashboardData.sales || []).forEach(r => { salesLookup[(r.name || '').toUpperCase()] = r; });
+  const bdcLookup = {};
+  (dashboardData.bdc || []).forEach(r => { bdcLookup[(r.name || '').toUpperCase()] = r; });
+
+  const rows = [];
+  // For each manager, find their OWN individual row in sales/BDC data
+  Object.values(managers).forEach(mgr => {
+    const linked = (mgr.linkedName || '').trim().toUpperCase();
+    if (!linked) return;
+    const salesRow = salesLookup[linked];
+    const bdcRow = bdcLookup[linked];
+    if (!salesRow && !bdcRow) return;
+    const r = salesRow || bdcRow;
+    rows.push({
+      name: mgr.displayName || mgr.linkedName || mgr.email,
+      calls: safeNum(r.calls),
+      texts: safeNum(r.texts),
+      emails: 0, // Not currently tracked — placeholder
+      created: safeNum(r.created ?? r.created_count ?? 0),
+      shown: safeNum(shownVal(r)),
+      due: safeNum(r.due ?? r.due_count ?? 0),
+      sales: safeNum(salesRow?.sales || 0)
+    });
+  });
+  return rows;
+}
+
+function toggleMgrLbSort(col) {
+  if (_mgrLbSort.col === col) { _mgrLbSort.dir = _mgrLbSort.dir === 'desc' ? 'asc' : 'desc'; }
+  else { _mgrLbSort.col = col; _mgrLbSort.dir = 'desc'; }
+  renderManagerLeaderboard();
+}
+window.toggleMgrLbSort = toggleMgrLbSort;
+
+function renderManagerLeaderboard() {
+  const rows = getManagerRows();
+  const { col, dir } = _mgrLbSort;
+  const mult = dir === 'desc' ? -1 : 1;
+  const sorted = [...rows].sort((a, b) => {
+    if (col === 'name') return mult * (a.name || '').localeCompare(b.name || '');
+    return mult * ((a[col] || 0) - (b[col] || 0));
+  });
+
+  // Summary stats
+  const totalMgrs = sorted.length;
+  const totalCalls = sorted.reduce((s, r) => s + r.calls, 0);
+  const totalTexts = sorted.reduce((s, r) => s + r.texts, 0);
+  const totalAppts = sorted.reduce((s, r) => s + r.created, 0);
+
+  const sortTh = (key, label) => {
+    const active = _mgrLbSort.col === key;
+    const arrow = active ? (_mgrLbSort.dir === 'desc' ? ' ▼' : ' ▲') : '';
+    return `<th class="${active ? 'sorted' : ''}" onclick="toggleMgrLbSort('${key}')" style="cursor:pointer;">${label}${arrow}</th>`;
+  };
+
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="max-width:1200px;margin:0 auto;padding:18px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h2 style="margin:0;font-size:20px;">🏆 Sales Manager Leaderboard</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Individual manager activity — Calls, Texts, Emails &amp; Appointments</p>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="topbar-btn manage" onclick="showManagerLeaderboard()">↻ Refresh</button>
+          <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
+        </div>
+      </div>
+
+      <div class="reassign-stats">
+        <div class="reassign-stat">
+          <div class="stat-label">Managers</div>
+          <div class="stat-value">${totalMgrs}</div>
+        </div>
+        <div class="reassign-stat">
+          <div class="stat-label">Total Calls</div>
+          <div class="stat-value">${totalCalls}</div>
+        </div>
+        <div class="reassign-stat">
+          <div class="stat-label">Total Texts</div>
+          <div class="stat-value">${totalTexts}</div>
+        </div>
+        <div class="reassign-stat">
+          <div class="stat-label">Total Appts Created</div>
+          <div class="stat-value">${totalAppts}</div>
+        </div>
+      </div>
+
+      ${sorted.length > 0 ? `<div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:32px;text-align:center;">#</th>
+              ${sortTh('name', 'Manager')}
+              ${sortTh('calls', 'Calls')}
+              ${sortTh('texts', 'Texts')}
+              ${sortTh('emails', 'Emails')}
+              ${sortTh('created', 'Appts Created')}
+              ${sortTh('shown', 'Appts Shown')}
+              ${sortTh('sales', 'Sales')}
+            </tr>
+          </thead>
+          <tbody>
+            ${sorted.map((r, i) => {
+              const trophy = i === 0 ? '<span class="trophy">🥇</span>' : i === 1 ? '<span class="trophy">🥈</span>' : i === 2 ? '<span class="trophy">🥉</span>' : '';
+              return `<tr class="${i < 3 ? 'top3' : ''}">
+                <td class="rank-cell">${i + 1}</td>
+                <td class="name-cell">${trophy}${r.name}</td>
+                <td>${r.calls}</td>
+                <td>${r.texts}</td>
+                <td style="color:var(--muted);">${r.emails || '—'}</td>
+                <td>${r.created}</td>
+                <td>${r.shown}</td>
+                <td><strong>${r.sales}</strong></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>` : `<div class="detail-card" style="text-align:center;padding:40px 20px;color:var(--muted);">
+        <p style="font-size:15px;">No manager activity data found.</p>
+        <p style="font-size:12px;">Managers need a <strong>linkedName</strong> matching a row in the leaderboard data.</p>
+      </div>`}
+
+      <p style="margin-top:12px;font-size:11px;color:var(--muted);text-align:center;">
+        Emails column is not yet tracked — it will populate once the data source provides email activity counts.
+      </p>
+    </div>`;
+}
+
+window.showManagerLeaderboard = showManagerLeaderboard;
 
 /* ══════════════════════════════════════════
    ENGAGEMENT REPORT (Admin)
