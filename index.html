@@ -1302,7 +1302,7 @@ async function showDashboard() {
     prefetchForDashboard(dashboardData);
     checkLeadsAtRisk();
     loadCustomLinks();
-    loadCallPatterns();
+    loadLeaderboardUsers();
     initChat();
     initPushNotifications();
 
@@ -1403,6 +1403,77 @@ window.onColDragStart = onColDragStart;
 window.onColDragEnd = onColDragEnd;
 window.onColDragOver = onColDragOver;
 window.onColDrop = onColDrop;
+
+/* ── Leaderboard View Mode (Individual / By Teams) ── */
+let _lbViewMode = 'individual'; // 'individual' | 'teams'
+let _lbUsersCache = null;
+
+async function loadLeaderboardUsers() {
+  if (_lbUsersCache) return _lbUsersCache;
+  try {
+    const snap = await getDocs(collection(db, 'users'));
+    const nameMap = {};
+    const managers = {};
+    snap.forEach(d => {
+      const u = { uid: d.id, ...d.data() };
+      if (u.deleted) return;
+      if (u.linkedName) nameMap[u.linkedName.trim().toUpperCase()] = u;
+      if (u.role === 'manager' || u.role === 'admin' || u.role === 'superadmin') {
+        managers[d.id] = u;
+      }
+    });
+    _lbUsersCache = { nameMap, managers };
+    if (_lbViewMode === 'teams') renderDashboard();
+    return _lbUsersCache;
+  } catch(e) {
+    console.warn('Failed to load users for team view:', e);
+    return null;
+  }
+}
+
+function toggleLeaderboardView() {
+  _lbViewMode = _lbViewMode === 'individual' ? 'teams' : 'individual';
+  renderDashboard();
+}
+window.toggleLeaderboardView = toggleLeaderboardView;
+
+function buildManagerSalesRows() {
+  if (!_lbUsersCache) return null;
+  const { nameMap, managers } = _lbUsersCache;
+  const salesData = dashboardData.sales || [];
+  const bdcData = dashboardData.bdc || [];
+  const salesLookup = {};
+  salesData.forEach(r => { salesLookup[(r.name || '').toUpperCase()] = r; });
+  const bdcLookup = {};
+  bdcData.forEach(r => { bdcLookup[(r.name || '').toUpperCase()] = r; });
+
+  const teamAgg = {};
+  Object.entries(nameMap).forEach(([upperName, user]) => {
+    const managerId = user.managerId;
+    if (!managerId || !managers[managerId]) return;
+    const salesRow = salesLookup[upperName];
+    const bdcRow = bdcLookup[upperName];
+    if (!salesRow && !bdcRow) return;
+    if (!teamAgg[managerId]) {
+      teamAgg[managerId] = {
+        name: managers[managerId].displayName || managers[managerId].email,
+        managerId, sales: 0, calls: 0, texts: 0, created: 0, due: 0, shown: 0, visits: 0,
+        memberCount: 0
+      };
+    }
+    const r = salesRow || bdcRow;
+    teamAgg[managerId].sales += safeNum(salesRow?.sales || 0);
+    teamAgg[managerId].calls += safeNum(r.calls);
+    teamAgg[managerId].texts += safeNum(r.texts);
+    teamAgg[managerId].created += safeNum(r.created ?? r.created_count ?? 0);
+    teamAgg[managerId].due += safeNum(r.due ?? r.due_count ?? 0);
+    teamAgg[managerId].shown += safeNum(shownVal(r));
+    teamAgg[managerId].visits += safeNum(salesRow?.visits || 0);
+    teamAgg[managerId].memberCount++;
+  });
+
+  return Object.values(teamAgg);
+}
 
 /* ── Sales Trending Projection (off Sundays only) ── */
 function trendingSales(currentSales) {
@@ -2106,6 +2177,72 @@ function renderDashboard() {
     </tr>`;
   }
 
+  /* ── Manager row renderers (team-aggregated view) ── */
+  function managerSalesCellData(team) {
+    const salesV = team.sales;
+    const calls = team.calls;
+    const texts = team.texts;
+    const visits = team.visits;
+    const created = team.created;
+    const due = team.due;
+    const shown = team.shown;
+    const mc = team.memberCount || 1;
+    const pct = due > 0 ? ((shown / due) * 100).toFixed(1) + '%' : (created > 0 ? ((shown / created) * 100).toFixed(1) + '%' : '–');
+    const closeRate = visits > 0 ? ((salesV / visits) * 100).toFixed(1) + '%' : '–';
+    const trend = trendingSales(salesV);
+    const trendPerMember = mc > 0 ? trend / mc : 0;
+    const trendStyle = trendPerMember >= 20 ? 'background:#bbf7d0;color:#166534;font-weight:700;'
+                     : trendPerMember >= 12 ? 'background:#dcfce7;color:#16a34a;font-weight:700;'
+                     : trendPerMember >= 10 ? 'background:#fef9c3;color:#ca8a04;font-weight:700;'
+                     :                        'background:#f4f4f5;color:#a1a1aa;font-weight:600;';
+    const callsK = kpiClass(calls, WEEKLY_TARGETS.calls * mc);
+    const textsK = kpiClass(texts, WEEKLY_TARGETS.texts * mc);
+    const createdK = kpiClass(created, WEEKLY_TARGETS.created * mc);
+    const dueK = kpiClass(due, WEEKLY_TARGETS.due * mc);
+    const shownK = kpiClass(shown, WEEKLY_TARGETS.shown * mc);
+    return {
+      sales:     `<td class="sales-primary">${salesV}</td>`,
+      trending:  `<td style="${trendStyle}">${trend}</td>`,
+      closeRate: `<td style="font-weight:600;">${closeRate}</td>`,
+      pctShown:  `<td>${pct}</td>`,
+      shown:     `<td class="${shownK}">${shown}</td>`,
+      due:       `<td class="${dueK}">${due}</td>`,
+      created:   `<td class="${createdK}">${created}</td>`,
+      calls:     `<td class="${callsK}">${calls}</td>`,
+      texts:     `<td class="${textsK}">${texts}</td>`,
+    };
+  }
+
+  function managerSalesRow(team, i) {
+    const name = team.name || '–';
+    const members = team.memberCount || 0;
+    const top3 = i < 3 ? ' top3' : '';
+    const cells = managerSalesCellData(team);
+    return `<tr class="${top3}" onclick="showTeamDashboard('${team.managerId}')" style="cursor:pointer;">
+      <td class="rank-cell">${trophy(i)}${i < 3 ? '' : (i + 1)}</td>
+      <td class="name-cell">${name} <span style="font-size:10px;color:var(--muted);font-weight:400;">(${members} member${members !== 1 ? 's' : ''})</span></td>
+      ${salesColOrder.map(k => cells[k]).join('')}
+    </tr>`;
+  }
+
+  /* ── Compute Sales tbody (individual or team view) ── */
+  let salesTbodyHtml;
+  if (_lbViewMode === 'teams') {
+    const mgrRows = buildManagerSalesRows();
+    if (!mgrRows) {
+      salesTbodyHtml = `<tr><td colspan="${2 + salesColOrder.length}" style="padding:30px;color:var(--muted);">Loading team data…</td></tr>`;
+    } else if (!mgrRows.length) {
+      salesTbodyHtml = `<tr><td colspan="${2 + salesColOrder.length}" style="padding:30px;color:var(--muted);">No teams found — assign managers to users via User Management</td></tr>`;
+    } else {
+      const sorted = sortRows(mgrRows, salesSort, 'sales');
+      salesTbodyHtml = sorted.map((r, i) => managerSalesRow(r, i)).join('');
+    }
+  } else {
+    salesTbodyHtml = sales.length
+      ? sales.map((r, i) => salesRow(r, i)).join('')
+      : `<tr><td colspan="${2 + salesColOrder.length}" style="padding:30px;color:var(--muted);">No sales data</td></tr>`;
+  }
+
   document.getElementById('app').innerHTML = `
     <!-- Top Bar -->
     <div class="topbar">
@@ -2241,17 +2378,38 @@ function renderDashboard() {
           { key: 'shown', label: 'Appts Shown' },
           { key: 'pctShown', label: '% Show Rate' },
         ])}
-        ${(isAdmin() || isManager()) ? '<div id="callPatternsBox" style="margin-top:12px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:10px;"><div style="color:var(--muted);font-size:12px;">Loading call patterns…</div></div>' : ''}
+        <!-- Call patterns removed -->
       </div>
 
       <!-- ═══ Sales Panel ═══ -->
       <div>
         <div class="panel-header">
-          <div class="panel-title">🚗 Sales – Units Sold</div>
-          <div class="panel-subtitle">Ranked by units sold · weekly KPI flags · click headers to sort · drag to reorder</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div class="panel-title">${_lbViewMode === 'teams' ? '👔 Manager Leaderboard' : '🚗 Sales – Units Sold'}</div>
+            <button onclick="toggleLeaderboardView()" style="padding:5px 14px;font-size:11px;font-weight:600;border:1px solid ${_lbViewMode === 'teams' ? 'var(--accent)' : 'var(--line)'};background:${_lbViewMode === 'teams' ? 'var(--accent)' : 'transparent'};color:${_lbViewMode === 'teams' ? '#fff' : 'var(--text)'};border-radius:6px;cursor:pointer;transition:all .15s;">${_lbViewMode === 'individual' ? '👥 View by Teams' : '👤 Individual View'}</button>
+          </div>
+          <div class="panel-subtitle">${_lbViewMode === 'teams' ? 'Aggregated team KPIs per manager · click row for team details' : 'Ranked by units sold · weekly KPI flags · click headers to sort · drag to reorder'}</div>
         </div>
 
-        <div class="stat-row">
+        ${_lbViewMode === 'teams' ? (() => {
+          const mgrRows = buildManagerSalesRows();
+          const numTeams = mgrRows ? mgrRows.length : 0;
+          const topTeam = mgrRows && mgrRows.length ? [...mgrRows].sort((a,b) => b.sales - a.sales)[0] : null;
+          return `<div class="stat-row">
+            <div class="stat-card">
+              <div class="stat-label">Total Units 🚗</div>
+              <div class="stat-value">${ss.totalUnits}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Teams 👥</div>
+              <div class="stat-value">${numTeams}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Top Team ⭐</div>
+              <div class="stat-value top-performer">${topTeam ? topTeam.name + ' (' + topTeam.sales + ')' : '–'}</div>
+            </div>
+          </div>`;
+        })() : `<div class="stat-row">
           <div class="stat-card">
             <div class="stat-label">Total Units 🚗</div>
             <div class="stat-value">${ss.totalUnits}</div>
@@ -2264,17 +2422,17 @@ function renderDashboard() {
             <div class="stat-label">Top Performer ⭐</div>
             <div class="stat-value top-performer">${ss.topName} (${ss.topVal})</div>
           </div>
-        </div>
+        </div>`}
 
         <div class="chip-row">
           <div class="chip active">MTD</div>
         </div>
 
         <div class="kpi-legend">
-          <span><span class="kpi-dot green"></span> ≥ target</span>
+          <span><span class="kpi-dot green"></span> ≥ target${_lbViewMode === 'teams' ? ' (scaled by team size)' : ''}</span>
           <span><span class="kpi-dot yellow"></span> some but &lt; target</span>
           <span><span class="kpi-dot gray"></span> no activity yet</span>
-          <span><span class="kpi-dot red"></span> sales well below target</span>
+          <span><span class="kpi-dot red"></span> ${_lbViewMode === 'teams' ? 'well below team target' : 'sales well below target'}</span>
         </div>
 
         <div class="table-card">
@@ -2287,7 +2445,7 @@ function renderDashboard() {
               </tr>
             </thead>
             <tbody>
-              ${sales.length ? sales.map((r, i) => salesRow(r, i)).join('') : '<tr><td colspan="' + (2 + salesColOrder.length) + '" style="padding:30px;color:var(--muted);">No sales data</td></tr>'}
+              ${salesTbodyHtml}
             </tbody>
           </table>
         </div>
