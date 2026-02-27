@@ -1313,7 +1313,6 @@ async function showDashboard() {
     checkPersonalBests(dashboardData.sales, dashboardData.bdc).catch(e => console.warn('PB error:', e));
     try { showMorningBriefing(dashboardData.sales, dashboardData.bdc); } catch(e) { console.warn('Briefing error:', e); }
     try { if (isAdmin() || isManager()) showManagerBriefing(dashboardData.sales, dashboardData.bdc); } catch(e) { console.warn('Manager briefing error:', e); }
-    try { initKudos(); } catch(e) { console.warn('Kudos error:', e); }
     try { if (hasDismissedMorningBriefing()) { setTimeout(() => checkMilestones(), 1000); } } catch(e) { console.warn('Milestone error:', e); }
   } catch (err) {
     console.error('Dashboard error:', err);
@@ -2305,13 +2304,6 @@ function renderDashboard() {
     <!-- Two Panels -->
     ${buildPersonalSection(sales, bdc)}
 
-    <!-- Kudos Feed -->
-    <div class="kudos-section">
-      <div class="kudos-card">
-        <h3><span>Shoutouts</span> <button class="kudos-give-btn" onclick="openKudosModal()">+ Give a Shoutout</button></h3>
-        <div id="kudosFeed"><div style="text-align:center;color:var(--muted);padding:12px;font-size:13px;">Loading shoutouts...</div></div>
-      </div>
-    </div>
 
     <div class="panels">
 
