@@ -2291,8 +2291,8 @@ function renderDashboard() {
             <a href="#" onclick="event.preventDefault();closeReportsMenu();showReassignments();" class="res-link">🔄 Reassignments</a>
             <a href="#" onclick="event.preventDefault();closeReportsMenu();showActivityModal();" class="res-link">🕐 Activity Log</a>
             <a href="#" onclick="event.preventDefault();closeReportsMenu();showVehicleDemand();" class="res-link">🚗 Vehicle Demand</a>
-            <a href="#" onclick="event.preventDefault();closeReportsMenu();showManagerLeaderboard();" class="res-link">🏆 Manager Leaderboard</a>
-            ${isAdmin() ? '<div style="border-top:1px solid var(--line);margin:4px 0;"></div><a href="#" onclick="event.preventDefault();closeReportsMenu();showLeadFunnel();" class="res-link">🔬 Lead Funnel</a>' : ''}
+            ${isAdmin() ? '<div style="border-top:1px solid var(--line);margin:4px 0;"></div><a href="#" onclick="event.preventDefault();closeReportsMenu();showManagerLeaderboard();" class="res-link">🏆 Manager Leaderboard</a>' : ''}
+            ${isAdmin() ? '<a href="#" onclick="event.preventDefault();closeReportsMenu();showLeadFunnel();" class="res-link">🔬 Lead Funnel</a>' : ''}
             ${isAdmin() ? '<a href="#" onclick="event.preventDefault();closeReportsMenu();showEngagement();" class="res-link">📈 Engagement</a>' : ''}
           </div>
         </div>` : ''}
@@ -4410,7 +4410,7 @@ window.showVehLeads = showVehLeads;
 let _mgrLbSort = { col: 'calls', dir: 'desc' };
 
 async function showManagerLeaderboard() {
-  if (!isAdmin() && !isManager()) { alert('Only managers and admins can view this report.'); return; }
+  if (!isAdmin()) { alert('Only admins can view this report.'); return; }
   trackClick();
   logPageView('Manager Leaderboard');
 
