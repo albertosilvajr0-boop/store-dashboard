@@ -297,6 +297,38 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
   overflow-x: auto;
 }
 
+/* ── Recordings Page ── */
+.rec-upload-zone {
+  border: 2px dashed var(--line); border-radius: 12px; padding: 28px 20px;
+  text-align: center; cursor: pointer; transition: border-color .2s, background .2s;
+  background: var(--card); margin-bottom: 16px;
+}
+.rec-upload-zone:hover, .rec-upload-zone.drag-over {
+  border-color: var(--accent); background: #fff7ed;
+}
+.rec-select { padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; font-weight: 500; background: var(--card); min-width: 240px; }
+.rec-call-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px; transition: box-shadow .15s;
+}
+.rec-call-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.rec-call-info { min-width: 0; flex: 1; }
+.rec-call-date { font-weight: 700; font-size: 14px; }
+.rec-call-meta { font-size: 12px; color: var(--muted); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 8px; }
+.rec-play-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px;
+  background: var(--accent); color: #fff; border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none;
+  transition: filter .15s; white-space: nowrap;
+}
+.rec-play-btn:hover { filter: brightness(1.1); }
+.rec-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.rec-badge-connected { background: var(--greenBg); color: var(--green); }
+.rec-badge-not-connected { background: var(--redBg); color: var(--red); }
+.rec-badge-voicemail { background: var(--yellowBg); color: var(--yellow); }
+.rec-search { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; width: 100%; max-width: 300px; }
+
 /* ── Loading Spinner ── */
 .loading-wrap {
   display: flex; align-items: center; justify-content: center;
@@ -2272,6 +2304,7 @@ function renderDashboard() {
             <a href="#" onclick="event.preventDefault();closeResourcesMenu();showRecallLookup();" class="res-link">🔔 Recall & TSB Lookup</a>
             ${(isAdmin() || isManager()) ? '<a href="#" onclick="event.preventDefault();closeResourcesMenu();showCompetitiveAnalysis();" class="res-link">🏆 Competitive Analysis</a>' : ''}
             <a href="#" onclick="event.preventDefault();closeResourcesMenu();showRoster();" class="res-link">📋 Roster</a>
+            ${isAdmin() ? '<a href="#" onclick="event.preventDefault();closeResourcesMenu();showRecordings();" class="res-link">🎙️ Recordings</a>' : ''}
             <div id="customLinksSection"></div>
             <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
             <div id="addLinkForm" style="padding:6px 12px;">
@@ -4010,6 +4043,13 @@ showManagerLeaderboard = async function() {
 };
 window.showManagerLeaderboard = showManagerLeaderboard;
 
+const _origShowRecordings = showRecordings;
+showRecordings = async function() {
+  navPush({ view: 'recordings' });
+  return _origShowRecordings();
+};
+window.showRecordings = showRecordings;
+
 // Handle browser back/forward buttons
 window.addEventListener('popstate', (e) => {
   const state = e.state;
@@ -4030,6 +4070,8 @@ window.addEventListener('popstate', (e) => {
     _origShowVeh();
   } else if (state.view === 'mgr-leaderboard') {
     _origShowMgrLb();
+  } else if (state.view === 'recordings') {
+    _origShowRecordings();
   } else {
     _origShowDashboard();
   }
@@ -5493,6 +5535,372 @@ function renderRosterView() {
 }
 
 window.showRoster = showRoster;
+
+/* ══════════════════════════════════════════
+   🎙️ CALL RECORDINGS
+   ══════════════════════════════════════════ */
+window._recData = [];       // all parsed call rows
+window._recNames = [];       // unique names from Phone Code Reference
+window._recSelected = '';    // currently selected name
+window._recSearch = '';      // search filter
+
+async function showRecordings() {
+  trackClick();
+  logPageView('Recordings');
+  if (!isAdmin()) { alert('Only admins can access Recordings.'); return; }
+
+  const app = document.getElementById('app');
+
+  // Load existing data from Firestore
+  let stored = [];
+  try {
+    const snap = await getDoc(doc(db, 'appData', 'callRecordings'));
+    if (snap.exists()) stored = snap.data().rows || [];
+  } catch (e) { console.warn('Could not load recordings:', e); }
+  window._recData = stored;
+  _recBuildNames();
+
+  app.innerHTML = `
+    <div style="max-width:1000px;margin:0 auto;padding:18px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h2 style="margin:0;font-size:20px;">🎙️ Recordings</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Call recordings organized by person</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="topbar-btn manage" onclick="showDashboard()">← Back</button>
+        </div>
+      </div>
+
+      <!-- Upload zone (admin) -->
+      <div id="recUploadZone" class="rec-upload-zone" onclick="document.getElementById('recFileInput').click();"
+           ondragover="event.preventDefault();this.classList.add('drag-over');"
+           ondragleave="this.classList.remove('drag-over');"
+           ondrop="event.preventDefault();this.classList.remove('drag-over');recHandleDrop(event);">
+        <div style="font-size:28px;margin-bottom:6px;">📤</div>
+        <div style="font-weight:600;font-size:14px;">Upload Call Recordings CSV</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Click or drag &amp; drop a CSV file · New uploads replace existing data</div>
+        <input type="file" id="recFileInput" accept=".csv" style="display:none;" onchange="recFileSelected(event);" />
+      </div>
+      <div id="recUploadStatus"></div>
+
+      <!-- Content area -->
+      <div id="recContent">
+        ${stored.length ? '' : '<p style="color:var(--muted);text-align:center;padding:40px 0;">No recordings uploaded yet. Upload a CSV file above to get started.</p>'}
+      </div>
+    </div>`;
+
+  if (stored.length) _recRenderContent();
+}
+
+function _recBuildNames() {
+  const nameSet = new Set();
+  window._recData.forEach(r => {
+    const name = (r.phoneCodeRef || '').trim();
+    if (name) nameSet.add(name);
+  });
+  window._recNames = Array.from(nameSet).sort((a, b) => a.localeCompare(b));
+  if (!window._recSelected && window._recNames.length) {
+    window._recSelected = window._recNames[0];
+  }
+}
+
+function _recRenderContent() {
+  const container = document.getElementById('recContent');
+  if (!container) return;
+
+  const names = window._recNames;
+  if (!names.length) {
+    container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:40px 0;">No recordings found.</p>';
+    return;
+  }
+
+  const selected = window._recSelected || names[0];
+  window._recSelected = selected;
+
+  // Build dropdown
+  const opts = names.map(n =>
+    `<option value="${n.replace(/"/g, '&quot;')}"${n === selected ? ' selected' : ''}>${n.replace(/</g, '&lt;')}</option>`
+  ).join('');
+
+  // Filter calls for selected person
+  let calls = window._recData.filter(r => (r.phoneCodeRef || '').trim() === selected);
+
+  // Apply search
+  const q = (window._recSearch || '').toLowerCase();
+  if (q) {
+    calls = calls.filter(r =>
+      (r.callerName || '').toLowerCase().includes(q) ||
+      (r.callerPhone || '').toLowerCase().includes(q) ||
+      (r.trackingNumber || '').toLowerCase().includes(q) ||
+      (r.disposition || '').toLowerCase().includes(q) ||
+      (r.callTags || '').toLowerCase().includes(q) ||
+      (r.date || '').toLowerCase().includes(q)
+    );
+  }
+
+  // Sort by date descending (most recent first)
+  calls.sort((a, b) => {
+    const dA = _recParseDate(a.date, a.time);
+    const dB = _recParseDate(b.date, b.time);
+    return dB - dA;
+  });
+
+  const totalForPerson = window._recData.filter(r => (r.phoneCodeRef || '').trim() === selected).length;
+
+  container.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <select class="rec-select" onchange="recSelectPerson(this.value)">
+        ${opts}
+      </select>
+      <input type="text" class="rec-search" placeholder="Search calls..." value="${(window._recSearch || '').replace(/"/g, '&quot;')}" oninput="recSearchCalls(this.value)" />
+      <span style="font-size:13px;color:var(--muted);">${calls.length}${q ? ' matching' : ''} of ${totalForPerson} call${totalForPerson !== 1 ? 's' : ''}</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;" id="recCallList">
+      ${calls.length ? calls.map(r => _recRenderCallCard(r)).join('') : '<p style="color:var(--muted);text-align:center;padding:20px 0;">No calls found.</p>'}
+    </div>`;
+}
+
+function _recRenderCallCard(r) {
+  const date = r.date || 'Unknown date';
+  const time = r.time || '';
+  const duration = r.callDuration || '';
+  const callerName = r.callerName || 'Unknown';
+  const callerPhone = r.callerPhone || '';
+  const disposition = r.disposition || '';
+  const trackingNum = r.trackingNumber || '';
+  const audioUrl = (r.audiofile || '').trim();
+  const callTags = r.callTags || '';
+  const dayOfWeek = r.dayOfWeek || '';
+  const connected = r.connected === '1' || (r.connected || '').toLowerCase() === 'yes' || (r.connected || '').toLowerCase() === 'true';
+
+  // Determine connection badge
+  let badge = '';
+  if (r.liveConversation === '1' || (r.liveConversation || '').toLowerCase() === 'yes') {
+    badge = '<span class="rec-badge rec-badge-connected">Live Conversation</span>';
+  } else if (r.leftVoicemail === '1' || (r.leftVoicemail || '').toLowerCase() === 'yes') {
+    badge = '<span class="rec-badge rec-badge-voicemail">Voicemail</span>';
+  } else if (connected) {
+    badge = '<span class="rec-badge rec-badge-connected">Connected</span>';
+  } else if (r.notConnected === '1' || (r.notConnected || '').toLowerCase() === 'yes') {
+    badge = '<span class="rec-badge rec-badge-not-connected">Not Connected</span>';
+  }
+
+  const safeAudio = audioUrl.replace(/"/g, '&quot;');
+
+  return `
+    <div class="rec-call-card">
+      <div class="rec-call-info">
+        <div class="rec-call-date">${date}${dayOfWeek ? ' (' + dayOfWeek + ')' : ''}${time ? ' · ' + time : ''}</div>
+        <div class="rec-call-meta">
+          <span><strong>${callerName.replace(/</g, '&lt;')}</strong></span>
+          ${callerPhone ? '<span>' + callerPhone.replace(/</g, '&lt;') + '</span>' : ''}
+          ${duration ? '<span>Duration: ' + duration + '</span>' : ''}
+          ${disposition ? '<span>' + disposition.replace(/</g, '&lt;') + '</span>' : ''}
+          ${trackingNum ? '<span>Tracking: ' + trackingNum.replace(/</g, '&lt;') + '</span>' : ''}
+        </div>
+        <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">
+          ${badge}
+          ${callTags ? callTags.split(',').map(t => '<span class="rec-badge" style="background:var(--chipBg);color:var(--text);">' + t.trim().replace(/</g, '&lt;') + '</span>').join('') : ''}
+        </div>
+      </div>
+      ${audioUrl ? `<a href="${safeAudio}" target="_blank" class="rec-play-btn">▶ Listen</a>` : '<span style="font-size:12px;color:var(--muted);">No audio</span>'}
+    </div>`;
+}
+
+function _recParseDate(dateStr, timeStr) {
+  if (!dateStr) return 0;
+  try {
+    const combined = timeStr ? dateStr + ' ' + timeStr : dateStr;
+    const d = new Date(combined);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  } catch { return 0; }
+}
+
+function recSelectPerson(name) {
+  window._recSelected = name;
+  window._recSearch = '';
+  _recRenderContent();
+}
+
+function recSearchCalls(q) {
+  window._recSearch = q;
+  _recRenderContent();
+}
+
+function recHandleDrop(e) {
+  const files = e.dataTransfer?.files;
+  if (files && files.length) _recProcessFile(files[0]);
+}
+
+function recFileSelected(e) {
+  const file = e.target?.files?.[0];
+  if (file) _recProcessFile(file);
+  e.target.value = '';
+}
+
+function _recProcessFile(file) {
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    alert('Please upload a CSV file.');
+    return;
+  }
+
+  const status = document.getElementById('recUploadStatus');
+  if (status) status.innerHTML = '<div style="padding:8px 0;color:var(--muted);font-size:13px;">⏳ Processing CSV...</div>';
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const text = e.target.result;
+      const rows = _recParseCSV(text);
+      if (!rows.length) { alert('No data rows found in CSV.'); if (status) status.innerHTML = ''; return; }
+
+      window._recData = rows;
+      _recBuildNames();
+
+      // Save to Firestore
+      if (status) status.innerHTML = '<div style="padding:8px 0;color:var(--muted);font-size:13px;">⏳ Saving to database...</div>';
+      await setDoc(doc(db, 'appData', 'callRecordings'), {
+        rows: rows,
+        uploadedBy: auth.currentUser?.email || '',
+        uploadedAt: serverTimestamp(),
+        rowCount: rows.length,
+        nameCount: window._recNames.length
+      });
+
+      if (status) status.innerHTML = `<div style="padding:8px 12px;background:var(--greenBg);color:var(--green);border-radius:8px;font-size:13px;font-weight:600;margin-bottom:12px;">✓ Uploaded ${rows.length} call records for ${window._recNames.length} people</div>`;
+      _recRenderContent();
+
+      setTimeout(() => { if (status) status.innerHTML = ''; }, 5000);
+    } catch (err) {
+      console.error('CSV processing error:', err);
+      if (status) status.innerHTML = `<div style="padding:8px 12px;background:var(--redBg);color:var(--red);border-radius:8px;font-size:13px;font-weight:600;">Error: ${err.message}</div>`;
+    }
+  };
+  reader.readAsText(file);
+}
+
+function _recParseCSV(text) {
+  const lines = text.split(/\r?\n/);
+  if (lines.length < 2) return [];
+
+  // Parse header row
+  const headers = _recSplitCSVLine(lines[0]);
+
+  // Map column indices by header name
+  const colMap = {};
+  headers.forEach((h, i) => { colMap[h.trim().toLowerCase()] = i; });
+
+  // Column mappings based on the expected CSV format
+  const get = (row, ...names) => {
+    for (const n of names) {
+      const idx = colMap[n.toLowerCase()];
+      if (idx !== undefined && row[idx] !== undefined) return (row[idx] || '').trim();
+    }
+    return '';
+  };
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const cols = _recSplitCSVLine(line);
+    if (cols.length < 5) continue;
+
+    const phoneCodeRef = get(cols, 'phone code reference', 'phonecoderef', 'phone_code_reference');
+    if (!phoneCodeRef) continue; // Skip rows without a person name
+
+    rows.push({
+      accountID: get(cols, 'accountid'),
+      account: get(cols, 'account'),
+      callID: get(cols, 'call_id', 'callid'),
+      date: get(cols, 'date'),
+      spam: get(cols, 'spam'),
+      trackingNumber: get(cols, 'tracking number', 'trackingnumber'),
+      dayOfWeek: get(cols, 'day of week', 'dayofweek'),
+      timeZone: get(cols, 'timezone'),
+      time: get(cols, 'time'),
+      callDuration: get(cols, 'call duration', 'callduration'),
+      callDurationExact: get(cols, 'call duration (exact)', 'callduration(exact)'),
+      pickupSeconds: get(cols, 'pickup_seconds', 'pickupseconds'),
+      extension: get(cols, 'extension'),
+      callDurationBilling: get(cols, 'call duration (billing)', 'callduration(billing)'),
+      ringTo: get(cols, 'ring to', 'ringto'),
+      disposition: get(cols, 'disposition'),
+      callerPhone: get(cols, 'caller_phone', 'callerphone'),
+      callerZip: get(cols, 'caller zip code', 'callerzipcode'),
+      callerName: get(cols, 'caller name', 'callername'),
+      callerAddress: get(cols, 'caller address', 'calleraddress'),
+      callerCity: get(cols, 'caller city', 'callercity'),
+      callerState: get(cols, 'caller state', 'callerstate'),
+      callerArea: get(cols, 'caller_area (rate center)', 'caller_area'),
+      bridgeSelection: get(cols, 'bridge_selection', 'bridgeselection'),
+      extensionRecipient: get(cols, 'extension_recipient', 'extensionrecipient'),
+      phoneCode: get(cols, 'phone code', 'phonecode'),
+      phoneCodeRef: phoneCodeRef,
+      phoneCodeThirdParty: get(cols, 'phone code third-party share id'),
+      audiofile: get(cols, 'audiofile'),
+      notes: get(cols, 'notes'),
+      sessionID: get(cols, 'session_id', 'sessionid'),
+      dynamicWebsite: get(cols, 'dynamic website', 'dynamicwebsite'),
+      referSite: get(cols, 'refer site', 'refersite'),
+      campaignName: get(cols, 'campaign name', 'campaignname'),
+      adGroupName: get(cols, 'ad group name', 'adgroupname'),
+      referPage: get(cols, 'refer page', 'referpage'),
+      landingPage: get(cols, 'landing page', 'landingpage'),
+      keyword: get(cols, 'keyword'),
+      visitorIP: get(cols, 'visitor ip', 'visitorip'),
+      deviceName: get(cols, 'device name', 'devicename'),
+      category: get(cols, 'category'),
+      connected: get(cols, 'connected'),
+      liveConversation: get(cols, 'live conversation', 'liveconversation'),
+      notConnected: get(cols, 'not connected - hung up while on hold', 'not connected - other'),
+      leftVoicemail: get(cols, 'not connected - left voicemail message', 'left a message'),
+      callTags: get(cols, 'call tags', 'calltags'),
+      callRecap: get(cols, 'call recap', 'callrecap')
+    });
+  }
+  return rows;
+}
+
+function _recSplitCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        result.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+window.showRecordings = showRecordings;
+window.recSelectPerson = recSelectPerson;
+window.recSearchCalls = recSearchCalls;
+window.recHandleDrop = recHandleDrop;
+window.recFileSelected = recFileSelected;
 
 /* ══════════════════════════════════════════
    👔 MANAGER TEAM DASHBOARD
