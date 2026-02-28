@@ -8593,8 +8593,9 @@ async function matchCallsToLeads() {
 
     showProgress(`Loaded ${linkedNameSet.size} agents. Matching ${_uploadedCallRows.length} calls by Phone Code Reference / Agent name...`);
 
-    // Match uploaded calls to agents using Phone Code Reference (column AP) → Linked Sheet Name
-    // Falls back to the Agent / Ring To column if Phone Code Reference is empty
+    // Match uploaded calls to the person who made/took the call
+    // Phone Code Reference (column AP) is authoritative — use it directly
+    // Falls back to Agent / Ring To only if Phone Code Reference is empty
     let matched = 0;
     let unmatched = 0;
     const matchResults = [];
@@ -8602,7 +8603,7 @@ async function matchCallsToLeads() {
     _uploadedCallRows.forEach(call => {
       const refName = (call.phoneCodeRef || '').toUpperCase().trim();
       const agentName = (call.agent || '').toUpperCase().trim();
-      const matchName = (refName && linkedNameSet.has(refName)) ? refName
+      const matchName = refName ? refName
                       : (agentName && linkedNameSet.has(agentName)) ? agentName
                       : null;
 
