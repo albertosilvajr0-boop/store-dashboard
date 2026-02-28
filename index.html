@@ -8629,7 +8629,7 @@ async function matchCallsToLeads() {
       }
     });
 
-    // Save match results to Firestore for each person
+    // Save match results to Firestore for each person (full call data for Recordings)
     const matchesByPerson = {};
     matchResults.forEach(m => {
       const person = m.matchedTo;
@@ -8639,9 +8639,22 @@ async function matchCallsToLeads() {
         callName: m.call.name || '',
         callDate: m.call.date || '',
         callDuration: m.call.duration || '',
-        callDirection: m.call.direction || '',
         callRecording: m.call.recording || '',
         callAgent: m.call.agent || '',
+        callStatus: m.call.status || '',
+        callSource: m.call.source || '',
+        callId: m.call.callId || '',
+        callerCity: m.call.callerCity || '',
+        callerState: m.call.callerState || '',
+        connected: isTruthy(m.call.connected),
+        liveConversation: isTruthy(m.call.liveConversation),
+        vehicleConversation: isTruthy(m.call.vehicleConversation),
+        salesOpp: isTruthy(m.call.salesOpp),
+        apptBooked: isTruthy(m.call.apptBooked),
+        apptSet: isTruthy(m.call.apptSet),
+        category: m.call.category || '',
+        tags: m.call.tags || '',
+        callRecap: m.call.callRecap || '',
         leadName: m.matchedLead.name || '',
         leadLink: m.matchedLead.link || '',
         leadPhone: m.matchedLead.phone || ''
@@ -8687,14 +8700,14 @@ async function showRecordings() {
 
   const appEl = document.getElementById('app');
   appEl.innerHTML = `
-    <div style="max-width:1200px;margin:0 auto;padding:18px 12px;">
+    <div style="max-width:1000px;margin:0 auto;padding:18px 12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <div>
-          <h2 style="margin:0;font-size:20px;">🎙️ Recordings</h2>
-          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Click on a team member to view their latest call recordings</p>
+          <h2 style="margin:0;font-size:20px;">Recordings</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Select a sales rep to view their latest calls</p>
         </div>
         <div style="display:flex;gap:8px;">
-          ${isAdmin() ? '<button class="topbar-btn manage" onclick="openUploadCallsModal()">📤 Upload Calls</button>' : ''}
+          ${isAdmin() ? '<button class="topbar-btn manage" onclick="openUploadCallsModal()">Upload Calls</button>' : ''}
           <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
         </div>
       </div>
@@ -8702,7 +8715,7 @@ async function showRecordings() {
     </div>`;
 
   try {
-    // Fetch all users to build user cards
+    // Fetch all users to build dropdown
     const usersSnapshot = await getDocs(collection(db, 'users'));
     const users = [];
     usersSnapshot.forEach(d => {
@@ -8727,15 +8740,11 @@ async function showRecordings() {
       visibleUsers = users.filter(u => u.managerId === myUid || u.uid === myUid);
     }
 
-    // Fetch call recording counts from Firestore
-    const recSnap = await getDocs(collection(db, 'callRecordings'));
-    const recCounts = {};
-    recSnap.forEach(d => {
-      try {
-        const data = d.data();
-        const calls = JSON.parse(data.calls || '[]');
-        recCounts[d.id] = calls.length;
-      } catch (_) { recCounts[d.id] = 0; }
+    // Fetch call match counts per person from callMatches collection
+    const matchSnap = await getDocs(collection(db, 'callMatches'));
+    const matchCounts = {};
+    matchSnap.forEach(d => {
+      matchCounts[d.id] = d.data().matchCount || 0;
     });
 
     visibleUsers.sort((a, b) => a.displayName.toLowerCase().localeCompare(b.displayName.toLowerCase()));
@@ -8745,18 +8754,19 @@ async function showRecordings() {
       return;
     }
 
-    let html = '<div class="rec-user-grid">';
+    // Build dropdown
+    let html = `
+      <div style="margin-bottom:16px;">
+        <label for="recRepSelect" style="font-size:13px;color:var(--muted);display:block;margin-bottom:6px;">Sales Rep</label>
+        <select id="recRepSelect" onchange="loadRepRecordings()" style="width:100%;max-width:400px;padding:10px 14px;font-size:15px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer;">
+          <option value="">-- Select a Sales Rep --</option>`;
     visibleUsers.forEach(u => {
-      const count = recCounts[u.linkedName] || 0;
-      const roleBadge = u.role === 'admin' || u.role === 'superadmin' ? 'Admin' : u.role === 'manager' ? 'Manager' : 'Rep';
-      html += `
-        <div class="rec-user-card" onclick="showUserRecordings('${u.linkedName.replace(/'/g, "\\'")}', '${u.displayName.replace(/'/g, "\\'")}')">
-          <div class="name">${u.displayName}</div>
-          <span class="role-badge">${roleBadge}</span>
-          <div class="call-count">${count > 0 ? count + ' call recording' + (count !== 1 ? 's' : '') : 'No recordings yet'}</div>
-        </div>`;
+      const count = matchCounts[u.linkedName] || 0;
+      html += `<option value="${u.linkedName}" data-display="${u.displayName.replace(/"/g, '&quot;')}">${u.displayName}${count > 0 ? ' (' + count + ' calls)' : ''}</option>`;
     });
-    html += '</div>';
+    html += `</select>
+      </div>
+      <div id="repCallsList"></div>`;
 
     document.getElementById('recordingsContent').innerHTML = html;
   } catch (e) {
@@ -8764,72 +8774,78 @@ async function showRecordings() {
   }
 }
 
-async function showUserRecordings(linkedName, displayName) {
-  if (!isAdmin() && !isManager()) { alert('Only admins and managers.'); return; }
+async function loadRepRecordings() {
+  const sel = document.getElementById('recRepSelect');
+  const linkedName = sel.value;
+  const displayName = sel.options[sel.selectedIndex]?.dataset?.display || linkedName;
+  const container = document.getElementById('repCallsList');
+
+  if (!linkedName) {
+    container.innerHTML = '';
+    return;
+  }
+
   trackClick();
   logPageView('Recordings: ' + displayName);
-
-  const appEl = document.getElementById('app');
-  appEl.innerHTML = `
-    <div style="max-width:1000px;margin:0 auto;padding:18px 12px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-        <div>
-          <h2 style="margin:0;font-size:20px;">🎙️ ${displayName}'s Recordings</h2>
-          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Sorted by most recent</p>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button class="topbar-btn manage" onclick="showRecordings()">← All Users</button>
-          <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
-        </div>
-      </div>
-      <div id="userRecContent"><div class="loading-wrap"><div class="spinner"></div></div></div>
-    </div>`;
+  container.innerHTML = '<div class="loading-wrap"><div class="spinner"></div></div>';
 
   try {
-    const recDoc = await getDoc(doc(db, 'callRecordings', linkedName));
-    let calls = [];
-    if (recDoc.exists()) {
-      calls = JSON.parse(recDoc.data().calls || '[]');
-    }
-
-    // Also check callMatches for matched recording data
+    // Primary source: callMatches (mapped by matchCallsToLeads)
     const matchDoc = await getDoc(doc(db, 'callMatches', linkedName));
-    let matches = [];
+    let calls = [];
     if (matchDoc.exists()) {
-      matches = JSON.parse(matchDoc.data().matches || '[]');
+      const matches = JSON.parse(matchDoc.data().matches || '[]');
+      calls = matches.map(m => ({
+        name: m.callName || m.leadName || '',
+        phone: m.callPhone || '',
+        date: m.callDate || '',
+        duration: m.callDuration || '',
+        status: m.callStatus || '',
+        recording: m.callRecording || '',
+        source: m.callSource || '',
+        callerCity: m.callerCity || '',
+        callerState: m.callerState || '',
+        connected: m.connected || false,
+        liveConversation: m.liveConversation || false,
+        vehicleConversation: m.vehicleConversation || false,
+        salesOpp: m.salesOpp || false,
+        apptBooked: m.apptBooked || false,
+        apptSet: m.apptSet || false,
+        category: m.category || '',
+        tags: m.tags || '',
+        callRecap: m.callRecap || '',
+        leadName: m.leadName || '',
+        leadLink: m.leadLink || '',
+        callId: m.callId || ''
+      }));
     }
 
-    // Merge matched call data: enrich call records with lead info
-    const matchByPhone = {};
-    matches.forEach(m => {
-      if (m.callPhone) {
-        const ph = m.callPhone.replace(/\D/g, '').slice(-10);
-        if (ph.length === 10) matchByPhone[ph] = m;
+    // Also merge any direct callRecordings for this person
+    try {
+      const recDoc = await getDoc(doc(db, 'callRecordings', linkedName));
+      if (recDoc.exists()) {
+        const directCalls = JSON.parse(recDoc.data().calls || '[]');
+        // Dedup by callId or phone+date
+        const seen = new Set();
+        calls.forEach(c => seen.add(c.callId || ((c.phone || '') + '|' + (c.date || ''))));
+        directCalls.forEach(c => {
+          const key = c.callId || ((c.phone || '') + '|' + (c.date || ''));
+          if (!seen.has(key)) {
+            seen.add(key);
+            calls.push(c);
+          }
+        });
       }
-    });
-
-    calls.forEach(c => {
-      if (c.phone) {
-        const ph = c.phone.replace(/\D/g, '').slice(-10);
-        if (ph.length === 10 && matchByPhone[ph]) {
-          c._matchedLead = matchByPhone[ph];
-        }
-      }
-    });
+    } catch (_) {}
 
     // Sort by date descending (most recent first)
-    calls.sort((a, b) => {
-      const da = parseCallDate(a.date);
-      const db2 = parseCallDate(b.date);
-      return db2 - da;
-    });
+    calls.sort((a, b) => parseCallDate(b.date) - parseCallDate(a.date));
 
     if (calls.length === 0) {
-      document.getElementById('userRecContent').innerHTML = `
+      container.innerHTML = `
         <div style="text-align:center;padding:40px;color:var(--muted);">
-          <div style="font-size:36px;margin-bottom:8px;">🎙️</div>
           <p>No call recordings found for ${displayName}.</p>
-          ${isAdmin() ? '<p style="font-size:13px;">Use <strong>Upload Calls</strong> to add call data.</p>' : ''}
+          ${isAdmin() ? '<p style="font-size:13px;">Upload calls and run <strong>Match Calls to Leads</strong> to populate recordings.</p>' : ''}
         </div>`;
       return;
     }
@@ -8839,7 +8855,7 @@ async function showUserRecordings(linkedName, displayName) {
     const connectedCalls = calls.filter(c => c.connected).length;
     const salesOpps = calls.filter(c => c.salesOpp).length;
     const apptsBooked = calls.filter(c => c.apptBooked || c.apptSet).length;
-    const withRec = calls.filter(c => c.recording || c._matchedLead?.callRecording).length;
+    const withRec = calls.filter(c => c.recording).length;
 
     let html = `
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
@@ -8862,20 +8878,18 @@ async function showUserRecordings(linkedName, displayName) {
       <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;">`;
 
     calls.forEach((c, i) => {
-      const customerName = c.name || c._matchedLead?.leadName || 'Unknown';
+      const customerName = c.name || c.leadName || 'Unknown';
       const phone = c.phone || '–';
       const date = c.date || '–';
       const duration = formatCallDuration(c.duration);
       const status = c.status || '';
-      const recording = c.recording || c._matchedLead?.callRecording || '';
-      const leadLink = c._matchedLead?.leadLink || '';
+      const recording = c.recording || '';
+      const leadLink = c.leadLink || '';
       const source = c.source || '';
       const location = [c.callerCity, c.callerState].filter(Boolean).join(', ');
 
-      // Status / disposition badge
       const statusBadge = status ? `<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:${status.toLowerCase().includes('answer') || status.toLowerCase().includes('connect') ? 'var(--greenBg);color:#15803d' : status.toLowerCase().includes('miss') || status.toLowerCase().includes('abandon') ? 'var(--redBg);color:#dc2626' : '#f4f4f5;color:var(--muted)'};">${status}</span>` : '';
 
-      // Scoring badges
       const badges = [];
       if (c.connected) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--greenBg);color:#15803d;">Connected</span>');
       if (c.salesOpp) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#dbeafe;color:#2563eb;">Sales Opp</span>');
@@ -8904,9 +8918,9 @@ async function showUserRecordings(linkedName, displayName) {
     });
 
     html += '</div>';
-    document.getElementById('userRecContent').innerHTML = html;
+    container.innerHTML = html;
   } catch (e) {
-    document.getElementById('userRecContent').innerHTML = `<p style="color:#dc2626;text-align:center;padding:40px;">Error: ${e.message}</p>`;
+    container.innerHTML = `<p style="color:#dc2626;text-align:center;padding:40px;">Error: ${e.message}</p>`;
   }
 }
 
@@ -8937,7 +8951,7 @@ window.clearCallUpload = clearCallUpload;
 window.saveUploadedCallData = saveUploadedCallData;
 window.matchCallsToLeads = matchCallsToLeads;
 window.showRecordings = showRecordings;
-window.showUserRecordings = showUserRecordings;
+window.loadRepRecordings = loadRepRecordings;
 
 /* Boot */
 if (auth.currentUser) { showDashboard(); } else { showLogin(); }
