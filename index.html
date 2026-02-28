@@ -8362,9 +8362,26 @@ function normalizeCallHeaders(row) {
     }
     if (!matched) mapped[rawKey] = rawVal;
   }
+  // Convert Excel serial date numbers to readable strings
+  if (mapped.date != null && typeof mapped.date === 'number') {
+    // Excel serial date: days since 1899-12-30
+    const excelEpoch = new Date(1899, 11, 30);
+    const d = new Date(excelEpoch.getTime() + mapped.date * 86400000);
+    mapped.date = (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear();
+  }
+  if (mapped.time != null && typeof mapped.time === 'number') {
+    // Excel serial time: fraction of a day (0.5 = 12:00 PM)
+    const totalMins = Math.round(mapped.time * 1440);
+    let h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    if (h > 12) h -= 12;
+    if (h === 0) h = 12;
+    mapped.time = h + ':' + String(m).padStart(2, '0') + ' ' + ampm;
+  }
   // Combine date + time if both present
-  if (mapped.date && mapped.time && !mapped.date.includes(':')) {
-    mapped.date = mapped.date + ' ' + mapped.time;
+  if (mapped.date && mapped.time && !String(mapped.date).includes(':')) {
+    mapped.date = String(mapped.date) + ' ' + String(mapped.time);
   }
   return mapped;
 }
