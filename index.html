@@ -896,7 +896,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
 import {
   getFirestore, doc, setDoc, getDoc, getDocs, collection, deleteDoc, updateDoc, increment,
-  addDoc, query, where, orderBy, limit, Timestamp, onSnapshot, serverTimestamp
+  addDoc, query, where, orderBy, limit, Timestamp, onSnapshot, serverTimestamp, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging.js';
 
@@ -5551,11 +5551,14 @@ async function showRecordings() {
 
   const app = document.getElementById('app');
 
-  // Load existing data from Firestore
+  // Load existing data from Firestore (per-person subcollection)
   let stored = [];
   try {
-    const snap = await getDoc(doc(db, 'appData', 'callRecordings'));
-    if (snap.exists()) stored = snap.data().rows || [];
+    const snap = await getDocs(collection(db, 'callRecordings'));
+    snap.forEach(d => {
+      const data = d.data();
+      if (data.rows && Array.isArray(data.rows)) stored = stored.concat(data.rows);
+    });
   } catch (e) { console.warn('Could not load recordings:', e); }
   window._recData = stored;
   _recBuildNames();
@@ -5758,10 +5761,55 @@ function _recProcessFile(file) {
       window._recData = rows;
       _recBuildNames();
 
-      // Save to Firestore
+      // Save to Firestore — per-person documents to avoid 1MB limit
       if (status) status.innerHTML = '<div style="padding:8px 0;color:var(--muted);font-size:13px;">⏳ Saving to database...</div>';
-      await setDoc(doc(db, 'appData', 'callRecordings'), {
-        rows: rows,
+
+      // Delete old documents first (in batches of 400)
+      try {
+        const oldSnap = await getDocs(collection(db, 'callRecordings'));
+        const oldDocs = [];
+        oldSnap.forEach(d => oldDocs.push(d.ref));
+        for (let di = 0; di < oldDocs.length; di += 400) {
+          const delBatch = writeBatch(db);
+          oldDocs.slice(di, di + 400).forEach(ref => delBatch.delete(ref));
+          await delBatch.commit();
+        }
+      } catch (e) { console.warn('Could not clear old recordings:', e); }
+
+      // Group rows by person name
+      const byPerson = {};
+      rows.forEach(r => {
+        const name = (r.phoneCodeRef || 'Unknown').trim();
+        if (!byPerson[name]) byPerson[name] = [];
+        byPerson[name].push(r);
+      });
+
+      // Write each person as separate document(s), chunking large sets
+      const CHUNK_SIZE = 300; // rows per document
+      const allDocs = [];
+      for (const pName of Object.keys(byPerson)) {
+        const pRows = byPerson[pName];
+        const safeBase = pName.replace(/[\/\.#$\[\]]/g, '_').substring(0, 90) || 'unknown';
+        if (pRows.length <= CHUNK_SIZE) {
+          allDocs.push({ id: safeBase, data: { personName: pName, rows: pRows, uploadedBy: auth.currentUser?.email || '', uploadedAt: serverTimestamp() } });
+        } else {
+          for (let c = 0; c < pRows.length; c += CHUNK_SIZE) {
+            const chunkIdx = Math.floor(c / CHUNK_SIZE);
+            allDocs.push({ id: safeBase + '_' + chunkIdx, data: { personName: pName, rows: pRows.slice(c, c + CHUNK_SIZE), uploadedBy: auth.currentUser?.email || '', uploadedAt: serverTimestamp() } });
+          }
+        }
+      }
+      // Write in batches of 400 (Firestore limit is 500)
+      for (let i = 0; i < allDocs.length; i += 400) {
+        const batch = writeBatch(db);
+        allDocs.slice(i, i + 400).forEach(d => {
+          batch.set(doc(db, 'callRecordings', d.id), d.data);
+        });
+        await batch.commit();
+      }
+
+      // Also save metadata
+      await setDoc(doc(db, 'callRecordings', '_meta'), {
         uploadedBy: auth.currentUser?.email || '',
         uploadedAt: serverTimestamp(),
         rowCount: rows.length,
@@ -5811,48 +5859,18 @@ function _recParseCSV(text) {
     const phoneCodeRef = get(cols, 'phone code reference', 'phonecoderef', 'phone_code_reference');
     if (!phoneCodeRef) continue; // Skip rows without a person name
 
+    // Only store fields used in the UI to minimize Firestore document size
     rows.push({
-      accountID: get(cols, 'accountid'),
-      account: get(cols, 'account'),
-      callID: get(cols, 'call_id', 'callid'),
       date: get(cols, 'date'),
-      spam: get(cols, 'spam'),
-      trackingNumber: get(cols, 'tracking number', 'trackingnumber'),
-      dayOfWeek: get(cols, 'day of week', 'dayofweek'),
-      timeZone: get(cols, 'timezone'),
       time: get(cols, 'time'),
+      dayOfWeek: get(cols, 'day of week', 'dayofweek'),
+      trackingNumber: get(cols, 'tracking number', 'trackingnumber'),
       callDuration: get(cols, 'call duration', 'callduration'),
-      callDurationExact: get(cols, 'call duration (exact)', 'callduration(exact)'),
-      pickupSeconds: get(cols, 'pickup_seconds', 'pickupseconds'),
-      extension: get(cols, 'extension'),
-      callDurationBilling: get(cols, 'call duration (billing)', 'callduration(billing)'),
-      ringTo: get(cols, 'ring to', 'ringto'),
       disposition: get(cols, 'disposition'),
       callerPhone: get(cols, 'caller_phone', 'callerphone'),
-      callerZip: get(cols, 'caller zip code', 'callerzipcode'),
       callerName: get(cols, 'caller name', 'callername'),
-      callerAddress: get(cols, 'caller address', 'calleraddress'),
-      callerCity: get(cols, 'caller city', 'callercity'),
-      callerState: get(cols, 'caller state', 'callerstate'),
-      callerArea: get(cols, 'caller_area (rate center)', 'caller_area'),
-      bridgeSelection: get(cols, 'bridge_selection', 'bridgeselection'),
-      extensionRecipient: get(cols, 'extension_recipient', 'extensionrecipient'),
-      phoneCode: get(cols, 'phone code', 'phonecode'),
       phoneCodeRef: phoneCodeRef,
-      phoneCodeThirdParty: get(cols, 'phone code third-party share id'),
       audiofile: get(cols, 'audiofile'),
-      notes: get(cols, 'notes'),
-      sessionID: get(cols, 'session_id', 'sessionid'),
-      dynamicWebsite: get(cols, 'dynamic website', 'dynamicwebsite'),
-      referSite: get(cols, 'refer site', 'refersite'),
-      campaignName: get(cols, 'campaign name', 'campaignname'),
-      adGroupName: get(cols, 'ad group name', 'adgroupname'),
-      referPage: get(cols, 'refer page', 'referpage'),
-      landingPage: get(cols, 'landing page', 'landingpage'),
-      keyword: get(cols, 'keyword'),
-      visitorIP: get(cols, 'visitor ip', 'visitorip'),
-      deviceName: get(cols, 'device name', 'devicename'),
-      category: get(cols, 'category'),
       connected: get(cols, 'connected'),
       liveConversation: get(cols, 'live conversation', 'liveconversation'),
       notConnected: get(cols, 'not connected - hung up while on hold', 'not connected - other'),
