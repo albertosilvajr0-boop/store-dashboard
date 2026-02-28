@@ -2381,8 +2381,7 @@ function renderDashboard() {
             <a href="#" onclick="event.preventDefault();closeReportsMenu();showManagerLeaderboard();" class="res-link">🏆 Manager Leaderboard</a>
             ${isAdmin() ? '<div style="border-top:1px solid var(--line);margin:4px 0;"></div><a href="#" onclick="event.preventDefault();closeReportsMenu();showLeadFunnel();" class="res-link">🔬 Lead Funnel</a>' : ''}
             ${isAdmin() ? '<a href="#" onclick="event.preventDefault();closeReportsMenu();showEngagement();" class="res-link">📈 Engagement</a>' : ''}
-            <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
-            <a href="#" onclick="event.preventDefault();closeReportsMenu();showRecordings();" class="res-link">🎙️ Recordings</a>
+            ${isAdmin() ? '<div style="border-top:1px solid var(--line);margin:4px 0;"></div><a href="#" onclick="event.preventDefault();closeReportsMenu();showRecordings();" class="res-link">🎙️ Recordings</a>' : ''}
           </div>
         </div>` : ''}
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showTeamDashboard()" style="min-width:90px;">👔 My Team</button>' : ''}
@@ -8699,7 +8698,7 @@ async function matchCallsToLeads() {
 // ══════════════════════════════════════════
 
 async function showRecordings() {
-  if (!isAdmin() && !isManager()) { alert('Only admins and managers can view recordings.'); return; }
+  if (!isAdmin()) { alert('Only admins can view recordings.'); return; }
   trackClick();
   logPageView('Recordings');
 
@@ -8738,12 +8737,7 @@ async function showRecordings() {
       });
     });
 
-    // If manager (not admin), only show their team members
     let visibleUsers = users;
-    if (isManager() && !isAdmin()) {
-      const myUid = auth.currentUser?.uid;
-      visibleUsers = users.filter(u => u.managerId === myUid || u.uid === myUid);
-    }
 
     // Fetch call match counts per person from callMatches collection
     const matchSnap = await getDocs(collection(db, 'callMatches'));
