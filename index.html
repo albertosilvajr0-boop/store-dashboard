@@ -8488,13 +8488,13 @@ async function saveUploadedCallData() {
     });
 
     // Also write per-agent call records to callRecordings/{PERSON} for the Recordings page
-    // Use Phone Code Reference (the person who made/took the call), fallback to Ring To
+    // Only use Phone Code Reference (the person who actually made/took the call)
+    // Ring To / Agent is who the call rang to, NOT who made the call
     const byAgent = {};
     _uploadedCallRows.forEach(r => {
       if (isTruthy(r.spam)) return; // skip spam calls
       const ref = (r.phoneCodeRef || '').toUpperCase().trim();
-      const ringTo = (r.agent || '').toUpperCase().trim();
-      const agent = ref || ringTo || 'UNASSIGNED';
+      const agent = ref || 'UNASSIGNED';
       if (!byAgent[agent]) byAgent[agent] = [];
       byAgent[agent].push({
         callId: r.callId || '',
@@ -8591,21 +8591,18 @@ async function matchCallsToLeads() {
       if (linked) linkedNameSet.add(linked);
     });
 
-    showProgress(`Loaded ${linkedNameSet.size} agents. Matching ${_uploadedCallRows.length} calls by Phone Code Reference / Agent name...`);
+    showProgress(`Loaded ${linkedNameSet.size} agents. Matching ${_uploadedCallRows.length} calls by Phone Code Reference...`);
 
     // Match uploaded calls to the person who made/took the call
-    // Phone Code Reference (column AP) is authoritative — use it directly
-    // Falls back to Agent / Ring To only if Phone Code Reference is empty
+    // Only use Phone Code Reference — this is who actually made the call
+    // Do NOT fall back to Agent / Ring To, as that is who the call rang to, not the caller
     let matched = 0;
     let unmatched = 0;
     const matchResults = [];
 
     _uploadedCallRows.forEach(call => {
       const refName = (call.phoneCodeRef || '').toUpperCase().trim();
-      const agentName = (call.agent || '').toUpperCase().trim();
-      const matchName = refName ? refName
-                      : (agentName && linkedNameSet.has(agentName)) ? agentName
-                      : null;
+      const matchName = (refName && linkedNameSet.has(refName)) ? refName : null;
 
       if (matchName) {
         matched++;
@@ -8703,7 +8700,7 @@ async function matchCallsToLeads() {
     document.getElementById('callMatchResult').innerHTML = `
       <div class="match-result ${resultClass}">
         <strong>Match Results:</strong> ${matched} of ${_uploadedCallRows.length} calls matched (${pct}%)<br>
-        <span style="font-size:12px;">Matched across ${Object.keys(matchesByPerson).length} agents using Phone Code Reference / Agent name → Linked Sheet Name. ${unmatched} calls could not be matched.</span>
+        <span style="font-size:12px;">Matched across ${Object.keys(matchesByPerson).length} agents using Phone Code Reference → Linked Sheet Name. ${unmatched} calls could not be matched (no Phone Code Reference).</span>
       </div>`;
 
     btn.textContent = 'Matched!';
@@ -8872,23 +8869,9 @@ async function loadRepRecordings() {
       }
     }
 
-    // Also merge any direct callRecordings for this person
-    try {
-      const recDoc = await getDoc(doc(db, 'callRecordings', linkedName));
-      if (recDoc.exists()) {
-        const directCalls = JSON.parse(recDoc.data().calls || '[]');
-        // Dedup by callId or phone+date
-        const seen = new Set();
-        calls.forEach(c => seen.add(c.callId || ((c.phone || '') + '|' + (c.date || ''))));
-        directCalls.forEach(c => {
-          const key = c.callId || ((c.phone || '') + '|' + (c.date || ''));
-          if (!seen.has(key)) {
-            seen.add(key);
-            calls.push(c);
-          }
-        });
-      }
-    } catch (_) {}
+    // Note: callRecordings is no longer merged here to prevent misattributed calls.
+    // callMatches (populated by Match Calls to Leads using Phone Code Reference) is the
+    // authoritative source for who actually made each call.
 
     // Sort by date descending (most recent first)
     calls.sort((a, b) => parseCallDate(b.date) - parseCallDate(a.date));
