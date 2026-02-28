@@ -8302,26 +8302,59 @@ function parseCsvLine(line) {
 }
 
 function normalizeCallHeaders(row) {
-  // Map common header names to standard fields
+  // Map actual CallRail / call tracking column names to standard fields
   const mapped = {};
   const keyMap = {
-    'phone': ['phone', 'phone number', 'phonenumber', 'phone_number', 'caller', 'caller_number', 'from', 'ani'],
-    'name': ['name', 'customer', 'customer name', 'customername', 'customer_name', 'caller_name', 'callername', 'contact', 'contact_name'],
-    'date': ['date', 'call date', 'calldate', 'call_date', 'datetime', 'date_time', 'timestamp', 'time', 'call_time', 'calltime'],
-    'duration': ['duration', 'call duration', 'callduration', 'call_duration', 'length', 'call_length', 'talk_time', 'talktime'],
-    'direction': ['direction', 'call direction', 'type', 'call_type', 'calltype', 'call type', 'inbound_outbound'],
-    'agent': ['agent', 'rep', 'representative', 'salesperson', 'sales_person', 'user', 'employee', 'bdc_agent', 'bdcagent', 'assigned', 'answered_by'],
-    'status': ['status', 'disposition', 'result', 'call_result', 'outcome', 'call_status'],
-    'recording': ['recording', 'recording_url', 'recordingurl', 'recording url', 'audio', 'audio_url', 'link', 'url', 'call_recording'],
-    'source': ['source', 'call_source', 'campaign', 'tracking_number', 'tracking'],
-    'notes': ['notes', 'note', 'comments', 'comment', 'memo']
+    'phone': ['caller_phone', 'callerphone', 'phone', 'phone number', 'phone_number', 'caller', 'caller_number', 'from', 'ani'],
+    'name': ['caller name', 'caller_name', 'callername', 'name', 'customer', 'customer name', 'customer_name', 'contact', 'contact_name'],
+    'date': ['date'],
+    'time': ['time'],
+    'duration': ['call duration (exact)', 'call_duration_exact', 'call duration', 'call_duration', 'duration', 'length', 'talk_time'],
+    'durationBilling': ['call duration (billing)', 'call_duration_billing'],
+    'agent': ['ring to', 'ring_to', 'extension_recipient', 'agent', 'rep', 'representative', 'salesperson', 'employee', 'answered_by'],
+    'status': ['disposition', 'status', 'result', 'call_result', 'outcome', 'call_status'],
+    'recording': ['audiofile', 'audio', 'audio_url', 'recording', 'recording_url', 'call_recording'],
+    'source': ['campaign name', 'campaign_name', 'label1', 'source', 'call_source', 'campaign'],
+    'trackingNumber': ['tracking number', 'tracking_number'],
+    'notes': ['notes', 'note', 'comments', 'comment', 'memo'],
+    'callId': ['call_id', 'callid', 'session_id', 'sessionid'],
+    'accountId': ['accountid', 'account_id', 'account'],
+    'spam': ['spam'],
+    'extension': ['extension'],
+    'callerCity': ['caller city', 'caller_city', 'callercity'],
+    'callerState': ['caller state', 'caller_state', 'callerstate'],
+    'callerZip': ['caller zip code', 'caller_zip_code', 'callerzipcode'],
+    'callerAddress': ['caller address', 'caller_address', 'calleraddress'],
+    'dayOfWeek': ['day of week', 'day_of_week', 'dayofweek'],
+    'timezone': ['timezone', 'time_zone'],
+    'landingPage': ['landing page', 'landing_page', 'landingpage'],
+    'referSite': ['refer site', 'refer_site', 'refersite'],
+    'keyword': ['keyword'],
+    'deviceName': ['device name', 'device_name', 'devicename'],
+    'tags': ['call tags', 'call_tags', 'calltags', 'tags'],
+    'callRecap': ['call recap', 'call_recap', 'callrecap'],
+    // Scoring / disposition columns
+    'connected': ['connected'],
+    'liveConversation': ['live conversation', 'live_conversation'],
+    'notConnectedHungUp': ['not connected - hung up while on hold'],
+    'notConnectedOther': ['not connected - other'],
+    'leftVoicemail': ['not connected - left voicemail message', 'left a message'],
+    'notConnectedNoMessage': ['not connected: no message', 'voicemail no message'],
+    'vehicleConversation': ['vehicle conversation', 'vehicle_conversation'],
+    'salesOpp': ['sales opp', 'sales_opp', 'salesopp'],
+    'apptBooked': ['appt booked (firm)', 'appt_booked_firm'],
+    'apptSet': ['appt set', 'appt_set', 'apptset'],
+    'apptBookedSoft': ['appt booked (soft)', 'appt_booked_soft'],
+    'firmDateTime': ['firm date/time', 'firm_date_time'],
+    'softDateTime': ['soft date/time', 'soft_date_time'],
+    'category': ['category']
   };
   for (const [rawKey, rawVal] of Object.entries(row)) {
-    const lower = rawKey.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-    const lowerOrig = rawKey.toLowerCase().trim();
+    const lower = rawKey.toLowerCase().trim().replace(/[^a-z0-9_/() -]/g, '').replace(/\s+/g, ' ');
+    const underscored = rawKey.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
     let matched = false;
     for (const [stdKey, aliases] of Object.entries(keyMap)) {
-      if (aliases.includes(lowerOrig) || aliases.includes(lower)) {
+      if (aliases.includes(lower) || aliases.includes(underscored)) {
         mapped[stdKey] = rawVal;
         matched = true;
         break;
@@ -8329,40 +8362,67 @@ function normalizeCallHeaders(row) {
     }
     if (!matched) mapped[rawKey] = rawVal;
   }
+  // Combine date + time if both present
+  if (mapped.date && mapped.time && !mapped.date.includes(':')) {
+    mapped.date = mapped.date + ' ' + mapped.time;
+  }
   return mapped;
+}
+
+function isTruthy(val) {
+  if (!val) return false;
+  const v = String(val).trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'y' || v === 'x';
 }
 
 function processCallRows(rawRows) {
   _uploadedCallRows = rawRows.map(r => normalizeCallHeaders(r));
 
-  // Show preview stats
+  // Show enriched preview stats
   const total = _uploadedCallRows.length;
   const withPhone = _uploadedCallRows.filter(r => r.phone).length;
   const withAgent = _uploadedCallRows.filter(r => r.agent).length;
   const withRecording = _uploadedCallRows.filter(r => r.recording).length;
+  const connectedCount = _uploadedCallRows.filter(r => isTruthy(r.connected)).length;
+  const salesOppCount = _uploadedCallRows.filter(r => isTruthy(r.salesOpp)).length;
+  const apptCount = _uploadedCallRows.filter(r => isTruthy(r.apptBooked) || isTruthy(r.apptSet)).length;
+  const spamCount = _uploadedCallRows.filter(r => isTruthy(r.spam)).length;
 
   let html = `
     <div class="upload-stats">
-      <div class="stat"><strong>${total}</strong> call records</div>
+      <div class="stat"><strong>${total}</strong> total calls</div>
       <div class="stat"><strong>${withPhone}</strong> with phone #</div>
       <div class="stat"><strong>${withAgent}</strong> with agent</div>
       <div class="stat"><strong>${withRecording}</strong> with recording</div>
+    </div>
+    <div class="upload-stats" style="margin-top:6px;">
+      <div class="stat" style="color:#15803d;"><strong>${connectedCount}</strong> connected</div>
+      <div class="stat" style="color:#2563eb;"><strong>${salesOppCount}</strong> sales opps</div>
+      <div class="stat" style="color:#7c3aed;"><strong>${apptCount}</strong> appts booked/set</div>
+      ${spamCount > 0 ? `<div class="stat" style="color:#dc2626;"><strong>${spamCount}</strong> spam (excluded)</div>` : ''}
     </div>`;
 
-  // Show first 5 rows as preview
-  if (_uploadedCallRows.length > 0) {
-    const previewCols = ['name', 'phone', 'date', 'duration', 'agent', 'direction', 'status'];
-    const hasCols = previewCols.filter(c => _uploadedCallRows.some(r => r[c]));
+  // Show first 5 non-spam rows as preview
+  const previewRows = _uploadedCallRows.filter(r => !isTruthy(r.spam));
+  if (previewRows.length > 0) {
+    const previewCols = ['name', 'phone', 'date', 'duration', 'agent', 'status', 'connected', 'salesOpp'];
+    const colLabels = { name: 'Caller', phone: 'Phone', date: 'Date', duration: 'Duration', agent: 'Ring To', status: 'Disposition', connected: 'Connected', salesOpp: 'Sales Opp' };
+    const hasCols = previewCols.filter(c => previewRows.some(r => r[c]));
     html += `<div style="overflow-x:auto;"><table class="upload-preview-table"><thead><tr>`;
-    hasCols.forEach(c => { html += `<th>${c.charAt(0).toUpperCase() + c.slice(1)}</th>`; });
+    hasCols.forEach(c => { html += `<th>${colLabels[c] || c}</th>`; });
     html += `</tr></thead><tbody>`;
-    _uploadedCallRows.slice(0, 5).forEach(r => {
+    previewRows.slice(0, 5).forEach(r => {
       html += '<tr>';
-      hasCols.forEach(c => { html += `<td>${r[c] || '–'}</td>`; });
+      hasCols.forEach(c => {
+        let val = r[c] || '–';
+        if ((c === 'connected' || c === 'salesOpp') && isTruthy(r[c])) val = '✓';
+        else if ((c === 'connected' || c === 'salesOpp') && !isTruthy(r[c])) val = '';
+        html += `<td>${val}</td>`;
+      });
       html += '</tr>';
     });
-    if (_uploadedCallRows.length > 5) {
-      html += `<tr><td colspan="${hasCols.length}" style="color:var(--muted);font-style:italic;">...and ${_uploadedCallRows.length - 5} more rows</td></tr>`;
+    if (previewRows.length > 5) {
+      html += `<tr><td colspan="${hasCols.length}" style="color:var(--muted);font-style:italic;">...and ${previewRows.length - 5} more rows</td></tr>`;
     }
     html += `</tbody></table></div>`;
   }
@@ -8396,37 +8456,72 @@ async function saveUploadedCallData() {
     // Also write per-agent call records to callRecordings/{AGENT_NAME} for the Recordings page
     const byAgent = {};
     _uploadedCallRows.forEach(r => {
+      if (isTruthy(r.spam)) return; // skip spam calls
       const agent = (r.agent || 'UNASSIGNED').toUpperCase().trim();
       if (!byAgent[agent]) byAgent[agent] = [];
       byAgent[agent].push({
+        callId: r.callId || '',
         name: r.name || '',
         phone: r.phone || '',
         date: r.date || '',
         duration: r.duration || '',
-        direction: r.direction || '',
         status: r.status || '',
         recording: r.recording || '',
         source: r.source || '',
         notes: r.notes || '',
+        tags: r.tags || '',
+        callRecap: r.callRecap || '',
+        callerCity: r.callerCity || '',
+        callerState: r.callerState || '',
+        connected: isTruthy(r.connected),
+        liveConversation: isTruthy(r.liveConversation),
+        vehicleConversation: isTruthy(r.vehicleConversation),
+        salesOpp: isTruthy(r.salesOpp),
+        apptBooked: isTruthy(r.apptBooked),
+        apptSet: isTruthy(r.apptSet),
+        category: r.category || '',
         uploadId: uploadId
       });
     });
 
-    const writePromises = Object.entries(byAgent).map(([agent, calls]) => {
+    // Merge with existing records and dedup by callId
+    const writePromises = Object.entries(byAgent).map(async ([agent, newCalls]) => {
+      let existingCalls = [];
+      try {
+        const existDoc = await getDoc(doc(db, 'callRecordings', agent));
+        if (existDoc.exists()) {
+          existingCalls = JSON.parse(existDoc.data().calls || '[]');
+        }
+      } catch (_) {}
+      // Dedup: use callId if available, else phone+date composite key
+      const seen = new Set();
+      existingCalls.forEach(c => {
+        const key = c.callId || ((c.phone || '') + '|' + (c.date || ''));
+        seen.add(key);
+      });
+      const deduped = newCalls.filter(c => {
+        const key = c.callId || ((c.phone || '') + '|' + (c.date || ''));
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      const merged = [...existingCalls, ...deduped];
       return setDoc(doc(db, 'callRecordings', agent), {
         agent: agent,
-        calls: JSON.stringify(calls),
+        calls: JSON.stringify(merged),
         lastUpdated: now,
         updatedBy: window.userData.email
-      }, { merge: true });
+      });
     });
     await Promise.all(writePromises);
 
+    const spamSkipped = _uploadedCallRows.filter(r => isTruthy(r.spam)).length;
     btn.textContent = 'Saved!';
     btn.style.background = '#16a34a';
     document.getElementById('callMatchResult').innerHTML = `
       <div class="match-result success">
-        Saved ${_uploadedCallRows.length} call records across ${Object.keys(byAgent).length} agents to Firestore.
+        Saved ${_uploadedCallRows.length - spamSkipped} call records across ${Object.keys(byAgent).length} agents to Firestore.
+        ${spamSkipped > 0 ? `(${spamSkipped} spam calls excluded)` : ''}
       </div>`;
     setTimeout(() => { btn.disabled = false; btn.textContent = 'Save Call Data'; btn.style.background = 'var(--green)'; }, 2000);
   } catch (e) {
@@ -8720,8 +8815,31 @@ async function showUserRecordings(linkedName, displayName) {
       return;
     }
 
+    // Summary stats
+    const totalCalls = calls.length;
+    const connectedCalls = calls.filter(c => c.connected).length;
+    const salesOpps = calls.filter(c => c.salesOpp).length;
+    const apptsBooked = calls.filter(c => c.apptBooked || c.apptSet).length;
+    const withRec = calls.filter(c => c.recording || c._matchedLead?.callRecording).length;
+
     let html = `
-      <div style="margin-bottom:12px;font-size:13px;color:var(--muted);">${calls.length} recording${calls.length !== 1 ? 's' : ''} found</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;">
+          <strong>${totalCalls}</strong> <span style="color:var(--muted);">calls</span>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;">
+          <strong style="color:#15803d;">${connectedCalls}</strong> <span style="color:var(--muted);">connected</span>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;">
+          <strong style="color:#2563eb;">${salesOpps}</strong> <span style="color:var(--muted);">sales opps</span>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;">
+          <strong style="color:#7c3aed;">${apptsBooked}</strong> <span style="color:var(--muted);">appts</span>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;">
+          <strong>${withRec}</strong> <span style="color:var(--muted);">recordings</span>
+        </div>
+      </div>
       <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;">`;
 
     calls.forEach((c, i) => {
@@ -8729,30 +8847,39 @@ async function showUserRecordings(linkedName, displayName) {
       const phone = c.phone || '–';
       const date = c.date || '–';
       const duration = formatCallDuration(c.duration);
-      const direction = c.direction || '';
-      const dirIcon = direction.toLowerCase().includes('inbound') || direction.toLowerCase().includes('in') ? '📥' : direction.toLowerCase().includes('outbound') || direction.toLowerCase().includes('out') ? '📤' : '📞';
       const status = c.status || '';
       const recording = c.recording || c._matchedLead?.callRecording || '';
       const leadLink = c._matchedLead?.leadLink || '';
       const source = c.source || '';
+      const location = [c.callerCity, c.callerState].filter(Boolean).join(', ');
 
+      // Status / disposition badge
       const statusBadge = status ? `<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:${status.toLowerCase().includes('answer') || status.toLowerCase().includes('connect') ? 'var(--greenBg);color:#15803d' : status.toLowerCase().includes('miss') || status.toLowerCase().includes('abandon') ? 'var(--redBg);color:#dc2626' : '#f4f4f5;color:var(--muted)'};">${status}</span>` : '';
+
+      // Scoring badges
+      const badges = [];
+      if (c.connected) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--greenBg);color:#15803d;">Connected</span>');
+      if (c.salesOpp) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#dbeafe;color:#2563eb;">Sales Opp</span>');
+      if (c.apptBooked) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#ede9fe;color:#7c3aed;">Appt Booked</span>');
+      else if (c.apptSet) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#ede9fe;color:#7c3aed;">Appt Set</span>');
+      if (c.vehicleConversation) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#fef3c7;color:#92400e;">Vehicle</span>');
 
       html += `
         <div class="rec-call-row" style="${i > 0 ? '' : 'border-top:none;'}">
           <div>
             <div class="caller">
-              ${dirIcon} ${leadLink ? `<a href="${leadLink}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline;">${customerName}</a>` : customerName}
+              ${c.connected ? '✅' : '📞'} ${leadLink ? `<a href="${leadLink}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline;">${customerName}</a>` : customerName}
               ${statusBadge}
             </div>
+            ${badges.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:3px 0;">${badges.join('')}</div>` : ''}
             <div class="meta">
-              ${phone !== '–' ? phone + ' · ' : ''}${source ? source + ' · ' : ''}${date}
+              ${phone !== '–' ? phone + ' · ' : ''}${location ? location + ' · ' : ''}${source ? source + ' · ' : ''}${date}
               ${recording ? ` · <a href="${recording}" target="_blank" rel="noopener" style="color:#2563eb;font-size:11px;">Play Recording</a>` : ''}
             </div>
           </div>
           <div>
             <div class="duration">${duration}</div>
-            <div class="time">${direction || '–'}</div>
+            <div class="time">${c.category || status || '–'}</div>
           </div>
         </div>`;
     });
