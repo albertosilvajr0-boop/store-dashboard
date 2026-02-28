@@ -8747,7 +8747,7 @@ async function showRecordings() {
           <option value="">-- Select a Sales Rep --</option>`;
     visibleUsers.forEach(u => {
       const count = matchCounts[u.linkedName] || 0;
-      html += `<option value="${u.linkedName}" data-display="${u.displayName.replace(/"/g, '&quot;')}">${u.displayName} — ${u.linkedName}${count > 0 ? ' (' + count + ' calls)' : ''}</option>`;
+      html += `<option value="${u.linkedName}" data-display="${u.displayName.replace(/"/g, '&quot;')}">${u.linkedName}${count > 0 ? ' (' + count + ' calls)' : ''}</option>`;
     });
     html += `</select>
       </div>
@@ -8909,16 +8909,40 @@ function parseCallDate(dateStr) {
 
 function formatCallDuration(dur) {
   if (!dur) return '–';
-  // If it's already formatted like "2:30" or "02:30:00", return as-is
-  if (typeof dur === 'string' && dur.includes(':')) return dur;
-  // Raw numeric values from call data are in minutes
-  const mins = parseInt(dur, 10);
-  if (isNaN(mins)) return dur;
-  if (mins < 1) return '<1m';
-  if (mins < 60) return mins + 'm';
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return h + ':' + String(m).padStart(2, '0');
+
+  let totalSeconds = 0;
+
+  if (typeof dur === 'string' && dur.includes(':')) {
+    // Parse "HH:MM:SS" or "MM:SS" format into total seconds
+    const parts = dur.split(':').map(Number);
+    if (parts.some(isNaN)) return dur;
+    if (parts.length === 3) {
+      totalSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else if (parts.length === 2) {
+      totalSeconds = parts[0] * 60 + parts[1];
+    } else {
+      return dur;
+    }
+  } else {
+    const num = parseFloat(dur);
+    if (isNaN(num)) return dur;
+    // Treat raw numeric values as seconds
+    totalSeconds = Math.round(num);
+  }
+
+  if (totalSeconds <= 0) return '0 sec';
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  if (hours > 0) {
+    return mins > 0 ? hours + ' hr ' + mins + ' min' : hours + ' hr';
+  }
+  if (mins > 0) {
+    return secs > 0 ? mins + ' min ' + secs + ' sec' : mins + ' min';
+  }
+  return secs + ' sec';
 }
 
 function renderRecCallRows(calls) {
