@@ -8305,29 +8305,49 @@ function normalizeCallHeaders(row) {
   // Map common header names to standard fields
   const mapped = {};
   const keyMap = {
-    'phone': ['phone', 'phone number', 'phonenumber', 'phone_number', 'caller', 'caller_number', 'from', 'ani'],
-    'name': ['name', 'customer', 'customer name', 'customername', 'customer_name', 'caller_name', 'callername', 'contact', 'contact_name'],
-    'date': ['date', 'call date', 'calldate', 'call_date', 'datetime', 'date_time', 'timestamp', 'time', 'call_time', 'calltime'],
-    'duration': ['duration', 'call duration', 'callduration', 'call_duration', 'length', 'call_length', 'talk_time', 'talktime'],
+    'phone': ['phone', 'phone number', 'phonenumber', 'phone_number', 'caller', 'caller_number', 'from', 'ani', 'caller_phone', 'caller phone'],
+    'name': ['name', 'customer', 'customer name', 'customername', 'customer_name', 'caller_name', 'callername', 'caller name', 'contact', 'contact_name'],
+    'date': ['date', 'call date', 'calldate', 'call_date', 'datetime', 'date_time', 'timestamp'],
+    'time': ['time', 'call_time', 'calltime', 'call time'],
+    'duration': ['duration', 'call duration', 'callduration', 'call_duration', 'call duration (exact)', 'call_duration_exact', 'length', 'call_length', 'talk_time', 'talktime'],
     'direction': ['direction', 'call direction', 'type', 'call_type', 'calltype', 'call type', 'inbound_outbound'],
-    'agent': ['agent', 'rep', 'representative', 'salesperson', 'sales_person', 'user', 'employee', 'bdc_agent', 'bdcagent', 'assigned', 'answered_by'],
+    'agent': ['agent', 'rep', 'representative', 'salesperson', 'sales_person', 'user', 'employee', 'bdc_agent', 'bdcagent', 'assigned', 'answered_by', 'ring to', 'ring_to', 'extension_recipient', 'extension recipient'],
     'status': ['status', 'disposition', 'result', 'call_result', 'outcome', 'call_status'],
-    'recording': ['recording', 'recording_url', 'recordingurl', 'recording url', 'audio', 'audio_url', 'link', 'url', 'call_recording'],
-    'source': ['source', 'call_source', 'campaign', 'tracking_number', 'tracking'],
-    'notes': ['notes', 'note', 'comments', 'comment', 'memo']
+    'recording': ['recording', 'recording_url', 'recordingurl', 'recording url', 'audio', 'audio_url', 'call_recording', 'audiofile'],
+    'source': ['source', 'call_source', 'campaign', 'campaign name', 'campaign_name', 'tracking_number', 'tracking', 'tracking number', 'label1'],
+    'notes': ['notes', 'note', 'comments', 'comment', 'memo', 'call recap[image]', 'call recap'],
+    'callId': ['call_id', 'callid', 'call id', 'session_id', 'sessionid'],
+    'connected': ['connected'],
+    'callerCity': ['caller city', 'caller_city', 'callercity'],
+    'callerState': ['caller state', 'caller_state', 'callerstate'],
+    'callerZip': ['caller zip code', 'caller_zip_code', 'callerzipcode', 'caller zip'],
+    'callerAddress': ['caller address', 'caller_address', 'calleraddress'],
+    'spam': ['spam'],
+    'dayOfWeek': ['day of week', 'day_of_week', 'dayofweek'],
+    'tags': ['call tags', 'call_tags', 'calltags', 'tags'],
+    'keyword': ['keyword', 'keywords'],
+    'landingPage': ['landing page', 'landing_page', 'landingpage'],
+    'device': ['device name', 'device_name', 'devicename', 'device'],
+    'account': ['account'],
+    'extension': ['extension']
   };
   for (const [rawKey, rawVal] of Object.entries(row)) {
-    const lower = rawKey.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-    const lowerOrig = rawKey.toLowerCase().trim();
+    const lower = rawKey.toLowerCase().trim().replace(/[^a-z0-9_ ()[\]]/g, '').replace(/\s+/g, ' ');
+    const underscored = lower.replace(/\s/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
     let matched = false;
     for (const [stdKey, aliases] of Object.entries(keyMap)) {
-      if (aliases.includes(lowerOrig) || aliases.includes(lower)) {
-        mapped[stdKey] = rawVal;
+      if (aliases.includes(lower) || aliases.includes(underscored)) {
+        // Only set if not already mapped (first match wins for priority)
+        if (!(stdKey in mapped)) mapped[stdKey] = rawVal;
         matched = true;
         break;
       }
     }
     if (!matched) mapped[rawKey] = rawVal;
+  }
+  // Combine date + time if both present
+  if (mapped.date && mapped.time && !mapped.date.includes(':')) {
+    mapped.date = mapped.date + ' ' + mapped.time;
   }
   return mapped;
 }
@@ -8335,11 +8355,22 @@ function normalizeCallHeaders(row) {
 function processCallRows(rawRows) {
   _uploadedCallRows = rawRows.map(r => normalizeCallHeaders(r));
 
+  // Filter out spam calls
+  const nonSpam = _uploadedCallRows.filter(r => {
+    const spam = (r.spam || '').toString().toLowerCase();
+    return spam !== 'yes' && spam !== 'true' && spam !== '1';
+  });
+  const spamCount = _uploadedCallRows.length - nonSpam.length;
+
   // Show preview stats
   const total = _uploadedCallRows.length;
   const withPhone = _uploadedCallRows.filter(r => r.phone).length;
   const withAgent = _uploadedCallRows.filter(r => r.agent).length;
   const withRecording = _uploadedCallRows.filter(r => r.recording).length;
+  const withConnected = _uploadedCallRows.filter(r => {
+    const c = (r.connected || '').toString().toLowerCase();
+    return c === 'yes' || c === 'true' || c === '1' || c === 'x';
+  }).length;
 
   let html = `
     <div class="upload-stats">
@@ -8347,14 +8378,17 @@ function processCallRows(rawRows) {
       <div class="stat"><strong>${withPhone}</strong> with phone #</div>
       <div class="stat"><strong>${withAgent}</strong> with agent</div>
       <div class="stat"><strong>${withRecording}</strong> with recording</div>
+      <div class="stat"><strong>${withConnected}</strong> connected</div>
+      ${spamCount > 0 ? `<div class="stat" style="background:var(--redBg);"><strong>${spamCount}</strong> spam</div>` : ''}
     </div>`;
 
   // Show first 5 rows as preview
   if (_uploadedCallRows.length > 0) {
-    const previewCols = ['name', 'phone', 'date', 'duration', 'agent', 'direction', 'status'];
+    const previewCols = ['name', 'phone', 'date', 'duration', 'agent', 'status', 'connected', 'source'];
+    const colLabels = { name: 'Customer', phone: 'Phone', date: 'Date/Time', duration: 'Duration', agent: 'Ring To', status: 'Disposition', connected: 'Connected', source: 'Source' };
     const hasCols = previewCols.filter(c => _uploadedCallRows.some(r => r[c]));
     html += `<div style="overflow-x:auto;"><table class="upload-preview-table"><thead><tr>`;
-    hasCols.forEach(c => { html += `<th>${c.charAt(0).toUpperCase() + c.slice(1)}</th>`; });
+    hasCols.forEach(c => { html += `<th>${colLabels[c] || c}</th>`; });
     html += `</tr></thead><tbody>`;
     _uploadedCallRows.slice(0, 5).forEach(r => {
       html += '<tr>';
@@ -8408,17 +8442,46 @@ async function saveUploadedCallData() {
         recording: r.recording || '',
         source: r.source || '',
         notes: r.notes || '',
+        callId: r.callId || '',
+        connected: r.connected || '',
+        spam: r.spam || '',
+        tags: r.tags || '',
+        callerCity: r.callerCity || '',
+        callerState: r.callerState || '',
+        // Scoring fields from the call tracking sheet
+        salesOpp: r['Sales opp'] || '',
+        apptBooked: r['Appt booked (firm)'] || r['Appt booked (soft)'] || '',
+        apptSet: r['Appt set'] || '',
+        vehicleConvo: r['Vehicle conversation'] || '',
+        liveConvo: r['Live conversation'] || '',
+        leftMessage: r['Left a message'] || '',
+        voicemail: r['Not connected - left voicemail message'] || '',
         uploadId: uploadId
       });
     });
 
-    const writePromises = Object.entries(byAgent).map(([agent, calls]) => {
+    // Merge new calls with existing recordings (append, dedup by callId)
+    const writePromises = Object.entries(byAgent).map(async ([agent, newCalls]) => {
+      let existing = [];
+      try {
+        const existDoc = await getDoc(doc(db, 'callRecordings', agent));
+        if (existDoc.exists()) {
+          existing = JSON.parse(existDoc.data().calls || '[]');
+        }
+      } catch (_) {}
+      // Dedup by callId if available, else by phone+date
+      const existingKeys = new Set(existing.map(c => c.callId ? c.callId : (c.phone || '') + '|' + (c.date || '')));
+      const toAdd = newCalls.filter(c => {
+        const key = c.callId ? c.callId : (c.phone || '') + '|' + (c.date || '');
+        return !existingKeys.has(key);
+      });
+      const merged = [...existing, ...toAdd];
       return setDoc(doc(db, 'callRecordings', agent), {
         agent: agent,
-        calls: JSON.stringify(calls),
+        calls: JSON.stringify(merged),
         lastUpdated: now,
         updatedBy: window.userData.email
-      }, { merge: true });
+      });
     });
     await Promise.all(writePromises);
 
@@ -8703,6 +8766,12 @@ async function showUserRecordings(linkedName, displayName) {
       }
     });
 
+    // Filter out spam
+    calls = calls.filter(c => {
+      const spam = (c.spam || '').toString().toLowerCase();
+      return spam !== 'yes' && spam !== 'true' && spam !== '1';
+    });
+
     // Sort by date descending (most recent first)
     calls.sort((a, b) => {
       const da = parseCallDate(a.date);
@@ -8720,8 +8789,20 @@ async function showUserRecordings(linkedName, displayName) {
       return;
     }
 
+    // Summary stats
+    const connectedCount = calls.filter(c => isTruthy(c.connected)).length;
+    const salesOppCount = calls.filter(c => isTruthy(c.salesOpp)).length;
+    const apptCount = calls.filter(c => isTruthy(c.apptBooked) || isTruthy(c.apptSet)).length;
+    const withRecording = calls.filter(c => c.recording).length;
+
     let html = `
-      <div style="margin-bottom:12px;font-size:13px;color:var(--muted);">${calls.length} recording${calls.length !== 1 ? 's' : ''} found</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+        <div class="stat" style="background:#f4f4f5;padding:6px 12px;border-radius:8px;font-size:13px;"><strong>${calls.length}</strong> calls</div>
+        <div class="stat" style="background:var(--greenBg);padding:6px 12px;border-radius:8px;font-size:13px;"><strong>${connectedCount}</strong> connected</div>
+        ${salesOppCount > 0 ? `<div class="stat" style="background:#dbeafe;padding:6px 12px;border-radius:8px;font-size:13px;"><strong>${salesOppCount}</strong> sales opps</div>` : ''}
+        ${apptCount > 0 ? `<div class="stat" style="background:var(--yellowBg);padding:6px 12px;border-radius:8px;font-size:13px;"><strong>${apptCount}</strong> appts</div>` : ''}
+        ${withRecording > 0 ? `<div class="stat" style="background:#f4f4f5;padding:6px 12px;border-radius:8px;font-size:13px;"><strong>${withRecording}</strong> recordings</div>` : ''}
+      </div>
       <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;">`;
 
     calls.forEach((c, i) => {
@@ -8729,30 +8810,42 @@ async function showUserRecordings(linkedName, displayName) {
       const phone = c.phone || '–';
       const date = c.date || '–';
       const duration = formatCallDuration(c.duration);
-      const direction = c.direction || '';
-      const dirIcon = direction.toLowerCase().includes('inbound') || direction.toLowerCase().includes('in') ? '📥' : direction.toLowerCase().includes('outbound') || direction.toLowerCase().includes('out') ? '📤' : '📞';
       const status = c.status || '';
       const recording = c.recording || c._matchedLead?.callRecording || '';
       const leadLink = c._matchedLead?.leadLink || '';
       const source = c.source || '';
+      const location = [c.callerCity, c.callerState].filter(Boolean).join(', ');
+      const connected = isTruthy(c.connected);
 
-      const statusBadge = status ? `<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:${status.toLowerCase().includes('answer') || status.toLowerCase().includes('connect') ? 'var(--greenBg);color:#15803d' : status.toLowerCase().includes('miss') || status.toLowerCase().includes('abandon') ? 'var(--redBg);color:#dc2626' : '#f4f4f5;color:var(--muted)'};">${status}</span>` : '';
+      // Build small badges for scoring
+      const badges = [];
+      if (connected) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--greenBg);color:#15803d;">Connected</span>');
+      else badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--redBg);color:#dc2626;">Not Connected</span>');
+      if (isTruthy(c.salesOpp)) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#dbeafe;color:#1d4ed8;">Sales Opp</span>');
+      if (isTruthy(c.apptBooked)) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--yellowBg);color:#a16207;">Appt Booked</span>');
+      else if (isTruthy(c.apptSet)) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--yellowBg);color:#a16207;">Appt Set</span>');
+      if (isTruthy(c.vehicleConvo)) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#f0fdf4;color:#166534;">Vehicle Convo</span>');
+
+      const statusBadge = status ? `<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#f4f4f5;color:var(--muted);">${status}</span>` : '';
 
       html += `
         <div class="rec-call-row" style="${i > 0 ? '' : 'border-top:none;'}">
-          <div>
+          <div style="min-width:0;">
             <div class="caller">
-              ${dirIcon} ${leadLink ? `<a href="${leadLink}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline;">${customerName}</a>` : customerName}
+              ${leadLink ? `<a href="${leadLink}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline;">${customerName}</a>` : customerName}
               ${statusBadge}
             </div>
             <div class="meta">
-              ${phone !== '–' ? phone + ' · ' : ''}${source ? source + ' · ' : ''}${date}
-              ${recording ? ` · <a href="${recording}" target="_blank" rel="noopener" style="color:#2563eb;font-size:11px;">Play Recording</a>` : ''}
+              ${phone !== '–' ? phone : ''}${location ? ' · ' + location : ''}${source ? ' · ' + source : ''} · ${date}
             </div>
+            <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">
+              ${badges.join('')}
+            </div>
+            ${recording ? `<div style="margin-top:4px;"><a href="${recording}" target="_blank" rel="noopener" style="color:#2563eb;font-size:12px;font-weight:600;">▶ Play Recording</a></div>` : ''}
           </div>
-          <div>
+          <div style="text-align:right;flex-shrink:0;">
             <div class="duration">${duration}</div>
-            <div class="time">${direction || '–'}</div>
+            ${c.tags ? `<div style="font-size:10px;color:var(--muted);margin-top:2px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.tags}</div>` : ''}
           </div>
         </div>`;
     });
@@ -8762,6 +8855,12 @@ async function showUserRecordings(linkedName, displayName) {
   } catch (e) {
     document.getElementById('userRecContent').innerHTML = `<p style="color:#dc2626;text-align:center;padding:40px;">Error: ${e.message}</p>`;
   }
+}
+
+function isTruthy(val) {
+  if (!val) return false;
+  const v = val.toString().toLowerCase().trim();
+  return v === 'yes' || v === 'true' || v === '1' || v === 'x' || v === 'y';
 }
 
 function parseCallDate(dateStr) {
