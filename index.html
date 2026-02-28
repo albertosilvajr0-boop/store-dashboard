@@ -8662,15 +8662,27 @@ async function matchCallsToLeads() {
     });
 
     const now = new Date();
-    const matchWrites = Object.entries(matchesByPerson).map(([person, matches]) => {
-      return setDoc(doc(db, 'callMatches', person), {
-        matches: JSON.stringify(matches),
+    // Write matches as subcollection docs: callMatches/{PERSON}/calls/{callId}
+    // This avoids the 1MB Firestore document limit for reps with many calls
+    const matchWrites = [];
+    for (const [person, matches] of Object.entries(matchesByPerson)) {
+      // Write summary doc with count
+      matchWrites.push(setDoc(doc(db, 'callMatches', person), {
         lastUpdated: now,
         updatedBy: window.userData.email,
         matchCount: matches.length
-      }, { merge: true });
-    });
-    await Promise.all(matchWrites);
+      }, { merge: true }));
+      // Write each call as a subcollection document
+      for (const m of matches) {
+        const callKey = m.callId || (m.callPhone + '_' + (m.callDate || '').replace(/[^a-zA-Z0-9]/g, ''));
+        matchWrites.push(setDoc(doc(db, 'callMatches', person, 'calls', callKey || ('call_' + Math.random().toString(36).slice(2))), m));
+      }
+    }
+    // Batch in groups of 400 to stay under Firestore limits
+    for (let i = 0; i < matchWrites.length; i += 400) {
+      await Promise.all(matchWrites.slice(i, i + 400));
+    }
+
 
     const pct = _uploadedCallRows.length > 0 ? Math.round((matched / _uploadedCallRows.length) * 100) : 0;
     const resultClass = pct >= 60 ? 'success' : pct >= 30 ? 'warning' : 'error';
@@ -8790,34 +8802,65 @@ async function loadRepRecordings() {
   container.innerHTML = '<div class="loading-wrap"><div class="spinner"></div></div>';
 
   try {
-    // Primary source: callMatches (mapped by matchCallsToLeads)
-    const matchDoc = await getDoc(doc(db, 'callMatches', linkedName));
+    // Primary source: callMatches subcollection (mapped by matchCallsToLeads)
     let calls = [];
-    if (matchDoc.exists()) {
-      const matches = JSON.parse(matchDoc.data().matches || '[]');
-      calls = matches.map(m => ({
-        name: m.callName || m.leadName || '',
-        phone: m.callPhone || '',
-        date: m.callDate || '',
-        duration: m.callDuration || '',
-        status: m.callStatus || '',
-        recording: m.callRecording || '',
-        source: m.callSource || '',
-        callerCity: m.callerCity || '',
-        callerState: m.callerState || '',
-        connected: m.connected || false,
-        liveConversation: m.liveConversation || false,
-        vehicleConversation: m.vehicleConversation || false,
-        salesOpp: m.salesOpp || false,
-        apptBooked: m.apptBooked || false,
-        apptSet: m.apptSet || false,
-        category: m.category || '',
-        tags: m.tags || '',
-        callRecap: m.callRecap || '',
-        leadName: m.leadName || '',
-        leadLink: m.leadLink || '',
-        callId: m.callId || ''
-      }));
+    try {
+      const callsSnap = await getDocs(collection(db, 'callMatches', linkedName, 'calls'));
+      callsSnap.forEach(d => {
+        const m = d.data();
+        calls.push({
+          name: m.callName || m.leadName || '',
+          phone: m.callPhone || '',
+          date: m.callDate || '',
+          duration: m.callDuration || '',
+          status: m.callStatus || '',
+          recording: m.callRecording || '',
+          source: m.callSource || '',
+          callerCity: m.callerCity || '',
+          callerState: m.callerState || '',
+          connected: m.connected || false,
+          liveConversation: m.liveConversation || false,
+          vehicleConversation: m.vehicleConversation || false,
+          salesOpp: m.salesOpp || false,
+          apptBooked: m.apptBooked || false,
+          apptSet: m.apptSet || false,
+          category: m.category || '',
+          tags: m.tags || '',
+          callRecap: m.callRecap || '',
+          leadName: m.leadName || '',
+          leadLink: m.leadLink || '',
+          callId: m.callId || ''
+        });
+      });
+    } catch (_) {
+      // Fallback: try legacy single-doc format
+      const matchDoc = await getDoc(doc(db, 'callMatches', linkedName));
+      if (matchDoc.exists() && matchDoc.data().matches) {
+        const matches = JSON.parse(matchDoc.data().matches || '[]');
+        calls = matches.map(m => ({
+          name: m.callName || m.leadName || '',
+          phone: m.callPhone || '',
+          date: m.callDate || '',
+          duration: m.callDuration || '',
+          status: m.callStatus || '',
+          recording: m.callRecording || '',
+          source: m.callSource || '',
+          callerCity: m.callerCity || '',
+          callerState: m.callerState || '',
+          connected: m.connected || false,
+          liveConversation: m.liveConversation || false,
+          vehicleConversation: m.vehicleConversation || false,
+          salesOpp: m.salesOpp || false,
+          apptBooked: m.apptBooked || false,
+          apptSet: m.apptSet || false,
+          category: m.category || '',
+          tags: m.tags || '',
+          callRecap: m.callRecap || '',
+          leadName: m.leadName || '',
+          leadLink: m.leadLink || '',
+          callId: m.callId || ''
+        }));
+      }
     }
 
     // Also merge any direct callRecordings for this person
