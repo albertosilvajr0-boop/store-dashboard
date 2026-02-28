@@ -8785,7 +8785,7 @@ async function showRecordings() {
           <option value="">-- Select a Sales Rep --</option>`;
     visibleUsers.forEach(u => {
       const count = matchCounts[u.linkedName] || 0;
-      html += `<option value="${u.linkedName}" data-display="${u.displayName.replace(/"/g, '&quot;')}">${u.displayName}${count > 0 ? ' (' + count + ' calls)' : ''}</option>`;
+      html += `<option value="${u.linkedName}" data-display="${u.displayName.replace(/"/g, '&quot;')}">${u.displayName} — ${u.linkedName}${count > 0 ? ' (' + count + ' calls)' : ''}</option>`;
     });
     html += `</select>
       </div>
@@ -8908,69 +8908,30 @@ async function loadRepRecordings() {
     const totalCalls = calls.length;
     const connectedCalls = calls.filter(c => c.connected).length;
     const salesOpps = calls.filter(c => c.salesOpp).length;
-    const apptsBooked = calls.filter(c => c.apptBooked || c.apptSet).length;
     const withRec = calls.filter(c => c.recording).length;
+
+    // Store calls on window for filtering
+    window._recAllCalls = calls;
+    window._recFilter = null;
 
     let html = `
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
         <div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;">
           <strong>${totalCalls}</strong> <span style="color:var(--muted);">calls</span>
         </div>
-        <div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;">
+        <div id="kpiConnected" onclick="filterRecCalls('connected')" style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;" title="Click to filter">
           <strong style="color:#15803d;">${connectedCalls}</strong> <span style="color:var(--muted);">connected</span>
         </div>
-        <div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;">
+        <div id="kpiSalesOpp" onclick="filterRecCalls('salesOpp')" style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;" title="Click to filter">
           <strong style="color:#2563eb;">${salesOpps}</strong> <span style="color:var(--muted);">sales opps</span>
-        </div>
-        <div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;">
-          <strong style="color:#7c3aed;">${apptsBooked}</strong> <span style="color:var(--muted);">appts</span>
         </div>
         <div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;">
           <strong>${withRec}</strong> <span style="color:var(--muted);">recordings</span>
         </div>
       </div>
-      <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;">`;
+      <div id="recCallsTable" style="background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;">`;
 
-    calls.forEach((c, i) => {
-      const customerName = c.name || c.leadName || 'Unknown';
-      const phone = c.phone || '–';
-      const date = c.date || '–';
-      const duration = formatCallDuration(c.duration);
-      const status = c.status || '';
-      const recording = c.recording || '';
-      const leadLink = c.leadLink || '';
-      const source = c.source || '';
-      const location = [c.callerCity, c.callerState].filter(Boolean).join(', ');
-
-      const statusBadge = status ? `<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:${status.toLowerCase().includes('answer') || status.toLowerCase().includes('connect') ? 'var(--greenBg);color:#15803d' : status.toLowerCase().includes('miss') || status.toLowerCase().includes('abandon') ? 'var(--redBg);color:#dc2626' : '#f4f4f5;color:var(--muted)'};">${status}</span>` : '';
-
-      const badges = [];
-      if (c.connected) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--greenBg);color:#15803d;">Connected</span>');
-      if (c.salesOpp) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#dbeafe;color:#2563eb;">Sales Opp</span>');
-      if (c.apptBooked) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#ede9fe;color:#7c3aed;">Appt Booked</span>');
-      else if (c.apptSet) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#ede9fe;color:#7c3aed;">Appt Set</span>');
-      if (c.vehicleConversation) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#fef3c7;color:#92400e;">Vehicle</span>');
-
-      html += `
-        <div class="rec-call-row" style="${i > 0 ? '' : 'border-top:none;'}">
-          <div>
-            <div class="caller">
-              ${c.connected ? '✅' : '📞'} ${leadLink ? `<a href="${leadLink}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline;">${customerName}</a>` : customerName}
-              ${statusBadge}
-            </div>
-            ${badges.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:3px 0;">${badges.join('')}</div>` : ''}
-            <div class="meta">
-              ${phone !== '–' ? phone + ' · ' : ''}${location ? location + ' · ' : ''}${source ? source + ' · ' : ''}${date}
-              ${recording ? ` · <a href="${recording}" target="_blank" rel="noopener" style="color:#2563eb;font-size:11px;">Play Recording</a>` : ''}
-            </div>
-          </div>
-          <div>
-            <div class="duration">${duration}</div>
-            <div class="time">${c.category || status || '–'}</div>
-          </div>
-        </div>`;
-    });
-
+    html += renderRecCallRows(calls);
     html += '</div>';
     container.innerHTML = html;
   } catch (e) {
@@ -8998,6 +8959,69 @@ function formatCallDuration(dur) {
   return h + ':' + String(m).padStart(2, '0');
 }
 
+function renderRecCallRows(calls) {
+  let html = '';
+  calls.forEach((c, i) => {
+    const customerName = c.name || c.leadName || 'Unknown';
+    const phone = c.phone || '–';
+    const date = c.date || '–';
+    const duration = formatCallDuration(c.duration);
+    const status = c.status || '';
+    const recording = c.recording || '';
+    const leadLink = c.leadLink || '';
+    const source = c.source || '';
+    const location = [c.callerCity, c.callerState].filter(Boolean).join(', ');
+
+    const statusBadge = status ? `<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:${status.toLowerCase().includes('answer') || status.toLowerCase().includes('connect') ? 'var(--greenBg);color:#15803d' : status.toLowerCase().includes('miss') || status.toLowerCase().includes('abandon') ? 'var(--redBg);color:#dc2626' : '#f4f4f5;color:var(--muted)'};">${status}</span>` : '';
+
+    const badges = [];
+    if (c.connected) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--greenBg);color:#15803d;">Connected</span>');
+    if (c.salesOpp) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#dbeafe;color:#2563eb;">Sales Opp</span>');
+    if (c.apptBooked) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#ede9fe;color:#7c3aed;">Appt Booked</span>');
+    else if (c.apptSet) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#ede9fe;color:#7c3aed;">Appt Set</span>');
+    if (c.vehicleConversation) badges.push('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:#fef3c7;color:#92400e;">Vehicle</span>');
+
+    html += `
+      <div class="rec-call-row" style="${i > 0 ? '' : 'border-top:none;'}">
+        <div>
+          <div class="caller">
+            ${c.connected ? '✅' : '📞'} ${leadLink ? `<a href="${leadLink}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline;">${customerName}</a>` : customerName}
+            ${statusBadge}
+          </div>
+          ${badges.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:3px 0;">${badges.join('')}</div>` : ''}
+          <div class="meta">
+            ${phone !== '–' ? phone + ' · ' : ''}${location ? location + ' · ' : ''}${source ? source + ' · ' : ''}${date}
+            ${recording ? ` · <a href="${recording}" target="_blank" rel="noopener" style="color:#2563eb;font-size:11px;">Play Recording</a>` : ''}
+          </div>
+        </div>
+        <div>
+          <div class="duration">${duration}</div>
+          <div class="time">${c.category || status || '–'}</div>
+        </div>
+      </div>`;
+  });
+  return html;
+}
+
+function filterRecCalls(type) {
+  // Toggle: click again to clear filter
+  if (window._recFilter === type) {
+    window._recFilter = null;
+  } else {
+    window._recFilter = type;
+  }
+  const filtered = window._recFilter
+    ? window._recAllCalls.filter(c => c[window._recFilter])
+    : window._recAllCalls;
+  const table = document.getElementById('recCallsTable');
+  if (table) table.innerHTML = renderRecCallRows(filtered);
+  // Highlight active KPI
+  const connEl = document.getElementById('kpiConnected');
+  const salesEl = document.getElementById('kpiSalesOpp');
+  if (connEl) connEl.style.border = window._recFilter === 'connected' ? '2px solid #15803d' : '1px solid var(--line)';
+  if (salesEl) salesEl.style.border = window._recFilter === 'salesOpp' ? '2px solid #2563eb' : '1px solid var(--line)';
+}
+
 // ── Window exports for new features ──
 window.openUploadCallsModal = openUploadCallsModal;
 window.closeUploadCallsModal = closeUploadCallsModal;
@@ -9007,6 +9031,7 @@ window.saveUploadedCallData = saveUploadedCallData;
 window.matchCallsToLeads = matchCallsToLeads;
 window.showRecordings = showRecordings;
 window.loadRepRecordings = loadRepRecordings;
+window.filterRecCalls = filterRecCalls;
 
 /* Boot */
 if (auth.currentUser) { showDashboard(); } else { showLogin(); }
