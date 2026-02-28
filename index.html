@@ -8658,17 +8658,35 @@ async function matchCallsToLeads() {
     // Write matches as subcollection docs: callMatches/{PERSON}/calls/{callId}
     // This avoids the 1MB Firestore document limit for reps with many calls
     const matchWrites = [];
+    const personMatchCounts = {}; // Track accurate total per person (existing + new)
     for (const [person, matches] of Object.entries(matchesByPerson)) {
-      // Write summary doc with count
+      // Read existing subcollection call keys to compute accurate total count
+      const existingKeys = new Set();
+      try {
+        const existingSnap = await getDocs(collection(db, 'callMatches', person, 'calls'));
+        existingSnap.forEach(d => existingKeys.add(d.id));
+      } catch (_) {}
+
+      // Compute call keys for new matches and track total unique keys
+      const allKeys = new Set(existingKeys);
+      const callEntries = [];
+      for (const m of matches) {
+        const callKey = m.callId || (m.callPhone + '_' + (m.callDate || '').replace(/[^a-zA-Z0-9]/g, ''));
+        const finalKey = callKey || ('call_' + Math.random().toString(36).slice(2));
+        allKeys.add(finalKey);
+        callEntries.push({ key: finalKey, data: m });
+      }
+      personMatchCounts[person] = allKeys.size;
+
+      // Write summary doc with accurate total count
       matchWrites.push(setDoc(doc(db, 'callMatches', person), {
         lastUpdated: now,
         updatedBy: window.userData.email,
-        matchCount: matches.length
+        matchCount: allKeys.size
       }, { merge: true }));
       // Write each call as a subcollection document
-      for (const m of matches) {
-        const callKey = m.callId || (m.callPhone + '_' + (m.callDate || '').replace(/[^a-zA-Z0-9]/g, ''));
-        matchWrites.push(setDoc(doc(db, 'callMatches', person, 'calls', callKey || ('call_' + Math.random().toString(36).slice(2))), m));
+      for (const entry of callEntries) {
+        matchWrites.push(setDoc(doc(db, 'callMatches', person, 'calls', entry.key), entry.data));
       }
     }
     // Batch in groups of 400 to stay under Firestore limits
@@ -8874,6 +8892,12 @@ async function loadRepRecordings() {
 
     // Sort by date descending (most recent first)
     calls.sort((a, b) => parseCallDate(b.date) - parseCallDate(a.date));
+
+    // Update dropdown option text with accurate call count
+    const opt = sel.options[sel.selectedIndex];
+    if (opt) {
+      opt.textContent = `${linkedName}${calls.length > 0 ? ' (' + calls.length + ' calls)' : ''}`;
+    }
 
     if (calls.length === 0) {
       container.innerHTML = `
