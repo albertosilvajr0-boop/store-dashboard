@@ -739,6 +739,64 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
 .pace-up { background:rgba(74,222,128,.15); color:#4ade80; }
 .pace-flat { background:rgba(148,163,184,.15); color:#94a3b8; }
 .pace-down { background:rgba(248,113,113,.15); color:#f87171; }
+
+/* ── Upload Call Data Modal ── */
+#uploadCallsModal {
+  display:none; position:fixed; inset:0; z-index:9999;
+  background:rgba(0,0,0,.5); place-items:center;
+}
+#uploadCallsModal.active { display:grid; }
+.upload-modal-content {
+  background:var(--card); border-radius:14px; padding:24px;
+  max-width:640px; width:90vw; max-height:85vh; overflow-y:auto;
+  box-shadow:0 12px 40px rgba(0,0,0,.25);
+}
+.upload-modal-content h2 { margin:0 0 4px; font-size:18px; }
+.upload-modal-content .sub { color:var(--muted); font-size:13px; margin-bottom:16px; }
+.upload-drop-zone {
+  border:2px dashed var(--line); border-radius:10px; padding:32px 16px;
+  text-align:center; cursor:pointer; transition:border-color .2s, background .2s;
+  margin-bottom:14px;
+}
+.upload-drop-zone:hover, .upload-drop-zone.dragover {
+  border-color:var(--accent); background:rgba(234,88,12,.04);
+}
+.upload-drop-zone .icon { font-size:28px; margin-bottom:6px; }
+.upload-drop-zone .label { font-size:13px; color:var(--muted); }
+.upload-preview-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:10px; }
+.upload-preview-table th { background:#f4f4f5; padding:6px 8px; text-align:left; font-weight:600; border-bottom:1px solid var(--line); }
+.upload-preview-table td { padding:5px 8px; border-bottom:1px solid #f0f0f0; }
+.upload-stats { display:flex; gap:12px; flex-wrap:wrap; margin:12px 0; }
+.upload-stats .stat { background:#f4f4f5; padding:8px 14px; border-radius:8px; font-size:13px; }
+.upload-stats .stat strong { font-weight:700; }
+.match-result { padding:10px 14px; border-radius:8px; margin-top:8px; font-size:13px; }
+.match-result.success { background:var(--greenBg); color:#15803d; }
+.match-result.warning { background:var(--yellowBg); color:#a16207; }
+.match-result.error { background:var(--redBg); color:#dc2626; }
+
+/* ── Recordings Page ── */
+.rec-user-grid {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));
+  gap:12px; margin-top:14px;
+}
+.rec-user-card {
+  background:var(--card); border:1px solid var(--line); border-radius:10px;
+  padding:14px 16px; cursor:pointer; transition:box-shadow .2s, border-color .2s;
+}
+.rec-user-card:hover { border-color:var(--accent); box-shadow:0 4px 16px rgba(0,0,0,.08); }
+.rec-user-card .name { font-weight:700; font-size:15px; margin-bottom:2px; }
+.rec-user-card .role-badge { font-size:11px; padding:1px 8px; border-radius:6px; background:#f4f4f5; color:var(--muted); display:inline-block; }
+.rec-user-card .call-count { margin-top:6px; font-size:13px; color:var(--muted); }
+.rec-call-row {
+  display:grid; grid-template-columns:1fr auto;
+  padding:10px 14px; border-bottom:1px solid #f0f0f0; align-items:center;
+  transition:background .15s;
+}
+.rec-call-row:hover { background:#fafafa; }
+.rec-call-row .caller { font-weight:600; font-size:14px; }
+.rec-call-row .meta { font-size:12px; color:var(--muted); margin-top:2px; }
+.rec-call-row .duration { font-size:13px; font-weight:600; color:var(--text); text-align:right; }
+.rec-call-row .time { font-size:11px; color:var(--muted); text-align:right; }
 </style>
 </head>
 
@@ -787,6 +845,35 @@ th[draggable="true"]:hover { background:rgba(59,130,246,.08); }
     </div>
     <div id="activityContent" style="margin-top:8px;">
       <p style="color:var(--muted);">Loading...</p>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Call Data Modal -->
+<div id="uploadCallsModal">
+  <div class="upload-modal-content">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <h2>Upload Call Data</h2>
+        <div class="sub">Upload a CSV or Excel file with call recordings data</div>
+      </div>
+      <button onclick="closeUploadCallsModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);padding:4px;">&times;</button>
+    </div>
+    <div class="upload-drop-zone" id="callDropZone" onclick="document.getElementById('callFileInput').click()">
+      <div class="icon">📁</div>
+      <div class="label">Click to browse or drag & drop your file here</div>
+      <div class="label" style="margin-top:4px;font-size:11px;">Accepts .csv, .xlsx, .xls</div>
+    </div>
+    <input type="file" id="callFileInput" accept=".csv,.xlsx,.xls" style="display:none;" onchange="callFileSelected(this)">
+    <div id="callUploadFileName" style="font-size:13px;font-weight:600;margin-bottom:8px;display:none;"></div>
+    <div id="callUploadPreview"></div>
+    <div id="callUploadActions" style="display:none;margin-top:14px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn" id="saveCallDataBtn" onclick="saveUploadedCallData()" style="background:var(--green);color:#fff;">Save Call Data</button>
+        <button class="btn" id="matchCallsBtn" onclick="matchCallsToLeads()" style="background:#2563eb;color:#fff;">Match Calls to Leads</button>
+        <button class="btn" onclick="clearCallUpload()" style="background:var(--line);color:var(--text);">Clear</button>
+      </div>
+      <div id="callMatchResult"></div>
     </div>
   </div>
 </div>
@@ -2294,9 +2381,12 @@ function renderDashboard() {
             <a href="#" onclick="event.preventDefault();closeReportsMenu();showManagerLeaderboard();" class="res-link">🏆 Manager Leaderboard</a>
             ${isAdmin() ? '<div style="border-top:1px solid var(--line);margin:4px 0;"></div><a href="#" onclick="event.preventDefault();closeReportsMenu();showLeadFunnel();" class="res-link">🔬 Lead Funnel</a>' : ''}
             ${isAdmin() ? '<a href="#" onclick="event.preventDefault();closeReportsMenu();showEngagement();" class="res-link">📈 Engagement</a>' : ''}
+            <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
+            <a href="#" onclick="event.preventDefault();closeReportsMenu();showRecordings();" class="res-link">🎙️ Recordings</a>
           </div>
         </div>` : ''}
         ${(isAdmin() || isManager()) ? '<button class="topbar-btn manage" onclick="showTeamDashboard()" style="min-width:90px;">👔 My Team</button>' : ''}
+        ${isAdmin() ? '<button class="topbar-btn manage" onclick="openUploadCallsModal()">📤 Upload Calls</button>' : ''}
         ${isAdmin() ? '<button class="topbar-btn manage" onclick="showUserModal()">👤 Manage Users</button>' : ''}
         <button class="topbar-btn logout" onclick="logout()">Logout</button>
       </div>
@@ -8085,6 +8175,623 @@ function buildSparklines() {
       <span class="pace-indicator ${paceClass}">${paceLabel}</span>
     </div>`;
 }
+
+/* ══════════════════════════════════════════
+   📤 UPLOAD CALL DATA & 🎙️ RECORDINGS
+   ══════════════════════════════════════════ */
+
+// ── State for uploaded call data ──
+let _uploadedCallRows = [];
+let _uploadedFileName = '';
+
+function openUploadCallsModal() {
+  if (!isAdmin()) { alert('Only admins can upload call data.'); return; }
+  logPageView('Upload Call Data');
+  const modal = document.getElementById('uploadCallsModal');
+  modal.classList.add('active');
+
+  // Wire up drag-and-drop
+  const dz = document.getElementById('callDropZone');
+  dz.ondragover = (e) => { e.preventDefault(); dz.classList.add('dragover'); };
+  dz.ondragleave = () => { dz.classList.remove('dragover'); };
+  dz.ondrop = (e) => {
+    e.preventDefault();
+    dz.classList.remove('dragover');
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleCallFile(file);
+  };
+}
+
+function closeUploadCallsModal() {
+  document.getElementById('uploadCallsModal').classList.remove('active');
+}
+
+function clearCallUpload() {
+  _uploadedCallRows = [];
+  _uploadedFileName = '';
+  document.getElementById('callFileInput').value = '';
+  document.getElementById('callUploadFileName').style.display = 'none';
+  document.getElementById('callUploadPreview').innerHTML = '';
+  document.getElementById('callUploadActions').style.display = 'none';
+  document.getElementById('callMatchResult').innerHTML = '';
+}
+
+function callFileSelected(input) {
+  const file = input.files?.[0];
+  if (file) handleCallFile(file);
+}
+
+function handleCallFile(file) {
+  _uploadedFileName = file.name;
+  document.getElementById('callUploadFileName').textContent = file.name;
+  document.getElementById('callUploadFileName').style.display = 'block';
+  document.getElementById('callUploadPreview').innerHTML = '<div style="color:var(--muted);font-size:13px;">Parsing file...</div>';
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'csv') {
+    const reader = new FileReader();
+    reader.onload = (e) => parseCallCsv(e.target.result);
+    reader.readAsText(file);
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    if (!window.XLSX) {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload = () => readCallXlsx(file);
+      s.onerror = () => { alert('Could not load spreadsheet library. Try a .csv file instead.'); };
+      document.head.appendChild(s);
+    } else {
+      readCallXlsx(file);
+    }
+  } else {
+    alert('Please upload a .csv, .xlsx, or .xls file.');
+  }
+}
+
+function readCallXlsx(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const jsonRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      processCallRows(jsonRows);
+    } catch (err) {
+      document.getElementById('callUploadPreview').innerHTML = `<div style="color:#dc2626;">Error reading file: ${err.message}</div>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseCallCsv(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) {
+    document.getElementById('callUploadPreview').innerHTML = '<div style="color:#dc2626;">File appears empty or has no data rows.</div>';
+    return;
+  }
+  // Parse header
+  const headers = parseCsvLine(lines[0]);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = parseCsvLine(lines[i]);
+    if (vals.length === 0 || vals.every(v => !v.trim())) continue;
+    const row = {};
+    headers.forEach((h, idx) => { row[h.trim()] = (vals[idx] || '').trim(); });
+    rows.push(row);
+  }
+  processCallRows(rows);
+}
+
+function parseCsvLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { current += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { result.push(current); current = ''; }
+      else { current += ch; }
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function normalizeCallHeaders(row) {
+  // Map common header names to standard fields
+  const mapped = {};
+  const keyMap = {
+    'phone': ['phone', 'phone number', 'phonenumber', 'phone_number', 'caller', 'caller_number', 'from', 'ani'],
+    'name': ['name', 'customer', 'customer name', 'customername', 'customer_name', 'caller_name', 'callername', 'contact', 'contact_name'],
+    'date': ['date', 'call date', 'calldate', 'call_date', 'datetime', 'date_time', 'timestamp', 'time', 'call_time', 'calltime'],
+    'duration': ['duration', 'call duration', 'callduration', 'call_duration', 'length', 'call_length', 'talk_time', 'talktime'],
+    'direction': ['direction', 'call direction', 'type', 'call_type', 'calltype', 'call type', 'inbound_outbound'],
+    'agent': ['agent', 'rep', 'representative', 'salesperson', 'sales_person', 'user', 'employee', 'bdc_agent', 'bdcagent', 'assigned', 'answered_by'],
+    'status': ['status', 'disposition', 'result', 'call_result', 'outcome', 'call_status'],
+    'recording': ['recording', 'recording_url', 'recordingurl', 'recording url', 'audio', 'audio_url', 'link', 'url', 'call_recording'],
+    'source': ['source', 'call_source', 'campaign', 'tracking_number', 'tracking'],
+    'notes': ['notes', 'note', 'comments', 'comment', 'memo']
+  };
+  for (const [rawKey, rawVal] of Object.entries(row)) {
+    const lower = rawKey.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    const lowerOrig = rawKey.toLowerCase().trim();
+    let matched = false;
+    for (const [stdKey, aliases] of Object.entries(keyMap)) {
+      if (aliases.includes(lowerOrig) || aliases.includes(lower)) {
+        mapped[stdKey] = rawVal;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) mapped[rawKey] = rawVal;
+  }
+  return mapped;
+}
+
+function processCallRows(rawRows) {
+  _uploadedCallRows = rawRows.map(r => normalizeCallHeaders(r));
+
+  // Show preview stats
+  const total = _uploadedCallRows.length;
+  const withPhone = _uploadedCallRows.filter(r => r.phone).length;
+  const withAgent = _uploadedCallRows.filter(r => r.agent).length;
+  const withRecording = _uploadedCallRows.filter(r => r.recording).length;
+
+  let html = `
+    <div class="upload-stats">
+      <div class="stat"><strong>${total}</strong> call records</div>
+      <div class="stat"><strong>${withPhone}</strong> with phone #</div>
+      <div class="stat"><strong>${withAgent}</strong> with agent</div>
+      <div class="stat"><strong>${withRecording}</strong> with recording</div>
+    </div>`;
+
+  // Show first 5 rows as preview
+  if (_uploadedCallRows.length > 0) {
+    const previewCols = ['name', 'phone', 'date', 'duration', 'agent', 'direction', 'status'];
+    const hasCols = previewCols.filter(c => _uploadedCallRows.some(r => r[c]));
+    html += `<div style="overflow-x:auto;"><table class="upload-preview-table"><thead><tr>`;
+    hasCols.forEach(c => { html += `<th>${c.charAt(0).toUpperCase() + c.slice(1)}</th>`; });
+    html += `</tr></thead><tbody>`;
+    _uploadedCallRows.slice(0, 5).forEach(r => {
+      html += '<tr>';
+      hasCols.forEach(c => { html += `<td>${r[c] || '–'}</td>`; });
+      html += '</tr>';
+    });
+    if (_uploadedCallRows.length > 5) {
+      html += `<tr><td colspan="${hasCols.length}" style="color:var(--muted);font-style:italic;">...and ${_uploadedCallRows.length - 5} more rows</td></tr>`;
+    }
+    html += `</tbody></table></div>`;
+  }
+
+  document.getElementById('callUploadPreview').innerHTML = html;
+  document.getElementById('callUploadActions').style.display = 'block';
+}
+
+// ── Save uploaded call data to Firestore ──
+async function saveUploadedCallData() {
+  if (!isAdmin()) { alert('Only admins.'); return; }
+  if (_uploadedCallRows.length === 0) { alert('No call data to save.'); return; }
+
+  const btn = document.getElementById('saveCallDataBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    const now = new Date();
+    const uploadId = 'upload_' + now.getTime();
+
+    // Save the full upload as a document in callUploads collection
+    await setDoc(doc(db, 'callUploads', uploadId), {
+      fileName: _uploadedFileName,
+      uploadedBy: window.userData.email,
+      uploadedAt: now,
+      rowCount: _uploadedCallRows.length,
+      rows: JSON.stringify(_uploadedCallRows)
+    });
+
+    // Also write per-agent call records to callRecordings/{AGENT_NAME} for the Recordings page
+    const byAgent = {};
+    _uploadedCallRows.forEach(r => {
+      const agent = (r.agent || 'UNASSIGNED').toUpperCase().trim();
+      if (!byAgent[agent]) byAgent[agent] = [];
+      byAgent[agent].push({
+        name: r.name || '',
+        phone: r.phone || '',
+        date: r.date || '',
+        duration: r.duration || '',
+        direction: r.direction || '',
+        status: r.status || '',
+        recording: r.recording || '',
+        source: r.source || '',
+        notes: r.notes || '',
+        uploadId: uploadId
+      });
+    });
+
+    const writePromises = Object.entries(byAgent).map(([agent, calls]) => {
+      return setDoc(doc(db, 'callRecordings', agent), {
+        agent: agent,
+        calls: JSON.stringify(calls),
+        lastUpdated: now,
+        updatedBy: window.userData.email
+      }, { merge: true });
+    });
+    await Promise.all(writePromises);
+
+    btn.textContent = 'Saved!';
+    btn.style.background = '#16a34a';
+    document.getElementById('callMatchResult').innerHTML = `
+      <div class="match-result success">
+        Saved ${_uploadedCallRows.length} call records across ${Object.keys(byAgent).length} agents to Firestore.
+      </div>`;
+    setTimeout(() => { btn.disabled = false; btn.textContent = 'Save Call Data'; btn.style.background = 'var(--green)'; }, 2000);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Save Call Data';
+    document.getElementById('callMatchResult').innerHTML = `<div class="match-result error">Error: ${e.message}</div>`;
+  }
+}
+
+// ── Match uploaded calls to leads in call sheets ──
+async function matchCallsToLeads() {
+  if (!isAdmin()) { alert('Only admins.'); return; }
+  if (_uploadedCallRows.length === 0) { alert('No call data to match.'); return; }
+
+  const btn = document.getElementById('matchCallsBtn');
+  btn.disabled = true;
+  btn.textContent = 'Matching...';
+
+  try {
+    // Gather all person snapshots that have callList data
+    const snapshotsRef = collection(db, 'personSnapshots');
+    const snapDocs = await getDocs(snapshotsRef);
+
+    // Build a lookup of leads by phone number and by name
+    const leadsByPhone = {};  // phone → [{ personName, lead }]
+    const leadsByName = {};   // name.upper → [{ personName, lead }]
+    let totalLeads = 0;
+
+    snapDocs.forEach(d => {
+      try {
+        const raw = d.data();
+        const payload = JSON.parse(raw.jsonData || '{}');
+        const calls = payload.callList?.calls || [];
+        const personName = d.id;
+        calls.forEach(lead => {
+          totalLeads++;
+          if (lead.phone) {
+            const ph = lead.phone.replace(/\D/g, '').slice(-10);
+            if (ph.length === 10) {
+              if (!leadsByPhone[ph]) leadsByPhone[ph] = [];
+              leadsByPhone[ph].push({ personName, lead });
+            }
+          }
+          if (lead.name) {
+            const nm = lead.name.toUpperCase().trim();
+            if (!leadsByName[nm]) leadsByName[nm] = [];
+            leadsByName[nm].push({ personName, lead });
+          }
+        });
+      } catch (_) {}
+    });
+
+    // Match uploaded calls to leads
+    let matched = 0;
+    let unmatched = 0;
+    const matchResults = [];
+
+    _uploadedCallRows.forEach(call => {
+      let matchedLead = null;
+
+      // Try phone match first (most reliable)
+      if (call.phone) {
+        const ph = call.phone.replace(/\D/g, '').slice(-10);
+        if (ph.length === 10 && leadsByPhone[ph]) {
+          matchedLead = leadsByPhone[ph][0];
+        }
+      }
+
+      // Fallback: try name match
+      if (!matchedLead && call.name) {
+        const nm = call.name.toUpperCase().trim();
+        if (leadsByName[nm]) {
+          matchedLead = leadsByName[nm][0];
+        }
+      }
+
+      if (matchedLead) {
+        matched++;
+        matchResults.push({
+          call,
+          matchedTo: matchedLead.personName,
+          matchedLead: matchedLead.lead
+        });
+      } else {
+        unmatched++;
+      }
+    });
+
+    // Save match results to Firestore for each person
+    const matchesByPerson = {};
+    matchResults.forEach(m => {
+      const person = m.matchedTo;
+      if (!matchesByPerson[person]) matchesByPerson[person] = [];
+      matchesByPerson[person].push({
+        callPhone: m.call.phone || '',
+        callName: m.call.name || '',
+        callDate: m.call.date || '',
+        callDuration: m.call.duration || '',
+        callDirection: m.call.direction || '',
+        callRecording: m.call.recording || '',
+        callAgent: m.call.agent || '',
+        leadName: m.matchedLead.name || '',
+        leadLink: m.matchedLead.link || '',
+        leadPhone: m.matchedLead.phone || ''
+      });
+    });
+
+    const now = new Date();
+    const matchWrites = Object.entries(matchesByPerson).map(([person, matches]) => {
+      return setDoc(doc(db, 'callMatches', person), {
+        matches: JSON.stringify(matches),
+        lastUpdated: now,
+        updatedBy: window.userData.email,
+        matchCount: matches.length
+      }, { merge: true });
+    });
+    await Promise.all(matchWrites);
+
+    const pct = _uploadedCallRows.length > 0 ? Math.round((matched / _uploadedCallRows.length) * 100) : 0;
+    const resultClass = pct >= 60 ? 'success' : pct >= 30 ? 'warning' : 'error';
+    document.getElementById('callMatchResult').innerHTML = `
+      <div class="match-result ${resultClass}">
+        <strong>Match Results:</strong> ${matched} of ${_uploadedCallRows.length} calls matched (${pct}%)<br>
+        <span style="font-size:12px;">Matched across ${Object.keys(matchesByPerson).length} people out of ${totalLeads} total leads in call sheets. ${unmatched} calls could not be matched.</span>
+      </div>`;
+
+    btn.textContent = 'Matched!';
+    setTimeout(() => { btn.disabled = false; btn.textContent = 'Match Calls to Leads'; }, 2000);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Match Calls to Leads';
+    document.getElementById('callMatchResult').innerHTML = `<div class="match-result error">Error: ${e.message}</div>`;
+  }
+}
+
+// ══════════════════════════════════════════
+//   🎙️ RECORDINGS PAGE
+// ══════════════════════════════════════════
+
+async function showRecordings() {
+  if (!isAdmin() && !isManager()) { alert('Only admins and managers can view recordings.'); return; }
+  trackClick();
+  logPageView('Recordings');
+
+  const appEl = document.getElementById('app');
+  appEl.innerHTML = `
+    <div style="max-width:1200px;margin:0 auto;padding:18px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h2 style="margin:0;font-size:20px;">🎙️ Recordings</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Click on a team member to view their latest call recordings</p>
+        </div>
+        <div style="display:flex;gap:8px;">
+          ${isAdmin() ? '<button class="topbar-btn manage" onclick="openUploadCallsModal()">📤 Upload Calls</button>' : ''}
+          <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
+        </div>
+      </div>
+      <div id="recordingsContent"><div class="loading-wrap"><div class="spinner"></div></div></div>
+    </div>`;
+
+  try {
+    // Fetch all users to build user cards
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const users = [];
+    usersSnapshot.forEach(d => {
+      const u = d.data();
+      if (u.deleted) return;
+      const linked = (u.linkedName || '').toUpperCase().trim();
+      if (!linked) return;
+      users.push({
+        uid: d.id,
+        email: u.email || '',
+        displayName: u.displayName || u.email || '',
+        linkedName: linked,
+        role: u.role || 'user',
+        managerId: u.managerId || ''
+      });
+    });
+
+    // If manager (not admin), only show their team members
+    let visibleUsers = users;
+    if (isManager() && !isAdmin()) {
+      const myUid = auth.currentUser?.uid;
+      visibleUsers = users.filter(u => u.managerId === myUid || u.uid === myUid);
+    }
+
+    // Fetch call recording counts from Firestore
+    const recSnap = await getDocs(collection(db, 'callRecordings'));
+    const recCounts = {};
+    recSnap.forEach(d => {
+      try {
+        const data = d.data();
+        const calls = JSON.parse(data.calls || '[]');
+        recCounts[d.id] = calls.length;
+      } catch (_) { recCounts[d.id] = 0; }
+    });
+
+    visibleUsers.sort((a, b) => a.displayName.toLowerCase().localeCompare(b.displayName.toLowerCase()));
+
+    if (visibleUsers.length === 0) {
+      document.getElementById('recordingsContent').innerHTML = '<p style="color:var(--muted);text-align:center;padding:40px;">No team members found with linked names.</p>';
+      return;
+    }
+
+    let html = '<div class="rec-user-grid">';
+    visibleUsers.forEach(u => {
+      const count = recCounts[u.linkedName] || 0;
+      const roleBadge = u.role === 'admin' || u.role === 'superadmin' ? 'Admin' : u.role === 'manager' ? 'Manager' : 'Rep';
+      html += `
+        <div class="rec-user-card" onclick="showUserRecordings('${u.linkedName.replace(/'/g, "\\'")}', '${u.displayName.replace(/'/g, "\\'")}')">
+          <div class="name">${u.displayName}</div>
+          <span class="role-badge">${roleBadge}</span>
+          <div class="call-count">${count > 0 ? count + ' call recording' + (count !== 1 ? 's' : '') : 'No recordings yet'}</div>
+        </div>`;
+    });
+    html += '</div>';
+
+    document.getElementById('recordingsContent').innerHTML = html;
+  } catch (e) {
+    document.getElementById('recordingsContent').innerHTML = `<p style="color:#dc2626;text-align:center;padding:40px;">Error: ${e.message}</p>`;
+  }
+}
+
+async function showUserRecordings(linkedName, displayName) {
+  if (!isAdmin() && !isManager()) { alert('Only admins and managers.'); return; }
+  trackClick();
+  logPageView('Recordings: ' + displayName);
+
+  const appEl = document.getElementById('app');
+  appEl.innerHTML = `
+    <div style="max-width:1000px;margin:0 auto;padding:18px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h2 style="margin:0;font-size:20px;">🎙️ ${displayName}'s Recordings</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Sorted by most recent</p>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="topbar-btn manage" onclick="showRecordings()">← All Users</button>
+          <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
+        </div>
+      </div>
+      <div id="userRecContent"><div class="loading-wrap"><div class="spinner"></div></div></div>
+    </div>`;
+
+  try {
+    const recDoc = await getDoc(doc(db, 'callRecordings', linkedName));
+    let calls = [];
+    if (recDoc.exists()) {
+      calls = JSON.parse(recDoc.data().calls || '[]');
+    }
+
+    // Also check callMatches for matched recording data
+    const matchDoc = await getDoc(doc(db, 'callMatches', linkedName));
+    let matches = [];
+    if (matchDoc.exists()) {
+      matches = JSON.parse(matchDoc.data().matches || '[]');
+    }
+
+    // Merge matched call data: enrich call records with lead info
+    const matchByPhone = {};
+    matches.forEach(m => {
+      if (m.callPhone) {
+        const ph = m.callPhone.replace(/\D/g, '').slice(-10);
+        if (ph.length === 10) matchByPhone[ph] = m;
+      }
+    });
+
+    calls.forEach(c => {
+      if (c.phone) {
+        const ph = c.phone.replace(/\D/g, '').slice(-10);
+        if (ph.length === 10 && matchByPhone[ph]) {
+          c._matchedLead = matchByPhone[ph];
+        }
+      }
+    });
+
+    // Sort by date descending (most recent first)
+    calls.sort((a, b) => {
+      const da = parseCallDate(a.date);
+      const db2 = parseCallDate(b.date);
+      return db2 - da;
+    });
+
+    if (calls.length === 0) {
+      document.getElementById('userRecContent').innerHTML = `
+        <div style="text-align:center;padding:40px;color:var(--muted);">
+          <div style="font-size:36px;margin-bottom:8px;">🎙️</div>
+          <p>No call recordings found for ${displayName}.</p>
+          ${isAdmin() ? '<p style="font-size:13px;">Use <strong>Upload Calls</strong> to add call data.</p>' : ''}
+        </div>`;
+      return;
+    }
+
+    let html = `
+      <div style="margin-bottom:12px;font-size:13px;color:var(--muted);">${calls.length} recording${calls.length !== 1 ? 's' : ''} found</div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;">`;
+
+    calls.forEach((c, i) => {
+      const customerName = c.name || c._matchedLead?.leadName || 'Unknown';
+      const phone = c.phone || '–';
+      const date = c.date || '–';
+      const duration = formatCallDuration(c.duration);
+      const direction = c.direction || '';
+      const dirIcon = direction.toLowerCase().includes('inbound') || direction.toLowerCase().includes('in') ? '📥' : direction.toLowerCase().includes('outbound') || direction.toLowerCase().includes('out') ? '📤' : '📞';
+      const status = c.status || '';
+      const recording = c.recording || c._matchedLead?.callRecording || '';
+      const leadLink = c._matchedLead?.leadLink || '';
+      const source = c.source || '';
+
+      const statusBadge = status ? `<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:${status.toLowerCase().includes('answer') || status.toLowerCase().includes('connect') ? 'var(--greenBg);color:#15803d' : status.toLowerCase().includes('miss') || status.toLowerCase().includes('abandon') ? 'var(--redBg);color:#dc2626' : '#f4f4f5;color:var(--muted)'};">${status}</span>` : '';
+
+      html += `
+        <div class="rec-call-row" style="${i > 0 ? '' : 'border-top:none;'}">
+          <div>
+            <div class="caller">
+              ${dirIcon} ${leadLink ? `<a href="${leadLink}" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline;">${customerName}</a>` : customerName}
+              ${statusBadge}
+            </div>
+            <div class="meta">
+              ${phone !== '–' ? phone + ' · ' : ''}${source ? source + ' · ' : ''}${date}
+              ${recording ? ` · <a href="${recording}" target="_blank" rel="noopener" style="color:#2563eb;font-size:11px;">Play Recording</a>` : ''}
+            </div>
+          </div>
+          <div>
+            <div class="duration">${duration}</div>
+            <div class="time">${direction || '–'}</div>
+          </div>
+        </div>`;
+    });
+
+    html += '</div>';
+    document.getElementById('userRecContent').innerHTML = html;
+  } catch (e) {
+    document.getElementById('userRecContent').innerHTML = `<p style="color:#dc2626;text-align:center;padding:40px;">Error: ${e.message}</p>`;
+  }
+}
+
+function parseCallDate(dateStr) {
+  if (!dateStr) return 0;
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? 0 : d.getTime();
+}
+
+function formatCallDuration(dur) {
+  if (!dur) return '–';
+  // If it's already formatted like "2:30" or "02:30:00", return as-is
+  if (typeof dur === 'string' && dur.includes(':')) return dur;
+  // If numeric (seconds), format
+  const secs = parseInt(dur, 10);
+  if (isNaN(secs)) return dur;
+  if (secs < 60) return secs + 's';
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+// ── Window exports for new features ──
+window.openUploadCallsModal = openUploadCallsModal;
+window.closeUploadCallsModal = closeUploadCallsModal;
+window.callFileSelected = callFileSelected;
+window.clearCallUpload = clearCallUpload;
+window.saveUploadedCallData = saveUploadedCallData;
+window.matchCallsToLeads = matchCallsToLeads;
+window.showRecordings = showRecordings;
+window.showUserRecordings = showUserRecordings;
 
 /* Boot */
 if (auth.currentUser) { showDashboard(); } else { showLogin(); }
