@@ -8558,8 +8558,11 @@ async function matchCallsToLeads() {
   const btn = document.getElementById('matchCallsBtn');
   btn.disabled = true;
   btn.textContent = 'Matching...';
+  const progressEl = document.getElementById('callMatchResult');
+  const showProgress = (msg) => { progressEl.innerHTML = `<div class="match-result" style="background:#e8f0fe;border-color:#4285f4;color:#1a73e8;">${msg}</div>`; };
 
   try {
+    showProgress('Loading lead data from Firestore...');
     // Gather all person snapshots that have callList data
     const snapshotsRef = collection(db, 'personSnapshots');
     const snapDocs = await getDocs(snapshotsRef);
@@ -8592,6 +8595,8 @@ async function matchCallsToLeads() {
         });
       } catch (_) {}
     });
+
+    showProgress(`Loaded ${totalLeads} leads. Matching ${_uploadedCallRows.length} calls...`);
 
     // Match uploaded calls to leads
     let matched = 0;
@@ -8661,6 +8666,9 @@ async function matchCallsToLeads() {
       });
     });
 
+    const totalPeople = Object.keys(matchesByPerson).length;
+    showProgress(`Matched ${matched} calls across ${totalPeople} reps. Saving to Firestore...`);
+
     const now = new Date();
     // Write matches as subcollection docs: callMatches/{PERSON}/calls/{callId}
     // This avoids the 1MB Firestore document limit for reps with many calls
@@ -8679,7 +8687,10 @@ async function matchCallsToLeads() {
       }
     }
     // Batch in groups of 400 to stay under Firestore limits
+    const totalBatches = Math.ceil(matchWrites.length / 400);
     for (let i = 0; i < matchWrites.length; i += 400) {
+      const batchNum = Math.floor(i / 400) + 1;
+      showProgress(`Saving to Firestore... batch ${batchNum} of ${totalBatches} (${matchWrites.length} docs total)`);
       await Promise.all(matchWrites.slice(i, i + 400));
     }
 
@@ -8977,13 +8988,14 @@ function formatCallDuration(dur) {
   if (!dur) return '–';
   // If it's already formatted like "2:30" or "02:30:00", return as-is
   if (typeof dur === 'string' && dur.includes(':')) return dur;
-  // If numeric (seconds), format
-  const secs = parseInt(dur, 10);
-  if (isNaN(secs)) return dur;
-  if (secs < 60) return secs + 's';
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return m + ':' + String(s).padStart(2, '0');
+  // Raw numeric values from call data are in minutes
+  const mins = parseInt(dur, 10);
+  if (isNaN(mins)) return dur;
+  if (mins < 1) return '<1m';
+  if (mins < 60) return mins + 'm';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h + ':' + String(m).padStart(2, '0');
 }
 
 // ── Window exports for new features ──
