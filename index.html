@@ -8347,7 +8347,8 @@ function normalizeCallHeaders(row) {
     'apptBookedSoft': ['appt booked (soft)', 'appt_booked_soft'],
     'firmDateTime': ['firm date/time', 'firm_date_time'],
     'softDateTime': ['soft date/time', 'soft_date_time'],
-    'category': ['category']
+    'category': ['category'],
+    'phoneCodeRef': ['phone code reference', 'phone_code_reference', 'phonecoderef', 'phone code ref', 'phone_code_ref']
   };
   for (const [rawKey, rawVal] of Object.entries(row)) {
     const lower = rawKey.toLowerCase().trim().replace(/[^a-z0-9_/() -]/g, '').replace(/\s+/g, ' ');
@@ -8562,72 +8563,32 @@ async function matchCallsToLeads() {
   const showProgress = (msg) => { progressEl.innerHTML = `<div class="match-result" style="background:#e8f0fe;border-color:#4285f4;color:#1a73e8;">${msg}</div>`; };
 
   try {
-    showProgress('Loading lead data from Firestore...');
-    // Gather all person snapshots that have callList data
-    const snapshotsRef = collection(db, 'personSnapshots');
-    const snapDocs = await getDocs(snapshotsRef);
-
-    // Build a lookup of leads by phone number and by name
-    const leadsByPhone = {};  // phone → [{ personName, lead }]
-    const leadsByName = {};   // name.upper → [{ personName, lead }]
-    let totalLeads = 0;
-
-    snapDocs.forEach(d => {
-      try {
-        const raw = d.data();
-        const payload = JSON.parse(raw.jsonData || '{}');
-        const calls = payload.callList?.calls || [];
-        const personName = d.id;
-        calls.forEach(lead => {
-          totalLeads++;
-          if (lead.phone) {
-            const ph = lead.phone.replace(/\D/g, '').slice(-10);
-            if (ph.length === 10) {
-              if (!leadsByPhone[ph]) leadsByPhone[ph] = [];
-              leadsByPhone[ph].push({ personName, lead });
-            }
-          }
-          if (lead.name) {
-            const nm = lead.name.toUpperCase().trim();
-            if (!leadsByName[nm]) leadsByName[nm] = [];
-            leadsByName[nm].push({ personName, lead });
-          }
-        });
-      } catch (_) {}
+    showProgress('Loading users from Firestore...');
+    // Build a lookup of Linked Sheet Names from the users collection
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const linkedNameSet = new Set(); // set of uppercase linked names
+    usersSnapshot.forEach(d => {
+      const u = d.data();
+      if (u.deleted) return;
+      const linked = (u.linkedName || '').toUpperCase().trim();
+      if (linked) linkedNameSet.add(linked);
     });
 
-    showProgress(`Loaded ${totalLeads} leads. Matching ${_uploadedCallRows.length} calls...`);
+    showProgress(`Loaded ${linkedNameSet.size} agents. Matching ${_uploadedCallRows.length} calls by Phone Code Reference...`);
 
-    // Match uploaded calls to leads
+    // Match uploaded calls to agents using the Phone Code Reference column (column AP)
     let matched = 0;
     let unmatched = 0;
     const matchResults = [];
 
     _uploadedCallRows.forEach(call => {
-      let matchedLead = null;
+      const refName = (call.phoneCodeRef || '').toUpperCase().trim();
 
-      // Try phone match first (most reliable)
-      if (call.phone) {
-        const ph = call.phone.replace(/\D/g, '').slice(-10);
-        if (ph.length === 10 && leadsByPhone[ph]) {
-          matchedLead = leadsByPhone[ph][0];
-        }
-      }
-
-      // Fallback: try name match
-      if (!matchedLead && call.name) {
-        const nm = call.name.toUpperCase().trim();
-        if (leadsByName[nm]) {
-          matchedLead = leadsByName[nm][0];
-        }
-      }
-
-      if (matchedLead) {
+      if (refName && linkedNameSet.has(refName)) {
         matched++;
         matchResults.push({
           call,
-          matchedTo: matchedLead.personName,
-          matchedLead: matchedLead.lead
+          matchedTo: refName
         });
       } else {
         unmatched++;
@@ -8660,9 +8621,10 @@ async function matchCallsToLeads() {
         category: m.call.category || '',
         tags: m.call.tags || '',
         callRecap: m.call.callRecap || '',
-        leadName: m.matchedLead.name || '',
-        leadLink: m.matchedLead.link || '',
-        leadPhone: m.matchedLead.phone || ''
+        phoneCodeRef: m.call.phoneCodeRef || '',
+        leadName: '',
+        leadLink: '',
+        leadPhone: ''
       });
     });
 
@@ -8700,7 +8662,7 @@ async function matchCallsToLeads() {
     document.getElementById('callMatchResult').innerHTML = `
       <div class="match-result ${resultClass}">
         <strong>Match Results:</strong> ${matched} of ${_uploadedCallRows.length} calls matched (${pct}%)<br>
-        <span style="font-size:12px;">Matched across ${Object.keys(matchesByPerson).length} people out of ${totalLeads} total leads in call sheets. ${unmatched} calls could not be matched.</span>
+        <span style="font-size:12px;">Matched across ${Object.keys(matchesByPerson).length} agents using Phone Code Reference → Linked Sheet Name. ${unmatched} calls could not be matched.</span>
       </div>`;
 
     btn.textContent = 'Matched!';
