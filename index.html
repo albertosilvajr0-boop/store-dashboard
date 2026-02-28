@@ -8487,11 +8487,14 @@ async function saveUploadedCallData() {
       rows: JSON.stringify(_uploadedCallRows)
     });
 
-    // Also write per-agent call records to callRecordings/{AGENT_NAME} for the Recordings page
+    // Also write per-agent call records to callRecordings/{PERSON} for the Recordings page
+    // Use Phone Code Reference (the person who made/took the call), fallback to Ring To
     const byAgent = {};
     _uploadedCallRows.forEach(r => {
       if (isTruthy(r.spam)) return; // skip spam calls
-      const agent = (r.agent || 'UNASSIGNED').toUpperCase().trim();
+      const ref = (r.phoneCodeRef || '').toUpperCase().trim();
+      const ringTo = (r.agent || '').toUpperCase().trim();
+      const agent = ref || ringTo || 'UNASSIGNED';
       if (!byAgent[agent]) byAgent[agent] = [];
       byAgent[agent].push({
         callId: r.callId || '',
