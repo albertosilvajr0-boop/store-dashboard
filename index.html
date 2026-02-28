@@ -8348,7 +8348,7 @@ function normalizeCallHeaders(row) {
     'firmDateTime': ['firm date/time', 'firm_date_time'],
     'softDateTime': ['soft date/time', 'soft_date_time'],
     'category': ['category'],
-    'phoneCodeRef': ['phone code reference', 'phone_code_reference', 'phonecoderef', 'phone code ref', 'phone_code_ref']
+    'phoneCodeRef': ['phone code reference', 'phone_code_reference', 'phonecoderef', 'phone code ref', 'phone_code_ref', 'phone code', 'phonecode', 'code reference', 'code ref']
   };
   for (const [rawKey, rawVal] of Object.entries(row)) {
     const lower = rawKey.toLowerCase().trim().replace(/[^a-z0-9_/() -]/g, '').replace(/\s+/g, ' ');
@@ -8377,6 +8377,21 @@ function normalizeCallHeaders(row) {
     if (h > 12) h -= 12;
     if (h === 0) h = 12;
     mapped.time = h + ':' + String(m).padStart(2, '0') + ' ' + ampm;
+  }
+  // Convert Excel time fraction for duration (Excel stores time as fraction of a day)
+  if (mapped.duration != null && typeof mapped.duration === 'number' && mapped.duration < 1) {
+    const totalSec = Math.round(mapped.duration * 86400);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    mapped.duration = h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+  if (mapped.durationBilling != null && typeof mapped.durationBilling === 'number' && mapped.durationBilling < 1) {
+    const totalSec = Math.round(mapped.durationBilling * 86400);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    mapped.durationBilling = h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
   }
   // Coerce all values to strings (Excel gives numbers for phone, duration, etc.)
   for (const k of Object.keys(mapped)) {
@@ -8574,21 +8589,26 @@ async function matchCallsToLeads() {
       if (linked) linkedNameSet.add(linked);
     });
 
-    showProgress(`Loaded ${linkedNameSet.size} agents. Matching ${_uploadedCallRows.length} calls by Phone Code Reference...`);
+    showProgress(`Loaded ${linkedNameSet.size} agents. Matching ${_uploadedCallRows.length} calls by Phone Code Reference / Agent name...`);
 
-    // Match uploaded calls to agents using the Phone Code Reference column (column AP)
+    // Match uploaded calls to agents using Phone Code Reference (column AP) → Linked Sheet Name
+    // Falls back to the Agent / Ring To column if Phone Code Reference is empty
     let matched = 0;
     let unmatched = 0;
     const matchResults = [];
 
     _uploadedCallRows.forEach(call => {
       const refName = (call.phoneCodeRef || '').toUpperCase().trim();
+      const agentName = (call.agent || '').toUpperCase().trim();
+      const matchName = (refName && linkedNameSet.has(refName)) ? refName
+                      : (agentName && linkedNameSet.has(agentName)) ? agentName
+                      : null;
 
-      if (refName && linkedNameSet.has(refName)) {
+      if (matchName) {
         matched++;
         matchResults.push({
           call,
-          matchedTo: refName
+          matchedTo: matchName
         });
       } else {
         unmatched++;
@@ -8662,7 +8682,7 @@ async function matchCallsToLeads() {
     document.getElementById('callMatchResult').innerHTML = `
       <div class="match-result ${resultClass}">
         <strong>Match Results:</strong> ${matched} of ${_uploadedCallRows.length} calls matched (${pct}%)<br>
-        <span style="font-size:12px;">Matched across ${Object.keys(matchesByPerson).length} agents using Phone Code Reference → Linked Sheet Name. ${unmatched} calls could not be matched.</span>
+        <span style="font-size:12px;">Matched across ${Object.keys(matchesByPerson).length} agents using Phone Code Reference / Agent name → Linked Sheet Name. ${unmatched} calls could not be matched.</span>
       </div>`;
 
     btn.textContent = 'Matched!';
