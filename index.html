@@ -2304,7 +2304,7 @@ function renderDashboard() {
             <a href="#" onclick="event.preventDefault();closeResourcesMenu();showRecallLookup();" class="res-link">🔔 Recall & TSB Lookup</a>
             ${(isAdmin() || isManager()) ? '<a href="#" onclick="event.preventDefault();closeResourcesMenu();showCompetitiveAnalysis();" class="res-link">🏆 Competitive Analysis</a>' : ''}
             <a href="#" onclick="event.preventDefault();closeResourcesMenu();showRoster();" class="res-link">📋 Roster</a>
-            ${isAdmin() ? '<a href="#" onclick="event.preventDefault();closeResourcesMenu();showRecordings();" class="res-link">🎙️ Recordings</a>' : ''}
+            ${(isAdmin() || isManager()) ? '<a href="#" onclick="event.preventDefault();closeResourcesMenu();showRecordings();" class="res-link">🎙️ Recordings</a>' : ''}
             <div id="customLinksSection"></div>
             <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
             <div id="addLinkForm" style="padding:6px 12px;">
@@ -5547,7 +5547,7 @@ window._recSearch = '';      // search filter
 async function showRecordings() {
   trackClick();
   logPageView('Recordings');
-  if (!isAdmin()) { alert('Only admins can access Recordings.'); return; }
+  if (!isAdmin() && !isManager()) { alert('Only admins and managers can access Recordings.'); return; }
 
   const app = document.getElementById('app');
 
