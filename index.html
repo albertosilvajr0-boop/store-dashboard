@@ -5761,19 +5761,15 @@ function _recProcessFile(file) {
       window._recData = rows;
       _recBuildNames();
 
-      // Save to Firestore — per-person documents to avoid 1MB limit
-      if (status) status.innerHTML = '<div style="padding:8px 0;color:var(--muted);font-size:13px;">⏳ Saving to database...</div>';
+      // Save to Firestore — individual writes per person to stay under 10MB request limit
+      if (status) status.innerHTML = '<div style="padding:8px 0;color:var(--muted);font-size:13px;">⏳ Saving to database (0%)...</div>';
 
-      // Delete old documents first (in batches of 400)
+      // Delete old documents first (individually)
       try {
         const oldSnap = await getDocs(collection(db, 'callRecordings'));
-        const oldDocs = [];
-        oldSnap.forEach(d => oldDocs.push(d.ref));
-        for (let di = 0; di < oldDocs.length; di += 400) {
-          const delBatch = writeBatch(db);
-          oldDocs.slice(di, di + 400).forEach(ref => delBatch.delete(ref));
-          await delBatch.commit();
-        }
+        const delRefs = [];
+        oldSnap.forEach(d => delRefs.push(d.ref));
+        for (const ref of delRefs) { await deleteDoc(ref); }
       } catch (e) { console.warn('Could not clear old recordings:', e); }
 
       // Group rows by person name
@@ -5784,31 +5780,38 @@ function _recProcessFile(file) {
         byPerson[name].push(r);
       });
 
-      // Write each person as separate document(s), chunking large sets
-      const CHUNK_SIZE = 300; // rows per document
+      // Build list of documents to write (chunk large per-person sets)
+      const CHUNK_SIZE = 150; // rows per document
       const allDocs = [];
       for (const pName of Object.keys(byPerson)) {
         const pRows = byPerson[pName];
         const safeBase = pName.replace(/[\/\.#$\[\]]/g, '_').substring(0, 90) || 'unknown';
         if (pRows.length <= CHUNK_SIZE) {
-          allDocs.push({ id: safeBase, data: { personName: pName, rows: pRows, uploadedBy: auth.currentUser?.email || '', uploadedAt: serverTimestamp() } });
+          allDocs.push({ id: safeBase, personName: pName, rows: pRows });
         } else {
           for (let c = 0; c < pRows.length; c += CHUNK_SIZE) {
-            const chunkIdx = Math.floor(c / CHUNK_SIZE);
-            allDocs.push({ id: safeBase + '_' + chunkIdx, data: { personName: pName, rows: pRows.slice(c, c + CHUNK_SIZE), uploadedBy: auth.currentUser?.email || '', uploadedAt: serverTimestamp() } });
+            const ci = Math.floor(c / CHUNK_SIZE);
+            allDocs.push({ id: safeBase + '_' + ci, personName: pName, rows: pRows.slice(c, c + CHUNK_SIZE) });
           }
         }
       }
-      // Write in batches of 400 (Firestore limit is 500)
-      for (let i = 0; i < allDocs.length; i += 400) {
-        const batch = writeBatch(db);
-        allDocs.slice(i, i + 400).forEach(d => {
-          batch.set(doc(db, 'callRecordings', d.id), d.data);
+
+      // Write each document individually to avoid request payload limits
+      for (let i = 0; i < allDocs.length; i++) {
+        const d = allDocs[i];
+        await setDoc(doc(db, 'callRecordings', d.id), {
+          personName: d.personName,
+          rows: d.rows,
+          uploadedBy: auth.currentUser?.email || '',
+          uploadedAt: serverTimestamp()
         });
-        await batch.commit();
+        if (i % 5 === 0 && status) {
+          const pct = Math.round(((i + 1) / allDocs.length) * 100);
+          status.innerHTML = `<div style="padding:8px 0;color:var(--muted);font-size:13px;">⏳ Saving to database (${pct}%)...</div>`;
+        }
       }
 
-      // Also save metadata
+      // Save metadata
       await setDoc(doc(db, 'callRecordings', '_meta'), {
         uploadedBy: auth.currentUser?.email || '',
         uploadedAt: serverTimestamp(),
