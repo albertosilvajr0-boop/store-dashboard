@@ -2590,8 +2590,12 @@ async function showPersonDetails(name, type) {
         ${note.opportunities ? `<div style="background:var(--yellowBg);padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:14px;"><strong>Opportunities:</strong> ${note.opportunities}</div>` : ''}
         ${note.coaching ? `<div style="background:#ede9fe;padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:14px;"><strong>Coaching:</strong> ${note.coaching}</div>` : ''}
 
-        <button class="btn" style="margin-top:10px;" onclick="viewCallSheets('${name.replace(/'/g, "\\'")}')">View Call Sheets</button>
-      </div>`;
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+          <button class="btn" onclick="viewCallSheets('${name.replace(/'/g, "\\'")}')">View Call Sheets</button>
+          <button class="btn" id="personRecBtn" style="background:#7c3aed;" onclick="loadPersonRecordings('${name.replace(/'/g, "\\'")}')">View My Calls</button>
+        </div>
+      </div>
+      <div id="personRecordingsSection"></div>`;
   } catch (e) {
     appEl.innerHTML = `
       <div style="padding:60px 20px;text-align:center;">
@@ -2603,6 +2607,92 @@ async function showPersonDetails(name, type) {
       </div>`;
   }
 }
+
+/* ── Person Recordings (under scorecard) ── */
+async function loadPersonRecordings(personName) {
+  const btn = document.getElementById('personRecBtn');
+  const section = document.getElementById('personRecordingsSection');
+  if (!btn || !section) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+
+  try {
+    // Fetch recordings from Firestore for this person
+    const snap = await getDocs(collection(db, 'callRecordings'));
+    let calls = [];
+    snap.forEach(d => {
+      const data = d.data();
+      if (data.rows && Array.isArray(data.rows)) {
+        data.rows.forEach(r => {
+          if ((r.phoneCodeRef || '').trim().toUpperCase() === personName.toUpperCase()) {
+            calls.push(r);
+          }
+        });
+      }
+    });
+
+    // Sort by date descending
+    calls.sort((a, b) => {
+      const dA = _recParseDate(a.date, a.time);
+      const dB = _recParseDate(b.date, b.time);
+      return dB - dA;
+    });
+
+    btn.disabled = false;
+    btn.textContent = `View My Calls (${calls.length})`;
+
+    if (!calls.length) {
+      section.innerHTML = `
+        <div class="detail-card" style="margin-top:12px;">
+          <h3 style="margin:0 0 8px;font-size:16px;">My Calls</h3>
+          <p style="color:var(--muted);text-align:center;padding:20px 0;">No call recordings found for ${personName}.</p>
+        </div>`;
+      return;
+    }
+
+    // Build search/filter UI + call cards
+    window._personRecCalls = calls;
+    window._personRecSearch = '';
+    _renderPersonRecordings(personName);
+  } catch (err) {
+    console.error('Error loading person recordings:', err);
+    btn.disabled = false;
+    btn.textContent = 'View My Calls';
+    section.innerHTML = `<div class="detail-card" style="margin-top:12px;color:#dc2626;">Error loading recordings: ${err.message}</div>`;
+  }
+}
+
+function _renderPersonRecordings(personName) {
+  const section = document.getElementById('personRecordingsSection');
+  if (!section) return;
+  let calls = window._personRecCalls || [];
+  const q = (window._personRecSearch || '').toLowerCase();
+  if (q) {
+    calls = calls.filter(r =>
+      (r.callerName || '').toLowerCase().includes(q) ||
+      (r.callerPhone || '').toLowerCase().includes(q) ||
+      (r.trackingNumber || '').toLowerCase().includes(q) ||
+      (r.disposition || '').toLowerCase().includes(q) ||
+      (r.callTags || '').toLowerCase().includes(q) ||
+      (r.date || '').toLowerCase().includes(q)
+    );
+  }
+
+  section.innerHTML = `
+    <div class="detail-card" style="margin-top:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <h3 style="margin:0;font-size:16px;">My Calls (${calls.length}${q ? ' matching' : ''})</h3>
+        <input type="text" class="rec-search" placeholder="Search calls..." value="${q.replace(/"/g, '&quot;')}" oninput="window._personRecSearch=this.value;_renderPersonRecordings('${personName.replace(/'/g, "\\'")}')" />
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${calls.length ? calls.map(r => _recRenderCallCard(r)).join('') : '<p style="color:var(--muted);text-align:center;padding:20px 0;">No calls match your search.</p>'}
+      </div>
+    </div>`;
+}
+
+window.loadPersonRecordings = loadPersonRecordings;
+window._renderPersonRecordings = _renderPersonRecordings;
 
 /* ══════════════════════════════════════════
    CALL SHEETS VIEW
@@ -2650,6 +2740,7 @@ async function viewCallSheets(name) {
         <div class="topbar-logo">SA</div>
         <div class="topbar-info"><div class="topbar-title">Call Sheets – ${name}</div><div class="topbar-sub">${rows.length} records</div></div>
         <div class="topbar-actions">
+          <button class="topbar-btn manage" id="matchCallsBtn" onclick="matchCallsToLeads('${name.replace(/'/g, "\\'")}');" style="background:#7c3aed;color:#fff;">Match My Calls</button>
           <button class="topbar-btn manage" onclick="showPersonDetails('${name.replace(/'/g, "\\'")}')">← Back to ${name}</button>
           <button class="topbar-btn manage" onclick="showDashboard()">← Dashboard</button>
         </div>
@@ -2668,7 +2759,11 @@ async function viewCallSheets(name) {
             ${rows.length ? trs : '<tr><td colspan="12" style="padding:30px;color:var(--muted);">No call data</td></tr>'}
           </tbody>
         </table>
-      </div>`;
+      </div>
+      <div id="matchedCallsSection"></div>`;
+
+    // Store call sheet rows for matching
+    window._csRows = rows;
   } catch (e) {
     appEl.innerHTML = `
       <div style="padding:60px 20px;text-align:center;">
@@ -2680,6 +2775,147 @@ async function viewCallSheets(name) {
       </div>`;
   }
 }
+
+/* ── Match Calls to Call Sheet Leads ── */
+async function matchCallsToLeads(personName) {
+  const btn = document.getElementById('matchCallsBtn');
+  const section = document.getElementById('matchedCallsSection');
+  if (!btn || !section) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Matching...';
+
+  try {
+    // 1. Build phone map from this person's call sheet
+    const csRows = window._csRows || [];
+    const leadPhones = {};  // normalized phone → lead row
+    csRows.forEach(r => {
+      const norm = _recNormalizePhone(r.phone);
+      if (norm) leadPhones[norm] = r;
+    });
+
+    if (Object.keys(leadPhones).length === 0) {
+      btn.disabled = false;
+      btn.textContent = 'Match My Calls';
+      section.innerHTML = `<div class="detail-card" style="margin-top:12px;"><p style="color:var(--muted);text-align:center;padding:20px 0;">No phone numbers found in call sheet to match against.</p></div>`;
+      return;
+    }
+
+    // 2. Fetch this person's recordings from Firestore
+    const snap = await getDocs(collection(db, 'callRecordings'));
+    let recordings = [];
+    snap.forEach(d => {
+      const data = d.data();
+      if (data.rows && Array.isArray(data.rows)) {
+        data.rows.forEach(r => {
+          if ((r.phoneCodeRef || '').trim().toUpperCase() === personName.toUpperCase()) {
+            recordings.push(r);
+          }
+        });
+      }
+    });
+
+    // 3. Match: find recordings where callerPhone matches a lead's phone
+    const matched = [];
+    recordings.forEach(rec => {
+      const normRecPhone = _recNormalizePhone(rec.callerPhone);
+      if (normRecPhone && leadPhones[normRecPhone]) {
+        matched.push({ recording: rec, lead: leadPhones[normRecPhone] });
+      }
+    });
+
+    // Sort by date descending
+    matched.sort((a, b) => {
+      const dA = _recParseDate(a.recording.date, a.recording.time);
+      const dB = _recParseDate(b.recording.date, b.recording.time);
+      return dB - dA;
+    });
+
+    btn.disabled = false;
+    btn.textContent = `${matched.length} Match${matched.length !== 1 ? 'es' : ''} Found`;
+    btn.style.background = matched.length > 0 ? 'var(--green)' : '#7c3aed';
+
+    if (!matched.length) {
+      section.innerHTML = `
+        <div class="detail-card" style="margin-top:12px;">
+          <h3 style="margin:0 0 8px;font-size:16px;">Matched Calls</h3>
+          <p style="color:var(--muted);text-align:center;padding:20px 0;">No recordings found that match a lead on this call sheet.</p>
+        </div>`;
+      return;
+    }
+
+    // Render matched calls with lead info
+    const cards = matched.map(m => {
+      const r = m.recording;
+      const lead = m.lead;
+      const leadName = (lead.name || 'Unknown').replace(/</g, '&lt;');
+      const leadLink = lead.link
+        ? `<a href="${lead.link.replace(/"/g, '&quot;')}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:6px;font-size:12px;font-weight:600;background:#dbeafe;color:#2563eb;text-decoration:none;border:1px solid #93c5fd;">CRM: ${leadName}</a>`
+        : `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:6px;font-size:12px;font-weight:600;background:#dbeafe;color:#2563eb;border:1px solid #93c5fd;">Lead: ${leadName}</span>`;
+
+      const date = r.date || 'Unknown date';
+      const time = r.time || '';
+      const duration = r.callDuration || '';
+      const callerName = (r.callerName || 'Unknown').replace(/</g, '&lt;');
+      const callerPhone = (r.callerPhone || '').replace(/</g, '&lt;');
+      const disposition = (r.disposition || '').replace(/</g, '&lt;');
+      const dayOfWeek = r.dayOfWeek || '';
+      const audioUrl = (r.audiofile || '').trim();
+      const safeAudio = audioUrl.replace(/"/g, '&quot;');
+      const connected = r.connected === '1' || (r.connected || '').toLowerCase() === 'yes' || (r.connected || '').toLowerCase() === 'true';
+
+      let badge = '';
+      if (r.liveConversation === '1' || (r.liveConversation || '').toLowerCase() === 'yes') {
+        badge = '<span class="rec-badge rec-badge-connected">Live Conversation</span>';
+      } else if (r.leftVoicemail === '1' || (r.leftVoicemail || '').toLowerCase() === 'yes') {
+        badge = '<span class="rec-badge rec-badge-voicemail">Voicemail</span>';
+      } else if (connected) {
+        badge = '<span class="rec-badge rec-badge-connected">Connected</span>';
+      } else if (r.notConnected === '1' || (r.notConnected || '').toLowerCase() === 'yes') {
+        badge = '<span class="rec-badge rec-badge-not-connected">Not Connected</span>';
+      }
+
+      const leadStatus = lead.status ? `<span class="rec-badge" style="background:#f3e8ff;color:#7c3aed;">${lead.status.replace(/</g, '&lt;')}</span>` : '';
+      const leadSource = lead.source ? `<span class="rec-badge" style="background:var(--chipBg);color:var(--text);">${lead.source.replace(/</g, '&lt;')}</span>` : '';
+
+      return `
+        <div class="rec-call-card">
+          <div class="rec-call-info">
+            <div class="rec-call-date">${date}${dayOfWeek ? ' (' + dayOfWeek + ')' : ''}${time ? ' · ' + time : ''}</div>
+            <div class="rec-call-meta">
+              <span><strong>${callerName}</strong></span>
+              ${callerPhone ? '<span>' + callerPhone + '</span>' : ''}
+              ${duration ? '<span>Duration: ' + duration + '</span>' : ''}
+              ${disposition ? '<span>' + disposition + '</span>' : ''}
+            </div>
+            <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">
+              ${leadLink}
+              ${badge}
+              ${leadStatus}
+              ${leadSource}
+            </div>
+          </div>
+          ${audioUrl ? '<a href="' + safeAudio + '" target="_blank" class="rec-play-btn">▶ Listen</a>' : '<span style="font-size:12px;color:var(--muted);">No audio</span>'}
+        </div>`;
+    }).join('');
+
+    section.innerHTML = `
+      <div class="detail-card" style="margin-top:12px;">
+        <h3 style="margin:0 0 12px;font-size:16px;">Matched Calls (${matched.length})</h3>
+        <p style="margin:0 0 12px;font-size:13px;color:var(--muted);">Calls made by ${personName} where the caller phone matches a lead on their call sheet.</p>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${cards}
+        </div>
+      </div>`;
+  } catch (err) {
+    console.error('Match calls error:', err);
+    btn.disabled = false;
+    btn.textContent = 'Match My Calls';
+    section.innerHTML = `<div class="detail-card" style="margin-top:12px;color:#dc2626;">Error matching calls: ${err.message}</div>`;
+  }
+}
+
+window.matchCallsToLeads = matchCallsToLeads;
 
 /* ══════════════════════════════════════════
    USER MANAGEMENT
