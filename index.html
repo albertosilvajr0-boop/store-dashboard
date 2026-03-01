@@ -5571,6 +5571,7 @@ async function showRecordings() {
           <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Call recordings organized by person</p>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
+          <button class="topbar-btn manage" id="recLookupBtn" onclick="recLookupLeads()" style="background:var(--accent);color:#fff;">🔍 Lookup Leads</button>
           <button class="topbar-btn manage" onclick="showDashboard()">← Back</button>
         </div>
       </div>
@@ -5691,6 +5692,19 @@ function _recRenderCallCard(r) {
 
   const safeAudio = audioUrl.replace(/"/g, '&quot;');
 
+  // Check for matched lead
+  const normPhone = _recNormalizePhone(callerPhone);
+  const matchedLead = normPhone ? (window._recLeadMap || {})[normPhone] : null;
+  let leadBadge = '';
+  if (matchedLead && matchedLead.name) {
+    const safeName = matchedLead.name.replace(/</g, '&lt;');
+    if (matchedLead.link) {
+      leadBadge = `<a href="${matchedLead.link.replace(/"/g, '&quot;')}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:6px;font-size:12px;font-weight:600;background:#dbeafe;color:#2563eb;text-decoration:none;border:1px solid #93c5fd;">👤 ${safeName}</a>`;
+    } else {
+      leadBadge = `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:6px;font-size:12px;font-weight:600;background:#dbeafe;color:#2563eb;border:1px solid #93c5fd;">👤 ${safeName}</span>`;
+    }
+  }
+
   return `
     <div class="rec-call-card">
       <div class="rec-call-info">
@@ -5703,6 +5717,7 @@ function _recRenderCallCard(r) {
           ${trackingNum ? '<span>Tracking: ' + trackingNum.replace(/</g, '&lt;') + '</span>' : ''}
         </div>
         <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">
+          ${leadBadge}
           ${badge}
           ${callTags ? callTags.split(',').map(t => '<span class="rec-badge" style="background:var(--chipBg);color:var(--text);">' + t.trim().replace(/</g, '&lt;') + '</span>').join('') : ''}
         </div>
@@ -5917,11 +5932,103 @@ function _recSplitCSVLine(line) {
   return result;
 }
 
+/* ── Lead Lookup for Recordings ── */
+window._recLeadMap = {};  // normalized phone → { name, link }
+
+function _recNormalizePhone(ph) {
+  if (!ph) return '';
+  // Strip everything except digits
+  let digits = ph.replace(/\D/g, '');
+  // Remove leading '1' country code if 11 digits
+  if (digits.length === 11 && digits[0] === '1') digits = digits.substring(1);
+  return digits;
+}
+
+async function recLookupLeads() {
+  const btn = document.getElementById('recLookupBtn');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Looking up…';
+
+  try {
+    // Collect all unique phone numbers from recordings
+    const recPhones = new Set();
+    window._recData.forEach(r => {
+      const norm = _recNormalizePhone(r.callerPhone);
+      if (norm) recPhones.add(norm);
+    });
+
+    if (recPhones.size === 0) {
+      alert('No phone numbers found in recordings.');
+      btn.disabled = false;
+      btn.textContent = '🔍 Lookup Leads';
+      return;
+    }
+
+    // Gather all person names from dashboard data to fetch their call sheets
+    const allNames = new Set();
+    (dashboardData.sales || []).forEach(x => { if (x.name) allNames.add(x.name); });
+    (dashboardData.bdc || []).forEach(x => { if (x.name) allNames.add(x.name); });
+
+    if (allNames.size === 0) {
+      alert('No dashboard data loaded. Please visit the Dashboard first, then return here.');
+      btn.disabled = false;
+      btn.textContent = '🔍 Lookup Leads';
+      return;
+    }
+
+    // Fetch call sheets (leads) from personSnapshots and build phone→lead map
+    const leadMap = {};
+    let fetched = 0;
+    const total = allNames.size;
+
+    for (const personName of allNames) {
+      fetched++;
+      if (fetched % 5 === 0) {
+        btn.textContent = `⏳ ${Math.round(fetched / total * 100)}%…`;
+      }
+      try {
+        const result = await fetchCalls(personName);
+        if (result?.ok) {
+          const calls = result.data?.calls || [];
+          calls.forEach(c => {
+            const norm = _recNormalizePhone(c.phone);
+            if (norm && recPhones.has(norm) && !leadMap[norm]) {
+              leadMap[norm] = { name: c.name || '', link: c.link || '' };
+            }
+          });
+        }
+      } catch (e) { /* skip person if fetch fails */ }
+    }
+
+    window._recLeadMap = leadMap;
+    const matchCount = Object.keys(leadMap).length;
+
+    // Re-render to show matched leads
+    _recRenderContent();
+
+    btn.disabled = false;
+    btn.textContent = `🔍 ${matchCount} Lead${matchCount !== 1 ? 's' : ''} Found`;
+    btn.style.background = matchCount > 0 ? 'var(--green)' : 'var(--accent)';
+
+    setTimeout(() => {
+      btn.textContent = '🔍 Lookup Leads';
+      btn.style.background = 'var(--accent)';
+    }, 4000);
+  } catch (err) {
+    console.error('Lead lookup error:', err);
+    btn.disabled = false;
+    btn.textContent = '🔍 Lookup Leads';
+    alert('Error looking up leads: ' + err.message);
+  }
+}
+
 window.showRecordings = showRecordings;
 window.recSelectPerson = recSelectPerson;
 window.recSearchCalls = recSearchCalls;
 window.recHandleDrop = recHandleDrop;
 window.recFileSelected = recFileSelected;
+window.recLookupLeads = recLookupLeads;
 
 /* ══════════════════════════════════════════
    👔 MANAGER TEAM DASHBOARD
